@@ -1,0 +1,22 @@
+# Dependencies
+/buildchain/node_modules/
+/vendor/
+
+# Build output
+/plugin/src/web/dist/
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.*

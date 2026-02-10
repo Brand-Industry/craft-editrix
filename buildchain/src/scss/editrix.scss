@@ -1,0 +1,955 @@
+@use 'variables' as *;
+
+// ==========================================
+// Editrix Main Styles
+// ==========================================
+
+.editrix {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: $text-primary;
+  
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+}
+
+// ==========================================
+// Layout
+// ==========================================
+
+.editrix-layout {
+  display: flex;
+  min-height: calc(100vh - 100px);
+  margin: -24px;
+  
+  &__sidebar {
+    width: $sidebar-width;
+    background: $bg-sidebar;
+    border-right: 1px solid $border-color;
+    padding: $spacing-lg;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+  
+  &__main {
+    flex: 1;
+    padding: $spacing-lg;
+    overflow-y: auto;
+    background: $bg-page;
+  }
+}
+
+// ==========================================
+// Buttons
+// ==========================================
+
+.editrix-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  border: none;
+  border-radius: $radius-md;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all $transition-fast;
+  text-decoration: none;
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  &--primary {
+    background: $secondary;
+    color: $text-inverse;
+    
+    &:hover:not(:disabled) {
+      background: $secondary-hover;
+    }
+  }
+  
+  &--secondary {
+    background: $gray-100;
+    color: $text-primary;
+    
+    &:hover:not(:disabled) {
+      background: $gray-200;
+    }
+  }
+  
+  &--danger {
+    background: $danger;
+    color: $text-inverse;
+    
+    &:hover:not(:disabled) {
+      background: darken($danger, 10%);
+    }
+  }
+  
+  &--ghost {
+    background: transparent;
+    color: $text-secondary;
+    
+    &:hover:not(:disabled) {
+      background: $gray-100;
+      color: $text-primary;
+    }
+  }
+  
+  &--sm {
+    padding: $spacing-xs $spacing-sm;
+    font-size: 12px;
+  }
+  
+  &--lg {
+    padding: $spacing-md $spacing-lg;
+    font-size: 16px;
+  }
+}
+
+// ==========================================
+// Form Elements
+// ==========================================
+
+.editrix-form {
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+  
+  &__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $spacing-lg;
+    margin-bottom: $spacing-lg;
+  }
+  
+  &__group {
+    margin-bottom: $spacing-md;
+  }
+  
+  &__label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: $spacing-xs;
+    color: $text-primary;
+  }
+  
+  &__input,
+  &__textarea {
+    width: 100%;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid $border-color;
+    border-radius: $radius-md;
+    font-size: 14px;
+    transition: border-color $transition-fast, box-shadow $transition-fast;
+    background: $bg-input;
+    
+    &:focus {
+      outline: none;
+      border-color: $secondary;
+      box-shadow: 0 0 0 3px rgba($secondary, 0.1);
+    }
+    
+    &::placeholder {
+      color: $text-muted;
+    }
+  }
+  
+  &__textarea {
+    min-height: 100px;
+    resize: vertical;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+  }
+  
+  &__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-lg;
+    padding-top: $spacing-md;
+    border-top: 1px solid $border-color;
+  }
+  
+  &__checkbox {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    cursor: pointer;
+    
+    input {
+      width: 16px;
+      height: 16px;
+      accent-color: $secondary;
+    }
+  }
+  
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: $spacing-lg;
+    margin-top: $spacing-lg;
+    border-top: 1px solid $border-color;
+  }
+  
+  &__warning {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    color: $warning;
+    font-size: 13px;
+  }
+}
+
+// Toggle switch
+.editrix-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-sm;
+  cursor: pointer;
+  
+  input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  &__track {
+    width: 40px;
+    height: 22px;
+    background: $gray-300;
+    border-radius: 11px;
+    position: relative;
+    transition: background $transition-fast;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform $transition-fast;
+      box-shadow: $shadow-sm;
+    }
+  }
+  
+  input:checked + &__track {
+    background: $secondary;
+    
+    &::after {
+      transform: translateX(18px);
+    }
+  }
+}
+
+// ==========================================
+// Sidebar
+// ==========================================
+
+.editrix-sidebar {
+  &__section {
+    margin-bottom: $spacing-lg;
+  }
+  
+  &__title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: $text-muted;
+    margin-bottom: $spacing-sm;
+  }
+  
+  &__nav {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  &__nav-item {
+    margin-bottom: $spacing-xs;
+    
+    button {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+      width: 100%;
+      padding: $spacing-sm $spacing-md;
+      border: none;
+      background: transparent;
+      border-radius: $radius-md;
+      color: $text-primary;
+      cursor: pointer;
+      transition: all $transition-fast;
+      text-align: left;
+      
+      &:hover {
+        background: $gray-100;
+      }
+      
+      &.is-active {
+        background: $info-light;
+        color: $secondary;
+      }
+    }
+  }
+  
+  &__counter {
+    margin-left: auto;
+    background: $gray-200;
+    color: $text-secondary;
+    padding: 2px $spacing-sm;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+}
+
+// Scope filters
+.editrix-scope {
+  &__group {
+    margin-bottom: $spacing-md;
+    border: 1px solid $border-color;
+    border-radius: $radius-md;
+    overflow: hidden;
+  }
+  
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-sm $spacing-md;
+    background: $gray-50;
+    cursor: pointer;
+    user-select: none;
+    
+    &:hover {
+      background: $gray-100;
+    }
+  }
+  
+  &__toggle {
+    width: 16px;
+    height: 16px;
+    transition: transform $transition-fast;
+    color: $text-muted;
+    
+    &.is-open {
+      transform: rotate(90deg);
+    }
+  }
+  
+  &__content {
+    padding: $spacing-sm $spacing-md;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-xs 0;
+    
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: $secondary;
+    }
+    
+    label {
+      cursor: pointer;
+      flex: 1;
+      font-size: 13px;
+    }
+  }
+}
+
+// Selection summary
+.editrix-selection {
+  background: $gray-100;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  margin-top: $spacing-lg;
+  
+  &__title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: $text-muted;
+    margin-bottom: $spacing-sm;
+  }
+  
+  &__stat {
+    display: flex;
+    justify-content: space-between;
+    padding: $spacing-xs 0;
+    font-size: 13px;
+    
+    &-value {
+      font-weight: 600;
+    }
+  }
+}
+
+// ==========================================
+// Results Table
+// ==========================================
+
+.editrix-results {
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: $radius-lg;
+  overflow: hidden;
+  
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-md $spacing-lg;
+    border-bottom: 1px solid $border-color;
+    background: $gray-50;
+  }
+  
+  &__title {
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+  
+  &__count {
+    background: $secondary;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+  }
+  
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    
+    th, td {
+      padding: $spacing-md;
+      text-align: left;
+      border-bottom: 1px solid $border-color;
+    }
+    
+    th {
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: $text-secondary;
+      background: $gray-50;
+    }
+    
+    tbody tr {
+      cursor: pointer;
+      
+      &:hover td {
+        background: $gray-50;
+      }
+      
+      &.is-selected td {
+        background: $info-light;
+      }
+    }
+  }
+  
+  &__checkbox {
+    width: 40px;
+    
+    input {
+      width: 16px;
+      height: 16px;
+      accent-color: $secondary;
+    }
+  }
+  
+  &__element {
+    &-title {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    
+    &-meta {
+      font-size: 12px;
+      color: $text-muted;
+    }
+  }
+  
+  &__field {
+    font-size: 13px;
+    color: $text-secondary;
+  }
+  
+  &__preview {
+    max-width: 300px;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: $text-secondary;
+    
+    .match {
+      background: $diff-highlight;
+      padding: 1px 3px;
+      border-radius: 2px;
+      color: $text-primary;
+    }
+  }
+  
+  &__empty {
+    padding: $spacing-2xl;
+    text-align: center;
+    color: $text-muted;
+    
+    &-icon {
+      font-size: 48px;
+      margin-bottom: $spacing-md;
+    }
+  }
+  
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-md $spacing-lg;
+    background: $gray-50;
+    border-top: 1px solid $border-color;
+  }
+  
+  &__selection-info {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    font-size: 13px;
+    color: $text-secondary;
+    
+    strong {
+      color: $secondary;
+      font-weight: 600;
+    }
+  }
+}
+
+// ==========================================
+// Diff Preview Slideout
+// ==========================================
+
+.editrix-diff {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 500px;
+  height: 100vh;
+  background: $bg-card;
+  box-shadow: $shadow-xl;
+  z-index: $z-modal;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform $transition-normal;
+  
+  &.is-open {
+    transform: translateX(0);
+  }
+  
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: $spacing-lg;
+    border-bottom: 1px solid $border-color;
+  }
+  
+  &__title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 $spacing-xs 0;
+  }
+  
+  &__subtitle {
+    font-size: 13px;
+    color: $text-muted;
+  }
+  
+  &__close {
+    background: none;
+    border: none;
+    padding: $spacing-xs;
+    cursor: pointer;
+    color: $text-muted;
+    font-size: 20px;
+    
+    &:hover {
+      color: $text-primary;
+    }
+  }
+  
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    padding: $spacing-lg;
+  }
+  
+  &__section {
+    margin-bottom: $spacing-lg;
+    
+    &-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: $spacing-sm;
+    }
+    
+    &-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: $text-muted;
+      margin: 0;
+    }
+  }
+  
+  &__badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    
+    &--remove {
+      background: $danger-light;
+      color: $diff-remove-text;
+    }
+    
+    &--add {
+      background: $success-light;
+      color: $diff-add-text;
+    }
+  }
+  
+  &__text {
+    background: $gray-50;
+    border: 1px solid $border-color;
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    
+    .diff-remove {
+      background: $diff-remove-bg;
+      color: $diff-remove-text;
+      text-decoration: line-through;
+    }
+    
+    .diff-add {
+      background: $diff-add-bg;
+      color: $diff-add-text;
+    }
+  }
+  
+  &__arrow {
+    display: flex;
+    justify-content: center;
+    padding: $spacing-md 0;
+    color: $text-muted;
+    font-size: 20px;
+  }
+  
+  &__notice {
+    background: $info-light;
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    display: flex;
+    gap: $spacing-sm;
+    font-size: 13px;
+    color: $secondary;
+    margin-top: $spacing-lg;
+  }
+  
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $spacing-sm;
+    padding: $spacing-lg;
+    border-top: 1px solid $border-color;
+  }
+}
+
+// Backdrop
+.editrix-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: $z-modal-backdrop;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity $transition-normal, visibility $transition-normal;
+  
+  &.is-visible {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+// ==========================================
+// Modal
+// ==========================================
+
+.editrix-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: $z-modal;
+  padding: $spacing-lg;
+  
+  &__backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  
+  &__content {
+    position: relative;
+    background: $bg-card;
+    border-radius: $radius-lg;
+    box-shadow: $shadow-xl;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: auto;
+  }
+  
+  &__header {
+    padding: $spacing-lg;
+    border-bottom: 1px solid $border-color;
+  }
+  
+  &__title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+  }
+  
+  &__body {
+    padding: $spacing-lg;
+  }
+  
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $spacing-sm;
+    padding: $spacing-lg;
+    border-top: 1px solid $border-color;
+  }
+  
+  &__warning {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-sm;
+    background: $warning-light;
+    color: darken($warning, 20%);
+    padding: $spacing-md;
+    border-radius: $radius-md;
+    margin-bottom: $spacing-md;
+  }
+}
+
+// ==========================================
+// Loading States
+// ==========================================
+
+.editrix-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-2xl;
+  color: $text-muted;
+  
+  &__spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid $gray-200;
+    border-top-color: $secondary;
+    border-radius: 50%;
+    animation: editrix-spin 0.8s linear infinite;
+  }
+  
+  &__text {
+    margin-top: $spacing-md;
+  }
+}
+
+@keyframes editrix-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ==========================================
+// Badges & Tags
+// ==========================================
+
+.editrix-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  
+  &--success {
+    background: $success-light;
+    color: darken($success, 20%);
+  }
+  
+  &--warning {
+    background: $warning-light;
+    color: darken($warning, 20%);
+  }
+  
+  &--danger {
+    background: $danger-light;
+    color: darken($danger, 10%);
+  }
+  
+  &--info {
+    background: $info-light;
+    color: darken($info, 20%);
+  }
+  
+  &--neutral {
+    background: $gray-200;
+    color: $text-secondary;
+  }
+}
+
+.editrix-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: $gray-100;
+  border-radius: $radius-md;
+  font-size: 12px;
+  
+  &__remove {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: $text-muted;
+    font-size: 14px;
+    line-height: 1;
+    
+    &:hover {
+      color: $danger;
+    }
+  }
+}
+
+// ==========================================
+// Upgrade Notice
+// ==========================================
+
+.editrix-upgrade {
+  background: linear-gradient(135deg, $secondary 0%, darken($secondary, 15%) 100%);
+  color: white;
+  padding: $spacing-md;
+  border-radius: $radius-md;
+  margin-top: $spacing-lg;
+  
+  &__title {
+    font-weight: 600;
+    margin-bottom: $spacing-xs;
+  }
+  
+  &__text {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-bottom: $spacing-sm;
+  }
+  
+  &__btn {
+    background: white;
+    color: $secondary;
+    padding: $spacing-xs $spacing-md;
+    border-radius: $radius-sm;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-block;
+    
+    &:hover {
+      background: $gray-100;
+    }
+  }
+}
+
+// ==========================================
+// Environment Indicator
+// ==========================================
+
+.editrix-env {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-sm;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  
+  &--production {
+    background: $danger-light;
+    color: $danger;
+  }
+  
+  &--staging {
+    background: $warning-light;
+    color: darken($warning, 10%);
+  }
+  
+  &--dev {
+    background: $success-light;
+    color: darken($success, 10%);
+  }
+}

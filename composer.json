@@ -1,0 +1,53 @@
+{
+  "name": "brand-industry/craft-editrix",
+  "description": "The safest way to update content at scale in Craft CMS. Advanced search & replace with visual diff, dry-run, logs, and rollback.",
+  "version": "1.0.0",
+  "type": "craft-plugin",
+  "license": "proprietary",
+  "keywords": [
+    "craftcms",
+    "craft",
+    "search",
+    "replace",
+    "find",
+    "content",
+    "bulk",
+    "editrix"
+  ],
+  "authors": [
+    {
+      "name": "Brand Industry",
+      "email": "lalonso@tbi.com.mx",
+      "homepage": "https://thebrandindustry.com/"
+    },
+    {
+      "name": "Lucas A Alonso Cruz",
+      "email": "lalonso.dev@gmail.com",
+      "homepage": "https://useralberto.github.io/"
+    }
+  ],
+  "support": {
+    "email": "lalonso@tbi.com.mx",
+    "docs": "https://github.com/brand-industry/craft-editrix"
+  },
+  "require": {
+    "php": "^8.0.2",
+    "craftcms/cms": "^4.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "brandindustry\\editrix\\": "plugin/src/"
+    }
+  },
+  "extra": {
+    "name": "Editrix",
+    "handle": "editrix",
+    "hasCpSettings": true,
+    "hasCpSection": true,
+    "class": "brandindustry\\editrix\\Editrix",
+    "developer": "Brand Industry",
+    "developerUrl": "https://tbi.com.mx",
+    "documentationUrl": "https://github.com/brand-industry/craft-editrix",
+    "changelogUrl": "https://github.com/brand-industry/craft-editrix/blob/main/CHANGELOG.md"
+  }
+}

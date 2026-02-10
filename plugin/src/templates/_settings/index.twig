@@ -1,0 +1,104 @@
+{% import "_includes/forms" as forms %}
+
+<h2>{{ "License"|t('editrix') }}</h2>
+
+{{ forms.textField({
+    label: "License Key"|t('editrix'),
+    instructions: "Enter your Editrix license key for Standard or Pro features."|t('editrix'),
+    id: 'licenseKey',
+    name: 'licenseKey',
+    value: settings.licenseKey,
+    placeholder: "STD-XXXX-XXXX-XXXX or PRO-XXXX-XXXX-XXXX",
+}) }}
+
+<p class="light">
+    {{ "Current edition:"|t('editrix') }} <strong>{{ edition|capitalize }}</strong>
+    {% if edition == 'lite' %}
+        — <a href="https://editrix.dev/pricing" target="_blank">{{ "Upgrade"|t('editrix') }}</a>
+    {% endif %}
+</p>
+
+<hr>
+
+<h2>{{ "Search Defaults"|t('editrix') }}</h2>
+
+{{ forms.checkboxField({
+    label: "Search in Entries"|t('editrix'),
+    id: 'searchEntries',
+    name: 'searchEntries',
+    checked: settings.searchEntries,
+}) }}
+
+{{ forms.checkboxField({
+    label: "Search in Globals"|t('editrix'),
+    id: 'searchGlobals',
+    name: 'searchGlobals',
+    checked: settings.searchGlobals,
+}) }}
+
+{{ forms.checkboxField({
+    label: "Search in Matrix fields"|t('editrix'),
+    instructions: "Requires Standard or Pro edition"|t('editrix'),
+    id: 'searchMatrix',
+    name: 'searchMatrix',
+    checked: settings.searchMatrix,
+    disabled: edition == 'lite',
+}) }}
+
+{{ forms.checkboxField({
+    label: "Search in Categories"|t('editrix'),
+    instructions: "Requires Standard or Pro edition"|t('editrix'),
+    id: 'searchCategories',
+    name: 'searchCategories',
+    checked: settings.searchCategories,
+    disabled: edition == 'lite',
+}) }}
+
+<hr>
+
+<h2>{{ "Logs"|t('editrix') }}</h2>
+
+{{ forms.textField({
+    label: "Log Retention (days)"|t('editrix'),
+    instructions: "How long to keep operation logs. Limited by your edition (Lite: 7, Standard: 30, Pro: 90)."|t('editrix'),
+    id: 'logRetentionDays',
+    name: 'logRetentionDays',
+    value: settings.logRetentionDays,
+    type: 'number',
+    min: 1,
+    max: 365,
+    size: 5,
+}) }}
+
+<hr>
+
+<h2>{{ "Safety"|t('editrix') }}</h2>
+
+{{ forms.textField({
+    label: "Bulk Confirmation Threshold"|t('editrix'),
+    instructions: "Require extra confirmation when replacing more than this many entries."|t('editrix'),
+    id: 'bulkConfirmationThreshold',
+    name: 'bulkConfirmationThreshold',
+    value: settings.bulkConfirmationThreshold,
+    type: 'number',
+    min: 1,
+    size: 5,
+}) }}
+
+{{ forms.checkboxField({
+    label: "Show Environment Indicator"|t('editrix'),
+    instructions: "Display current environment (production/staging/dev) in the UI."|t('editrix'),
+    id: 'showEnvironmentIndicator',
+    name: 'showEnvironmentIndicator',
+    checked: settings.showEnvironmentIndicator,
+    disabled: edition == 'lite',
+}) }}
+
+{{ forms.checkboxField({
+    label: "Production Safe Mode"|t('editrix'),
+    instructions: "Require confirmation code before replacing in production environment."|t('editrix'),
+    id: 'productionSafeMode',
+    name: 'productionSafeMode',
+    checked: settings.productionSafeMode,
+    disabled: edition != 'pro',
+}) }}
