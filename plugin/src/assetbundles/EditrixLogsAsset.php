@@ -2,17 +2,17 @@
 
 namespace brandindustry\editrix\assetbundles;
 
-class EditrixAsset extends BaseEditrixAsset
+class EditrixLogsAsset extends BaseEditrixAsset
 {
     protected function cssFiles(): array
     {
         return [
-            'css/editrix.css',
+            'css/editrix-logs.css',
         ];
     }
 
     protected function jsFile(): ?string
     {
-        return 'editrix.js';
+        return 'editrix-logs.js';
     }
 }

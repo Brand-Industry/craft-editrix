@@ -23,53 +23,42 @@ class SearchResult extends Model
     public ?string $parentTitle = null;
     public ?string $blockTypeHandle = null;
 
-    /**
-     * Get CP edit URL for this element
-     */
     public function getCpEditUrl(): string
     {
-        return match($this->elementType) {
-            'entry' => "entries/{$this->sectionHandle}/{$this->elementId}",
-            'global' => "globals/{$this->siteHandle}/{$this->sectionHandle}",
-            'matrixBlock' => "entries/{$this->sectionHandle}/{$this->parentId}",
-            'category' => "categories/{$this->sectionHandle}/{$this->elementId}",
-            default => '#',
+        return match ($this->elementType) {
+            "entry" => "entries/{$this->sectionHandle}/{$this->elementId}",
+            "global" => "globals/{$this->siteHandle}/{$this->sectionHandle}",
+            "matrixBlock" => "entries/{$this->sectionHandle}/{$this->parentId}",
+            "category"
+                => "categories/{$this->sectionHandle}/{$this->elementId}",
+            default => "#",
         };
     }
 
-    /**
-     * Get unique key for this result
-     */
     public function getUniqueKey(): string
     {
         return "{$this->elementType}_{$this->elementId}_{$this->fieldHandle}_{$this->matchStart}_{$this->siteId}";
     }
 
-    /**
-     * Get icon for element type
-     */
     public function getTypeIcon(): string
     {
-        return match($this->elementType) {
-            'entry' => 'file-text',
-            'global' => 'globe',
-            'matrixBlock' => 'grid',
-            'category' => 'folder',
-            default => 'file',
+        return match ($this->elementType) {
+            "entry" => "file-text",
+            "global" => "globe",
+            "matrixBlock" => "grid",
+            "category" => "folder",
+            default => "file",
         };
     }
 
-    /**
-     * Get label for element type
-     */
     public function getTypeLabel(): string
     {
-        return match($this->elementType) {
-            'entry' => 'Entry',
-            'global' => 'Global',
-            'matrixBlock' => 'Matrix Block',
-            'category' => 'Category',
-            default => 'Element',
+        return match ($this->elementType) {
+            "entry" => "Entry",
+            "global" => "Global",
+            "matrixBlock" => "Matrix Block",
+            "category" => "Category",
+            default => "Element",
         };
     }
 }

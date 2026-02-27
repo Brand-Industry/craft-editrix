@@ -6,36 +6,35 @@ Editrix is an advanced search & replace plugin that lets you find and update con
 
 ## Features
 
-- 🔍 **Powerful Search** - Find text across entries, globals, Matrix fields, and more
-- 👁️ **Visual Diff Preview** - See exactly what will change before you commit
-- 🔒 **Safe by Default** - Dry-run mode, confirmation dialogs, and environment warnings
-- 📝 **Complete History** - Every operation is logged with full rollback capability
-- 🌐 **Multi-Site Ready** - Search across all sites or filter by specific ones
-- 🎯 **Scope Filters** - Target specific sections, fields, or entry types
-- ⚡ **Fast & Efficient** - Update thousands of entries in seconds
+- **Powerful Search** - Find text across entries, globals, Matrix fields, and more
+- **Visual Diff Preview** - See exactly what will change before you commit
+- **Safe by Default** - Dry-run mode, confirmation dialogs, and environment warnings
+- **Complete History** - Every operation is logged with full rollback capability
+- **Multi-Site Ready** - Search across all sites or filter by specific ones
+- **Scope Filters** - Target specific sections, fields, or entry types
+- **Fast & Efficient** - Update thousands of entries in seconds
 
 ## Editions
 
-| Feature | Lite (Free) | Standard | Pro |
-|---------|:-----------:|:--------:|:---:|
-| Search Entries & Globals | ✅ | ✅ | ✅ |
-| Basic Replace | ✅ | ✅ | ✅ |
-| Case Insensitive | ✅ | ✅ | ✅ |
-| Logs & Revert | 7 days | 30 days | 90 days |
-| Matrix Fields | - | ✅ | ✅ |
-| Categories | - | ✅ | ✅ |
-| Regex Support | - | ✅ | ✅ |
-| Whole Words | - | ✅ | ✅ |
-| Multi-Site | - | ✅ | ✅ |
-| Scope Filters | - | Sections, Sites | Full |
-| Diff Preview | - | Text | Visual |
-| Dry Run Mode | - | ✅ | ✅ |
-| Export Logs | - | CSV | CSV + JSON |
-| Presets | - | 5 | Unlimited |
-| Protected Fields | - | - | ✅ |
-| CLI Commands | - | - | ✅ |
-| API & Webhooks | - | - | ✅ |
-| Monthly Operations | 50 | Unlimited | Unlimited |
+| Feature | Standard | Pro |
+|---------|:--------:|:---:|
+| Search Entries & Globals | ✅ | ✅ |
+| Basic Replace | ✅ | ✅ |
+| Case Insensitive | ✅ | ✅ |
+| Logs & Revert | 30 days | 90 days |
+| Matrix Fields | ✅ | ✅ |
+| Categories | ✅ | ✅ |
+| Regex Support | ✅ | ✅ |
+| Whole Words | ✅ | ✅ |
+| Multi-Site | ✅ | ✅ |
+| Scope Filters | Sections, Sites | Full |
+| Diff Preview | Text | Visual |
+| Dry Run Mode | ✅ | ✅ |
+| Export Logs | CSV | CSV + JSON |
+| Presets | 5 | Unlimited |
+| Protected Fields | - | ✅ |
+| CLI Commands | - | ✅ |
+| API & Webhooks | - | ✅ |
 
 ## Requirements
 
@@ -70,11 +69,10 @@ Then install the plugin from **Settings → Plugins** or run:
 
 ## License
 
-Editrix Lite is free to use. Standard and Pro editions require a license.
+Editrix is available in Standard and Pro editions.
 
 - Standard: $59/project
 - Pro: $149/project
 
 Purchase at [editrix.dev](https://editrix.dev)
-
 

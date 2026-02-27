@@ -1,8 +1,8 @@
-{% extends "_layouts/cp" %}
+{% extends "editrix/_layouts/base" %}
 
-{% set title = "Editrix - History"|t('editrix') %}
+{% set title = "Editrix - Logs & History"|t('editrix') %}
 {% set selectedSubnavItem = 'logs' %}
 
-{% block content %}
-<div id="editrix-app"></div>
+{% block pluginContent %}
+<div id="editrix-logs-app"></div>
 {% endblock %}

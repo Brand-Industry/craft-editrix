@@ -13,9 +13,6 @@ use brandindustry\editrix\Editrix;
 
 class ReplaceService extends Component
 {
-    /**
-     * Execute replacements
-     */
     public function replace(
         array $results,
         string $searchQuery,
@@ -27,21 +24,20 @@ class ReplaceService extends Component
         $replacements = [];
         $processedElements = [];
 
-        // Group by element to avoid multiple saves
         foreach ($results as $result) {
-            $key = "{$result['elementType']}_{$result['elementId']}_{$result['fieldHandle']}";
+            $key = "{$result["elementType"]}_{$result["elementId"]}_{$result["fieldHandle"]}";
 
             if (!isset($processedElements[$key])) {
                 $processedElements[$key] = [
-                    'result' => $result,
-                    'oldValue' => $result['fieldValue'],
+                    "result" => $result,
+                    "oldValue" => $result["fieldValue"],
                 ];
             }
         }
 
         foreach ($processedElements as $data) {
-            $result = $data['result'];
-            $oldValue = $data['oldValue'];
+            $result = $data["result"];
+            $oldValue = $data["oldValue"];
 
             $newValue = $this->performReplacement(
                 $oldValue,
@@ -60,16 +56,16 @@ class ReplaceService extends Component
 
             if ($saved) {
                 $replacements[] = [
-                    'elementType' => $result['elementType'],
-                    'elementId' => $result['elementId'],
-                    'elementTitle' => $result['elementTitle'],
-                    'sectionHandle' => $result['sectionHandle'],
-                    'fieldHandle' => $result['fieldHandle'],
-                    'fieldName' => $result['fieldName'] ?? '',
-                    'oldValue' => $oldValue,
-                    'newValue' => $newValue,
-                    'siteId' => $result['siteId'],
-                    'parentId' => $result['parentId'] ?? null,
+                    "elementType" => $result["elementType"],
+                    "elementId" => $result["elementId"],
+                    "elementTitle" => $result["elementTitle"],
+                    "sectionHandle" => $result["sectionHandle"],
+                    "fieldHandle" => $result["fieldHandle"],
+                    "fieldName" => $result["fieldName"] ?? "",
+                    "oldValue" => $oldValue,
+                    "newValue" => $newValue,
+                    "siteId" => $result["siteId"],
+                    "parentId" => $result["parentId"] ?? null,
                 ];
             }
         }
@@ -77,9 +73,6 @@ class ReplaceService extends Component
         return $replacements;
     }
 
-    /**
-     * Perform text replacement
-     */
     private function performReplacement(
         string $value,
         string $query,
@@ -89,14 +82,14 @@ class ReplaceService extends Component
         bool $wholeWords
     ): string {
         if ($useRegex) {
-            $flags = $caseSensitive ? '' : 'i';
+            $flags = $caseSensitive ? "" : "i";
             $pattern = "/{$query}/{$flags}";
             return @preg_replace($pattern, $replaceWith, $value) ?? $value;
         }
 
         if ($wholeWords) {
-            $escapedQuery = preg_quote($query, '/');
-            $flags = $caseSensitive ? '' : 'i';
+            $escapedQuery = preg_quote($query, "/");
+            $flags = $caseSensitive ? "" : "i";
             $pattern = "/\\b{$escapedQuery}\\b/{$flags}u";
             return preg_replace($pattern, $replaceWith, $value);
         }
@@ -105,13 +98,10 @@ class ReplaceService extends Component
             return str_replace($query, $replaceWith, $value);
         }
 
-        $pattern = '/' . preg_quote($query, '/') . '/i';
+        $pattern = "/" . preg_quote($query, "/") . "/i";
         return preg_replace($pattern, $replaceWith, $value);
     }
 
-    /**
-     * Save field value to element
-     */
     private function saveElementField(array $result, string $newValue): bool
     {
         try {
@@ -121,61 +111,122 @@ class ReplaceService extends Component
                 return false;
             }
 
-            $element->setFieldValue($result['fieldHandle'], $newValue);
+            $element->setFieldValue($result["fieldHandle"], $newValue);
 
-            if ($result['elementType'] === 'matrixBlock' && isset($result['parentId'])) {
+            if (
+                $result["elementType"] === "matrixBlock" &&
+                isset($result["parentId"])
+            ) {
                 $parentEntry = Entry::find()
-                    ->id($result['parentId'])
-                    ->siteId($result['siteId'])
+                    ->id($result["parentId"])
+                    ->siteId($result["siteId"])
                     ->status(null)
                     ->one();
 
                 if ($parentEntry) {
-                    return Craft::$app->getElements()->saveElement($parentEntry);
+                    return Craft::$app
+                        ->getElements()
+                        ->saveElement($parentEntry);
                 }
                 return false;
             }
 
             return Craft::$app->getElements()->saveElement($element);
-
         } catch (\Throwable $e) {
-            Craft::error("Editrix: Failed to save element - " . $e->getMessage(), __METHOD__);
+            Craft::error(
+                "Editrix: Failed to save element - " . $e->getMessage(),
+                __METHOD__
+            );
             return false;
         }
     }
 
-    /**
-     * Get element by result data
-     */
     private function getElement(array $result): mixed
     {
-        return match($result['elementType']) {
-            'entry' => Entry::find()
-                ->id($result['elementId'])
-                ->siteId($result['siteId'])
+        return match ($result["elementType"]) {
+            "entry" => Entry::find()
+                ->id($result["elementId"])
+                ->siteId($result["siteId"])
                 ->status(null)
                 ->drafts(false)
                 ->revisions(false)
                 ->one(),
-            'global' => GlobalSet::find()
-                ->id($result['elementId'])
-                ->siteId($result['siteId'])
+            "global" => GlobalSet::find()
+                ->id($result["elementId"])
+                ->siteId($result["siteId"])
                 ->one(),
-            'matrixBlock' => MatrixBlock::find()
-                ->id($result['elementId'])
-                ->siteId($result['siteId'])
+            "matrixBlock" => MatrixBlock::find()
+                ->id($result["elementId"])
+                ->siteId($result["siteId"])
                 ->one(),
-            'category' => Category::find()
-                ->id($result['elementId'])
-                ->siteId($result['siteId'])
+            "category" => Category::find()
+                ->id($result["elementId"])
+                ->siteId($result["siteId"])
                 ->one(),
             default => null,
         };
     }
 
     /**
-     * Revert a replacement
+     * Validate whether a revert is safe (content hasn't changed since replacement)
+     *
+     * Returns an array of discrepancies for each replacement:
+     * - 'safe' = current value matches newValue, revert is clean
+     * - 'modified' = current value was changed after the replacement
+     * - 'missing' = element no longer exists
      */
+    public function validateRevert(array $replacements): array
+    {
+        $results = [];
+
+        foreach ($replacements as $i => $replacement) {
+            $element = $this->getElement($replacement);
+
+            if (!$element) {
+                $results[] = [
+                    "index" => $i,
+                    "status" => "missing",
+                    "elementId" => $replacement["elementId"],
+                    "elementTitle" =>
+                        $replacement["elementTitle"] ?? "(unknown)",
+                    "fieldHandle" => $replacement["fieldHandle"],
+                ];
+                continue;
+            }
+
+            $currentValue = (string) $element->getFieldValue(
+                $replacement["fieldHandle"]
+            );
+            $expectedValue = (string) ($replacement["newValue"] ?? "");
+
+            if ($currentValue === $expectedValue) {
+                $results[] = [
+                    "index" => $i,
+                    "status" => "safe",
+                    "elementId" => $replacement["elementId"],
+                    "elementTitle" =>
+                        $replacement["elementTitle"] ??
+                        ($element->title ?? "(unknown)"),
+                    "fieldHandle" => $replacement["fieldHandle"],
+                ];
+            } else {
+                $results[] = [
+                    "index" => $i,
+                    "status" => "modified",
+                    "elementId" => $replacement["elementId"],
+                    "elementTitle" =>
+                        $replacement["elementTitle"] ??
+                        ($element->title ?? "(unknown)"),
+                    "fieldHandle" => $replacement["fieldHandle"],
+                    "expectedValue" => mb_substr($expectedValue, 0, 100),
+                    "currentValue" => mb_substr($currentValue, 0, 100),
+                ];
+            }
+        }
+
+        return $results;
+    }
+
     public function revert(array $replacement): bool
     {
         try {
@@ -185,25 +236,37 @@ class ReplaceService extends Component
                 return false;
             }
 
-            $element->setFieldValue($replacement['fieldHandle'], $replacement['oldValue']);
+            $element->setFieldValue(
+                $replacement["fieldHandle"],
+                $replacement["oldValue"]
+            );
 
-            if ($replacement['elementType'] === 'matrixBlock' && isset($replacement['parentId'])) {
+            if (
+                $replacement["elementType"] === "matrixBlock" &&
+                isset($replacement["parentId"])
+            ) {
                 $parentEntry = Entry::find()
-                    ->id($replacement['parentId'])
-                    ->siteId($replacement['siteId'])
+                    ->id($replacement["parentId"])
+                    ->siteId($replacement["siteId"])
                     ->status(null)
+                    ->drafts(false)
+                    ->revisions(false)
                     ->one();
 
                 if ($parentEntry) {
-                    return Craft::$app->getElements()->saveElement($parentEntry);
+                    return Craft::$app
+                        ->getElements()
+                        ->saveElement($parentEntry);
                 }
                 return false;
             }
 
             return Craft::$app->getElements()->saveElement($element);
-
         } catch (\Throwable $e) {
-            Craft::error("Editrix: Failed to revert - " . $e->getMessage(), __METHOD__);
+            Craft::error(
+                "Editrix: Failed to revert - " . $e->getMessage(),
+                __METHOD__
+            );
             return false;
         }
     }

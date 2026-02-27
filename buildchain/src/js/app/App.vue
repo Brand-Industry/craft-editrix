@@ -1,7 +1,6 @@
 <template>
   <div class="editrix">
     <div class="editrix-layout">
-      <!-- Sidebar (Standard+) -->
       <aside v-if="hasFeature('scopeFilters')" class="editrix-layout__sidebar">
         <ScopeFilters
           v-model:sections="searchParams.sections"
@@ -9,37 +8,32 @@
           v-model:fields="searchParams.fields"
           v-model:entry-types="searchParams.entryTypes"
         />
-        
+
         <SelectionSummary
           :total-entries="totalEntries"
           :selected-fields="searchParams.fields.length"
         />
-        
-        <!-- Upgrade notice for Lite -->
-        <UpgradeNotice v-if="edition === 'lite'" />
+
       </aside>
-      
-      <!-- Main content -->
+
       <main class="editrix-layout__main">
-        <!-- Header -->
         <header class="editrix-search__header">
           <h1 class="editrix-search__title">
             {{ t('Find & Replace') }}
             <EnvironmentBadge v-if="hasFeature('envIndicator')" />
           </h1>
-          
+
           <div class="editrix-search__actions">
             <button
               v-if="hasFeature('presets')"
               class="editrix-btn editrix-btn--secondary"
               @click="showPresets = true"
             >
-              📋 {{ t('Presets') }}
+            {{ t('Presets') }}
             </button>
           </div>
         </header>
-        
-        <!-- Search Form -->
+
         <SearchForm
           v-model:query="searchParams.query"
           v-model:replace-with="searchParams.replaceWith"
@@ -57,11 +51,9 @@
           :show-scope-inline="!hasFeature('scopeFilters')"
           @search="handleSearch"
         />
-        
-        <!-- Loading -->
+
         <LoadingSpinner v-if="loading" :text="t('Searching...')" />
-        
-        <!-- Results -->
+
         <ResultsTable
           v-else-if="hasSearched"
           :results="results"
@@ -74,13 +66,11 @@
           @view="openDiffPreview"
           @replace="showReplaceConfirm = true"
         />
-        
-        <!-- Empty state -->
-        <EmptyState v-else />
+
+        <!-- <EmptyState v-else /> -->
       </main>
     </div>
-    
-    <!-- Diff Preview Slideout -->
+
     <DiffPreview
       :show="!!previewResult"
       :result="previewResult"
@@ -90,8 +80,7 @@
       @apply="applyToSingle"
       @skip="skipToNext"
     />
-    
-    <!-- Replace Confirmation Modal -->
+
     <ConfirmModal
       :show="showReplaceConfirm"
       :title="t('Confirm Replacement')"
@@ -108,7 +97,6 @@ import { ref, computed, onMounted, provide } from 'vue';
 import { useConfig } from '../composables/useConfig';
 import { useSearch } from '../composables/useSearch';
 
-// Components
 import SearchForm from '../components/search/SearchForm.vue';
 import ResultsTable from '../components/results/ResultsTable.vue';
 import DiffPreview from '../components/results/DiffPreview.vue';
@@ -117,17 +105,13 @@ import SelectionSummary from '../components/search/SelectionSummary.vue';
 import ConfirmModal from '../components/common/ConfirmModal.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import EmptyState from '../components/common/EmptyState.vue';
-import UpgradeNotice from '../components/common/UpgradeNotice.vue';
 import EnvironmentBadge from '../components/common/EnvironmentBadge.vue';
 
-// Config
-const { t, hasFeature, edition, currentSiteId, sites } = useConfig();
+const { t, hasFeature, currentSiteId } = useConfig();
 
-// Provide t function to all children
 provide('t', t);
 provide('hasFeature', hasFeature);
 
-// Search
 const {
   loading,
   error,
@@ -151,7 +135,6 @@ const {
   reset,
 } = useSearch();
 
-// Local state
 const showPresets = ref(false);
 const showReplaceConfirm = ref(false);
 const replacing = ref(false);
@@ -159,12 +142,10 @@ const previewResult = ref(null);
 const selectedSites = ref([]);
 const totalEntries = ref(0);
 
-// Initialize
 onMounted(() => {
   searchParams.siteId = currentSiteId.value;
 });
 
-// Handlers
 const handleSearch = async () => {
   try {
     await search();
@@ -175,14 +156,14 @@ const handleSearch = async () => {
 
 const handleReplace = async () => {
   replacing.value = true;
-  
+
   try {
     const data = await replace();
-    
+
     if (data?.success) {
       window.Craft?.cp?.displayNotice?.(data.message);
       showReplaceConfirm.value = false;
-      
+
       // Re-run search to update results
       await handleSearch();
     } else {
@@ -210,7 +191,7 @@ const skipToNext = () => {
   const currentIndex = selectedResults.value.findIndex(
     r => r.uniqueKey === previewResult.value?.uniqueKey
   );
-  
+
   if (currentIndex >= 0 && currentIndex < selectedResults.value.length - 1) {
     previewResult.value = selectedResults.value[currentIndex + 1];
   } else {

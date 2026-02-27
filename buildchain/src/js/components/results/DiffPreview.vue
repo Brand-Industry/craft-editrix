@@ -1,13 +1,11 @@
 <template>
   <Teleport to="body">
-    <!-- Backdrop -->
     <div
       class="editrix-backdrop"
       :class="{ 'is-visible': show }"
       @click="$emit('close')"
     ></div>
-    
-    <!-- Slideout -->
+
     <div class="editrix-diff" :class="{ 'is-open': show }">
       <header class="editrix-diff__header">
         <div>
@@ -18,9 +16,8 @@
         </div>
         <button class="editrix-diff__close" @click="$emit('close')">✕</button>
       </header>
-      
+
       <div class="editrix-diff__content">
-        <!-- Original -->
         <div class="editrix-diff__section">
           <div class="editrix-diff__section-header">
             <h4 class="editrix-diff__section-title">⊖ {{ t('ORIGINAL') }}</h4>
@@ -30,11 +27,9 @@
             <span v-html="originalHtml"></span>
           </div>
         </div>
-        
-        <!-- Arrow -->
+
         <div class="editrix-diff__arrow">↓</div>
-        
-        <!-- Proposed -->
+
         <div class="editrix-diff__section">
           <div class="editrix-diff__section-header">
             <h4 class="editrix-diff__section-title">⊕ {{ t('PROPOSED') }}</h4>
@@ -44,18 +39,17 @@
             <span v-html="proposedHtml"></span>
           </div>
         </div>
-        
-        <!-- Notice -->
+
         <div class="editrix-diff__notice">
           <span>ℹ️</span>
           <p>
             <strong>{{ t('Individual Update') }}</strong><br>
-            {{ t('Applying this will only update the') }} "{{ result?.fieldName }}" 
+            {{ t('Applying this will only update the') }} "{{ result?.fieldName }}"
             {{ t('on the') }} "{{ result?.elementTitle }}" {{ t('page.') }}
           </p>
         </div>
       </div>
-      
+
       <footer class="editrix-diff__footer">
         <button
           class="editrix-btn editrix-btn--secondary"
@@ -91,33 +85,33 @@ defineEmits(['close', 'apply', 'skip']);
 // Generate diff HTML
 const originalHtml = computed(() => {
   if (!props.result?.fieldValue || !props.searchQuery) return '';
-  
+
   const value = props.result.fieldValue;
   const query = props.searchQuery;
-  
+
   // Simple highlight for now - could use diff library for more complex
   const escaped = escapeHtml(value);
   const pattern = new RegExp(`(${escapeRegExp(query)})`, 'gi');
-  
+
   return escaped.replace(pattern, '<span class="diff-remove">$1</span>');
 });
 
 const proposedHtml = computed(() => {
   if (!props.result?.fieldValue || !props.searchQuery) return '';
-  
+
   const value = props.result.fieldValue;
   const query = props.searchQuery;
   const replacement = props.replaceWith;
-  
+
   // Replace and highlight
   const newValue = value.replace(new RegExp(escapeRegExp(query), 'gi'), replacement);
   const escaped = escapeHtml(newValue);
-  
+
   if (replacement) {
     const pattern = new RegExp(`(${escapeRegExp(replacement)})`, 'gi');
     return escaped.replace(pattern, '<span class="diff-add">$1</span>');
   }
-  
+
   return escaped;
 });
 

@@ -1,0 +1,330 @@
+@use 'variables' as *;
+
+.editrix {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: $text-primary;
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+}
+
+.editrix-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  border: none;
+  border-radius: $radius-md;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all $transition-fast;
+  text-decoration: none;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    background: $secondary;
+    color: $text-inverse;
+
+    &:hover:not(:disabled) {
+      background: $secondary-hover;
+    }
+  }
+
+  &--secondary {
+    background: $gray-100;
+    color: $text-primary;
+
+    &:hover:not(:disabled) {
+      background: $gray-200;
+    }
+  }
+
+  &--ghost {
+    background: transparent;
+    color: $text-secondary;
+
+    &:hover:not(:disabled) {
+      background: $gray-100;
+      color: $text-primary;
+    }
+  }
+
+  &--danger {
+    background: $danger;
+    color: $text-inverse;
+
+    &:hover:not(:disabled) {
+      background: darken($danger, 10%);
+    }
+  }
+
+  &--sm {
+    padding: $spacing-xs $spacing-sm;
+    font-size: 12px;
+  }
+}
+
+.editrix-results {
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: $radius-lg;
+  overflow: hidden;
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th, td {
+      padding: $spacing-md;
+      text-align: left;
+      border-bottom: 1px solid $border-color;
+    }
+
+    th {
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: $text-secondary;
+      background: $gray-50;
+    }
+
+    tbody tr {
+      &:hover td {
+        background: $gray-50;
+      }
+    }
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-md $spacing-lg;
+    background: $gray-50;
+    border-top: 1px solid $border-color;
+  }
+}
+
+.editrix-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: $z-modal;
+  padding: $spacing-lg;
+
+  &__backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  &__content {
+    position: relative;
+    background: $bg-card;
+    border-radius: $radius-lg;
+    box-shadow: $shadow-xl;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: auto;
+  }
+
+  &__header {
+    padding: $spacing-lg;
+    border-bottom: 1px solid $border-color;
+  }
+
+  &__title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  &__body {
+    padding: $spacing-lg;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $spacing-sm;
+    padding: $spacing-lg;
+    border-top: 1px solid $border-color;
+  }
+
+  &__warning {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-sm;
+    background: $warning-light;
+    color: darken($warning, 20%);
+    padding: $spacing-md;
+    border-radius: $radius-md;
+    margin-bottom: $spacing-md;
+  }
+}
+
+.editrix-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-2xl;
+  color: $text-muted;
+
+  &__spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid $gray-200;
+    border-top-color: $secondary;
+    border-radius: 50%;
+    animation: editrix-spin 0.8s linear infinite;
+  }
+
+  &__text {
+    margin-top: $spacing-md;
+  }
+}
+
+@keyframes editrix-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.editrix-badge {
+  display: inline-block;
+  padding: 2px $spacing-sm;
+  border-radius: $radius-sm;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+
+  &--success {
+    background: $success-light;
+    color: darken($success, 15%);
+  }
+
+  &--warning {
+    background: $warning-light;
+    color: darken($warning, 15%);
+  }
+
+  &--neutral {
+    background: $gray-100;
+    color: $gray-600;
+  }
+}
+
+.editrix-btn--danger-text {
+  color: $danger;
+
+  &:hover {
+    color: darken($danger, 10%);
+  }
+}
+
+.editrix-logs {
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-lg;
+  }
+
+  &__title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+  }
+
+  &__filters {
+    display: flex;
+    gap: $spacing-md;
+    margin-bottom: $spacing-lg;
+
+    select {
+      padding: $spacing-sm $spacing-md;
+      border: 1px solid $border-color;
+      border-radius: $radius-md;
+      background: $bg-input;
+      font-size: 14px;
+      min-width: 160px;
+
+      &:focus {
+        outline: none;
+        border-color: $secondary;
+        box-shadow: 0 0 0 3px rgba($secondary, 0.1);
+      }
+    }
+  }
+
+  &__query {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    code {
+      background: $gray-100;
+      padding: 2px 6px;
+      border-radius: $radius-sm;
+      font-size: 12px;
+    }
+  }
+
+  &__actions-cell {
+    white-space: nowrap;
+    display: flex;
+    gap: $spacing-xs;
+  }
+
+  &__pagination {
+    display: flex;
+    gap: $spacing-sm;
+  }
+
+  &__loading {
+    padding: $spacing-2xl;
+    text-align: center;
+  }
+
+  &__empty {
+    text-align: center;
+    padding: $spacing-2xl;
+    color: $text-muted;
+
+    h3 {
+      margin: 0 0 $spacing-sm;
+      font-weight: 600;
+      color: $text-primary;
+    }
+
+    p {
+      margin: 0;
+    }
+  }
+}

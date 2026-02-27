@@ -18,10 +18,9 @@ export function useConfig() {
   
   // License
   const license = computed(() => config.value.license || {});
-  const edition = computed(() => license.value.edition || 'lite');
+  const edition = computed(() => license.value.edition || 'standard');
   const features = computed(() => license.value.features || {});
   const limits = computed(() => license.value.limits || {});
-  const remainingOperations = computed(() => config.value.remainingOperations ?? -1);
   
   // Environment
   const environment = computed(() => config.value.environment || 'production');
@@ -49,7 +48,7 @@ export function useConfig() {
   
   // Edition check
   const isEdition = (ed) => {
-    const order = { lite: 0, standard: 1, pro: 2 };
+    const order = { standard: 0, pro: 1 };
     return (order[edition.value] || 0) >= (order[ed] || 0);
   };
   
@@ -68,7 +67,6 @@ export function useConfig() {
     edition,
     features,
     limits,
-    remainingOperations,
     environment,
     isProduction,
     translations,

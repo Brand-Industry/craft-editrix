@@ -14,15 +14,12 @@ use brandindustry\editrix\Editrix;
 
 class SearchService extends Component
 {
-    /**
-     * Perform search across content
-     */
     public function search(
         string $query,
         ?int $siteId = null,
         bool $useRegex = false,
         bool $caseSensitive = true,
-        array $options = [],
+        array $options = []
     ): array {
         $results = [];
         $settings = Editrix::$plugin->getSettings();
@@ -35,12 +32,10 @@ class SearchService extends Component
             $options["searchCategories"] ?? $settings->searchCategories;
         $wholeWords = $options["wholeWords"] ?? false;
 
-        // Scope filters
         $sectionFilter = $options["sections"] ?? [];
         $fieldFilter = $options["fields"] ?? [];
         $entryTypeFilter = $options["entryTypes"] ?? [];
 
-        // Get sites to search
         $sites = $this->getSitesToSearch($siteId);
 
         foreach ($sites as $site) {
@@ -56,8 +51,8 @@ class SearchService extends Component
                         $wholeWords,
                         $sectionFilter,
                         $fieldFilter,
-                        $entryTypeFilter,
-                    ),
+                        $entryTypeFilter
+                    )
                 );
             }
 
@@ -70,15 +65,15 @@ class SearchService extends Component
                         $useRegex,
                         $caseSensitive,
                         $wholeWords,
-                        $fieldFilter,
-                    ),
+                        $fieldFilter
+                    )
                 );
             }
 
             if (
                 $searchCategories &&
                 Editrix::$plugin->hasFeature(
-                    LicenseService::FEATURE_SEARCH_CATEGORIES,
+                    LicenseService::FEATURE_SEARCH_CATEGORIES
                 )
             ) {
                 $results = array_merge(
@@ -89,8 +84,8 @@ class SearchService extends Component
                         $useRegex,
                         $caseSensitive,
                         $wholeWords,
-                        $fieldFilter,
-                    ),
+                        $fieldFilter
+                    )
                 );
             }
         }
@@ -98,9 +93,6 @@ class SearchService extends Component
         return $results;
     }
 
-    /**
-     * Get sites to search
-     */
     private function getSitesToSearch(?int $siteId): array
     {
         if ($siteId !== null) {
@@ -110,9 +102,6 @@ class SearchService extends Component
         return Craft::$app->getSites()->getAllSites();
     }
 
-    /**
-     * Search in entries
-     */
     private function searchInEntries(
         string $query,
         int $siteId,
@@ -122,7 +111,7 @@ class SearchService extends Component
         bool $wholeWords,
         array $sectionFilter,
         array $fieldFilter,
-        array $entryTypeFilter,
+        array $entryTypeFilter
     ): array {
         $results = [];
         $site = Craft::$app->getSites()->getSiteById($siteId);
@@ -133,12 +122,10 @@ class SearchService extends Component
             ->drafts(false)
             ->revisions(false);
 
-        // Apply section filter
         if (!empty($sectionFilter)) {
             $entryQuery->section($sectionFilter);
         }
 
-        // Apply entry type filter
         if (!empty($entryTypeFilter)) {
             $entryQuery->type($entryTypeFilter);
         }
@@ -154,7 +141,6 @@ class SearchService extends Component
             }
 
             foreach ($fieldLayout->getCustomFields() as $field) {
-                // Apply field filter
                 if (
                     !empty($fieldFilter) &&
                     !in_array($field->handle, $fieldFilter)
@@ -169,7 +155,7 @@ class SearchService extends Component
                         $query,
                         $useRegex,
                         $caseSensitive,
-                        $wholeWords,
+                        $wholeWords
                     );
 
                     foreach ($matches as $match) {
@@ -191,7 +177,6 @@ class SearchService extends Component
                     }
                 }
 
-                // Search in Matrix fields
                 if ($searchMatrix && $field instanceof Matrix) {
                     $matrixResults = $this->searchInMatrixField(
                         $entry,
@@ -203,7 +188,7 @@ class SearchService extends Component
                         $useRegex,
                         $caseSensitive,
                         $wholeWords,
-                        $fieldFilter,
+                        $fieldFilter
                     );
                     $results = array_merge($results, $matrixResults);
                 }
@@ -213,9 +198,6 @@ class SearchService extends Component
         return $results;
     }
 
-    /**
-     * Search in Matrix field blocks
-     */
     private function searchInMatrixField(
         Entry $entry,
         Matrix $matrixField,
@@ -226,7 +208,7 @@ class SearchService extends Component
         bool $useRegex,
         bool $caseSensitive,
         bool $wholeWords,
-        array $fieldFilter,
+        array $fieldFilter
     ): array {
         $results = [];
 
@@ -242,7 +224,6 @@ class SearchService extends Component
             $blockFields = $blockType->getCustomFields();
 
             foreach ($blockFields as $field) {
-                // Apply field filter (check both the matrix field handle and sub-field handle)
                 if (!empty($fieldFilter)) {
                     $matrixFieldHandle = "{$matrixField->handle}.{$field->handle}";
                     if (
@@ -263,7 +244,7 @@ class SearchService extends Component
                     $query,
                     $useRegex,
                     $caseSensitive,
-                    $wholeWords,
+                    $wholeWords
                 );
 
                 foreach ($matches as $match) {
@@ -292,16 +273,13 @@ class SearchService extends Component
         return $results;
     }
 
-    /**
-     * Search in globals
-     */
     private function searchInGlobals(
         string $query,
         int $siteId,
         bool $useRegex,
         bool $caseSensitive,
         bool $wholeWords,
-        array $fieldFilter,
+        array $fieldFilter
     ): array {
         $results = [];
         $site = Craft::$app->getSites()->getSiteById($siteId);
@@ -332,7 +310,7 @@ class SearchService extends Component
                     $query,
                     $useRegex,
                     $caseSensitive,
-                    $wholeWords,
+                    $wholeWords
                 );
 
                 foreach ($matches as $match) {
@@ -358,16 +336,13 @@ class SearchService extends Component
         return $results;
     }
 
-    /**
-     * Search in categories
-     */
     private function searchInCategories(
         string $query,
         int $siteId,
         bool $useRegex,
         bool $caseSensitive,
         bool $wholeWords,
-        array $fieldFilter,
+        array $fieldFilter
     ): array {
         $results = [];
         $site = Craft::$app->getSites()->getSiteById($siteId);
@@ -400,7 +375,7 @@ class SearchService extends Component
                     $query,
                     $useRegex,
                     $caseSensitive,
-                    $wholeWords,
+                    $wholeWords
                 );
 
                 foreach ($matches as $match) {
@@ -436,39 +411,13 @@ class SearchService extends Component
         return in_array($fieldClass, $settings->searchableFieldTypes);
     }
 
-    /**
-     * Find matches in text
-     */
     private function findMatches(
         mixed $value,
         string $query,
         bool $useRegex,
         bool $caseSensitive,
-        bool $wholeWords,
+        bool $wholeWords
     ): array {
-        if (!is_string($value) || empty($value) || empty($query)) {
-            return [];
-        }
-
-        // DEBUG - Ver el contenido real
-        if (strlen($value) > 50) {
-            \Craft::info(
-                "Editrix - Checking value (first 100 chars): " .
-                    substr($value, 0, 100),
-                __METHOD__,
-            );
-        }
-
-        // DEBUG - Ver si contiene la palabra
-        $containsQuery = stripos($value, $query) !== false;
-        \Craft::info(
-            "Editrix - Contains '{$query}'? " .
-                ($containsQuery ? "YES" : "NO") .
-                ", CaseSensitive: " .
-                ($caseSensitive ? "yes" : "no"),
-            __METHOD__,
-        );
-
         if (!is_string($value) || empty($value) || empty($query)) {
             return [];
         }
@@ -485,7 +434,7 @@ class SearchService extends Component
                     $pattern,
                     $value,
                     $regexMatches,
-                    PREG_OFFSET_CAPTURE,
+                    PREG_OFFSET_CAPTURE
                 ) === false
             ) {
                 return [];
@@ -503,7 +452,7 @@ class SearchService extends Component
                         $value,
                         $start,
                         $end,
-                        $contextLength,
+                        $contextLength
                     ),
                 ];
             }
@@ -511,7 +460,6 @@ class SearchService extends Component
             $searchValue = $caseSensitive ? $value : mb_strtolower($value);
             $searchQuery = $caseSensitive ? $query : mb_strtolower($query);
 
-            // Build regex for whole words if needed
             if ($wholeWords) {
                 $escapedQuery = preg_quote($searchQuery, "/");
                 $flags = $caseSensitive ? "" : "i";
@@ -522,7 +470,7 @@ class SearchService extends Component
                         $pattern,
                         $value,
                         $regexMatches,
-                        PREG_OFFSET_CAPTURE,
+                        PREG_OFFSET_CAPTURE
                     ) === false
                 ) {
                     return [];
@@ -540,22 +488,34 @@ class SearchService extends Component
                             $value,
                             $start,
                             $end,
-                            $contextLength,
+                            $contextLength
                         ),
                     ];
                 }
             } else {
-                // Whitespace-flexible matching: allow variations in spaces only when query contains spaces
-                if (mb_strpos($query, ' ') !== false) {
-                    $escapedQuery = preg_quote($searchQuery, '/');
-                    $pattern = '/' . str_replace(' ', '\\s+', $escapedQuery) . '/u';
-                    if (@preg_match_all($pattern, $value, $regexMatches, PREG_OFFSET_CAPTURE) === false) {
+                if (mb_strpos($query, " ") !== false) {
+                    $escapedQuery = preg_quote($query, "/");
+                    $flags = $caseSensitive ? "" : "i";
+                    $pattern =
+                        "/" .
+                        str_replace("\\ ", "\\s+", $escapedQuery) .
+                        "/" .
+                        $flags .
+                        "u";
+                    if (
+                        @preg_match_all(
+                            $pattern,
+                            $value,
+                            $regexMatches,
+                            PREG_OFFSET_CAPTURE
+                        ) === false
+                    ) {
                         return [];
                     }
                     foreach ($regexMatches[0] as $match) {
                         $start = $match[1];
                         $matchText = $match[0];
-                        $end = $start + mb_strlen($matchText);
+                        $end = $start + strlen($matchText);
                         $matches[] = [
                             "start" => $start,
                             "end" => $end,
@@ -564,15 +524,18 @@ class SearchService extends Component
                                 $value,
                                 $start,
                                 $end,
-                                $contextLength,
+                                $contextLength
                             ),
                         ];
                     }
                 } else {
                     $offset = 0;
                     while (
-                        ($pos = mb_strpos($searchValue, $searchQuery, $offset)) !==
-                        false
+                        ($pos = mb_strpos(
+                            $searchValue,
+                            $searchQuery,
+                            $offset
+                        )) !== false
                     ) {
                         $end = $pos + mb_strlen($query);
                         $matchText = mb_substr($value, $pos, mb_strlen($query));
@@ -584,7 +547,7 @@ class SearchService extends Component
                                 $value,
                                 $pos,
                                 $end,
-                                $contextLength,
+                                $contextLength
                             ),
                         ];
                         $offset = $pos + 1;
@@ -596,14 +559,11 @@ class SearchService extends Component
         return $matches;
     }
 
-    /**
-     * Get context around match
-     */
     private function getMatchContext(
         string $value,
         int $start,
         int $end,
-        int $contextLength,
+        int $contextLength
     ): string {
         $prefix = "";
         $suffix = "";
@@ -622,7 +582,6 @@ class SearchService extends Component
             $suffix .= "...";
         }
 
-        // Use markers for highlighting
         return $prefix . "[[MATCH]]" . $match . "[[/MATCH]]" . $suffix;
     }
 }

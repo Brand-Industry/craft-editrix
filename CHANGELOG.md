@@ -18,4 +18,4 @@ All notable changes to Editrix will be documented in this file.
 - Environment indicator
 - Granular permissions
 - Spanish and English translations
-- Three editions: Lite (free), Standard, Pro
+- Two editions: Standard and Pro

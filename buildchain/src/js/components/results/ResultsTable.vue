@@ -5,7 +5,7 @@
         {{ t('Results') }}
         <span class="editrix-results__count">{{ totalResults }}</span>
       </h2>
-      
+
       <div class="editrix-results__actions">
         <button
           class="editrix-btn editrix-btn--secondary editrix-btn--sm"
@@ -13,7 +13,7 @@
         >
           {{ allSelected ? t('Deselect All') : t('Select All') }}
         </button>
-        
+
         <button
           class="editrix-btn editrix-btn--primary"
           :disabled="selectedCount === 0"
@@ -24,14 +24,13 @@
         </button>
       </div>
     </header>
-    
+
     <!-- Empty state -->
     <div v-if="totalResults === 0" class="editrix-results__empty">
       <div class="editrix-results__empty-icon">🔍</div>
       <p>{{ t('No results found.') }}</p>
     </div>
-    
-    <!-- Results table -->
+
     <table v-else class="editrix-results__table">
       <thead>
         <tr>
@@ -50,15 +49,13 @@
       </thead>
       <tbody>
         <template v-for="(siteData, siteHandle) in results" :key="siteHandle">
-          <!-- Site header row -->
           <tr v-if="Object.keys(results).length > 1" class="editrix-results__site-row">
             <td colspan="5">
               <strong>📍 {{ siteData.siteName }}</strong>
               <span class="editrix-badge editrix-badge--neutral">{{ siteData.results.length }}</span>
             </td>
           </tr>
-          
-          <!-- Result rows -->
+
           <tr
             v-for="result in siteData.results"
             :key="result.uniqueKey"
@@ -99,8 +96,7 @@
         </template>
       </tbody>
     </table>
-    
-    <!-- Footer -->
+
     <footer v-if="totalResults > 0" class="editrix-results__footer">
       <div class="editrix-results__selection-info">
         <span v-if="selectedCount > 0">

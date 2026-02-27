@@ -2,8 +2,7 @@
   <div class="editrix-sidebar">
     <div class="editrix-sidebar__section">
       <div class="editrix-sidebar__title">{{ t('SCOPE FILTERS') }}</div>
-      
-      <!-- Sections -->
+
       <div class="editrix-scope__group">
         <div class="editrix-scope__header" @click="toggleSection('sections')">
           <span>📁 {{ t('Sections') }}</span>
@@ -24,8 +23,7 @@
           </div>
         </div>
       </div>
-      
-      <!-- Sites -->
+
       <div v-if="availableSites.length > 1" class="editrix-scope__group">
         <div class="editrix-scope__header" @click="toggleSection('sites')">
           <span>🌐 {{ t('Sites') }}</span>
@@ -43,8 +41,7 @@
           </div>
         </div>
       </div>
-      
-      <!-- Fields (Pro) -->
+
       <div v-if="hasFeature('scopeFilters.full')" class="editrix-scope__group">
         <div class="editrix-scope__header" @click="toggleSection('fields')">
           <span>📝 {{ t('Fields') }}</span>
@@ -65,8 +62,7 @@
           </div>
         </div>
       </div>
-      
-      <!-- Entry Types (Pro) -->
+
       <div v-if="hasFeature('scopeFilters.full')" class="editrix-scope__group">
         <div class="editrix-scope__header" @click="toggleSection('entryTypes')">
           <span>🏷️ {{ t('Entry Types') }}</span>
@@ -115,7 +111,6 @@ const emit = defineEmits([
   'update:entryTypes',
 ]);
 
-// UI State
 const openSections = reactive({
   sections: true,
   sites: false,
@@ -123,28 +118,26 @@ const openSections = reactive({
   entryTypes: false,
 });
 
-// Available options
 const availableSections = ref([]);
 const availableSites = ref([]);
 const availableFields = ref([]);
 const availableEntryTypes = ref([]);
 
-// Load data
 onMounted(async () => {
   availableSites.value = configSites.value;
-  
+
   try {
     if (scopeUrls.value.sections) {
       const data = await get(scopeUrls.value.sections);
       availableSections.value = data.sections || [];
     }
-    
+
     if (hasFeature('scopeFilters.full')) {
       if (scopeUrls.value.fields) {
         const data = await get(scopeUrls.value.fields);
         availableFields.value = data.fields || [];
       }
-      
+
       if (scopeUrls.value.entryTypes) {
         const data = await get(scopeUrls.value.entryTypes);
         availableEntryTypes.value = data.entryTypes || [];
@@ -164,14 +157,14 @@ const toggleSection = (section) => {
 const toggleItem = (type, value) => {
   const current = props[type];
   const index = current.indexOf(value);
-  
+
   let newValue;
   if (index === -1) {
     newValue = [...current, value];
   } else {
     newValue = current.filter(v => v !== value);
   }
-  
+
   emit(`update:${type}`, newValue);
 };
 </script>

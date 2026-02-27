@@ -11,6 +11,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         editrix: resolve(__dirname, 'src/js/app/main.js'),
+        'editrix-logs': resolve(__dirname, 'src/js/app/logs.js'),
       },
       output: {
         entryFileNames: 'js/[name].js',

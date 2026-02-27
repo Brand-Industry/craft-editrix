@@ -62,13 +62,15 @@ export function useApi() {
       if (typeof value === 'boolean') {
         formData.append(key, value ? '1' : '0');
       } else if (Array.isArray(value)) {
-        value.forEach((item, index) => {
-          if (typeof item === 'object') {
-            formData.append(key, JSON.stringify(item));
-          } else {
+        if (value.length > 0 && typeof value[0] === 'object') {
+          // Array of objects: send as single JSON string
+          formData.append(key, JSON.stringify(value));
+        } else {
+          // Array of primitives: send as key[]
+          value.forEach(item => {
             formData.append(`${key}[]`, item);
-          }
-        });
+          });
+        }
       } else if (typeof value === 'object') {
         formData.append(key, JSON.stringify(value));
       } else {

@@ -20,3 +20,7 @@ Thumbs.db
 # Environment
 .env
 .env.*
+
+# Agents
+.claudeignore
+AGENTS.md
