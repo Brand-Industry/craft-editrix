@@ -16,25 +16,25 @@ Editrix is an advanced search & replace plugin that lets you find and update con
 
 ## Editions
 
-| Feature | Standard | Pro |
-|---------|:--------:|:---:|
-| Search Entries & Globals | ✅ | ✅ |
-| Basic Replace | ✅ | ✅ |
-| Case Insensitive | ✅ | ✅ |
-| Logs & Revert | 30 days | 90 days |
-| Matrix Fields | ✅ | ✅ |
-| Categories | ✅ | ✅ |
-| Regex Support | ✅ | ✅ |
-| Whole Words | ✅ | ✅ |
-| Multi-Site | ✅ | ✅ |
-| Scope Filters | Sections, Sites | Full |
-| Diff Preview | Text | Visual |
-| Dry Run Mode | ✅ | ✅ |
-| Export Logs | CSV | CSV + JSON |
-| Presets | 5 | Unlimited |
-| Protected Fields | - | ✅ |
-| CLI Commands | - | ✅ |
-| API & Webhooks | - | ✅ |
+| Feature                  |    Standard     |    Pro     |
+| ------------------------ | :-------------: | :--------: |
+| Search Entries & Globals |       ✅        |     ✅     |
+| Basic Replace            |       ✅        |     ✅     |
+| Case Insensitive         |       ✅        |     ✅     |
+| Logs & Revert            |     30 days     |  90 days   |
+| Matrix Fields            |       ✅        |     ✅     |
+| Categories               |       ✅        |     ✅     |
+| Regex Support            |       ✅        |     ✅     |
+| Whole Words              |       ✅        |     ✅     |
+| Multi-Site               |       ✅        |     ✅     |
+| Scope Filters            | Sections, Sites |    Full    |
+| Diff Preview             |      Text       |   Visual   |
+| Dry Run Mode             |       ✅        |     ✅     |
+| Export Logs              |       CSV       | CSV + JSON |
+| Presets                  |        5        | Unlimited  |
+| Protected Fields         |        -        |     ✅     |
+| CLI Commands             |        -        |     ✅     |
+| API & Webhooks           |        -        |     ✅     |
 
 ## Requirements
 
@@ -42,16 +42,6 @@ Editrix is an advanced search & replace plugin that lets you find and update con
 - PHP 8.0.2+
 
 ## Installation
-
-```bash
-composer require brand-industry/craft-editrix
-```
-
-Then install the plugin from **Settings → Plugins** or run:
-
-```bash
-./craft plugin/install editrix
-```
 
 ## Usage
 
@@ -66,13 +56,3 @@ Then install the plugin from **Settings → Plugins** or run:
 
 - Documentation: [editrix.dev/docs](https://editrix.dev/docs)
 - Issues: [GitHub Issues](https://github.com/brand-industry/craft-editrix/issues)
-
-## License
-
-Editrix is available in Standard and Pro editions.
-
-- Standard: $59/project
-- Pro: $149/project
-
-Purchase at [editrix.dev](https://editrix.dev)
-
