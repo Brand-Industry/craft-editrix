@@ -2,7 +2,7 @@ import { ref, computed, reactive } from 'vue';
 import { useApi } from './useApi';
 import { useConfig } from './useConfig';
 
-export function useSearch() {
+export function useSearch(actionMode) {
   const { post } = useApi();
   const { apiUrl, replaceUrl, previewUrl, hasFeature } = useConfig();
 
@@ -37,9 +37,16 @@ export function useSearch() {
   const hasResults = computed(() => totalResults.value > 0);
   const selectedCount = computed(() => selectedResults.value.length);
   const hasSelected = computed(() => selectedCount.value > 0);
+  // Selection means different things per mode: in Search it drives CSV
+  // export (read-only matches like Tags are fine to include), in Replace
+  // it drives what gets written back (read-only matches must be excluded).
+  const selectableResults = computed(() => {
+    const all = getAllResults();
+    return actionMode?.value === 'replace' ? all.filter(r => !r.readOnly) : all;
+  });
   const allSelected = computed(() => {
-    if (totalResults.value === 0) return false;
-    return selectedCount.value === totalResults.value;
+    if (selectableResults.value.length === 0) return false;
+    return selectedCount.value === selectableResults.value.length;
   });
 
   // Perform search
@@ -98,6 +105,8 @@ export function useSearch() {
 
   // Selection methods
   const toggleResult = (result) => {
+    if (actionMode?.value === 'replace' && result.readOnly) return;
+
     const index = selectedResults.value.findIndex(
       r => r.uniqueKey === result.uniqueKey
     );
@@ -114,7 +123,7 @@ export function useSearch() {
   };
 
   const selectAll = () => {
-    selectedResults.value = getAllResults();
+    selectedResults.value = [...selectableResults.value];
   };
 
   const deselectAll = () => {
@@ -129,9 +138,13 @@ export function useSearch() {
     }
   };
 
-  // Replace methods
-  const replace = async () => {
-    if (!hasSelected.value) return null;
+  // Replace methods. Pass `results`/`replaceWith` to replace a single match
+  // (e.g. from the detail modal) instead of the current bulk selection.
+  const replace = async ({ results: targets, replaceWith } = {}) => {
+    const toReplace = (targets ?? selectedResults.value).filter(
+      r => !r.readOnly
+    );
+    if (toReplace.length === 0) return null;
 
     loading.value = true;
     error.value = null;
@@ -139,8 +152,8 @@ export function useSearch() {
     try {
       const data = await post(replaceUrl.value, {
         searchQuery: searchParams.query,
-        replaceWith: searchParams.replaceWith,
-        selectedResults: selectedResults.value,
+        replaceWith: replaceWith ?? searchParams.replaceWith,
+        selectedResults: toReplace,
         siteId: searchParams.siteId,
         useRegex: searchParams.useRegex,
         caseInsensitive: searchParams.caseInsensitive,

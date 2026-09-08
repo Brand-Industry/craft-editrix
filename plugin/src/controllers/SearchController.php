@@ -170,6 +170,29 @@ class SearchController extends Controller
 
             $groupedResults = $this->groupResultsBySite($results);
 
+            $logSiteId =
+                $searchSiteId ?? Craft::$app->getSites()->getCurrentSite()->id;
+
+            Editrix::$plugin->log->createSearchLog(
+                (int) $logSiteId,
+                $query,
+                count($results),
+                [
+                    "siteId" => $searchSiteId,
+                    "allSites" => $allSites,
+                    "searchEntries" => $searchEntries,
+                    "searchGlobals" => $searchGlobals,
+                    "searchMatrix" => $searchMatrix,
+                    "searchCategories" => $searchCategories,
+                    "sections" => is_array($sections) ? $sections : [],
+                    "fields" => is_array($fields) ? $fields : [],
+                    "entryTypes" => is_array($entryTypes) ? $entryTypes : [],
+                ],
+                $useRegex,
+                !$caseInsensitive,
+                $wholeWords
+            );
+
             return $this->asJson([
                 "success" => true,
                 "totalResults" => count($results),
@@ -236,6 +259,7 @@ class SearchController extends Controller
                 "blockTypeHandle" => $result->blockTypeHandle,
                 "siteId" => $result->siteId,
                 "siteHandle" => $result->siteHandle,
+                "readOnly" => $result->readOnly,
             ];
         }
 
@@ -319,6 +343,37 @@ class SearchController extends Controller
             "Globals",
             "Matrix fields",
             "Categories",
+            "Search & Replace",
+            "Find where content lives and export the results - nothing gets changed.",
+            "Find content and replace it. Only fields safe to overwrite are offered.",
+            "Export CSV",
+            "General Search",
+            "Segmented Search",
+            "Searches every entry and field across the selected site(s).",
+            "Narrow the search down to a section, entry type, and fields.",
+            "Section, then Entry Type, then Fields.",
+            "Select a section first.",
+            "Select an entry type first.",
+            "No entry types in the selected section(s).",
+            "No searchable fields on the selected entry type(s).",
+            "Only option",
+            "Sections",
+            "Entry Types",
+            "Fields",
+            "Sites",
+            "Title",
+            "Search only",
+            "Rename the tag directly - it may be shared by other entries.",
+            "View",
+            "Match Details",
+            "Element",
+            "Section",
+            "Field",
+            "Site",
+            "Open in Craft",
+            "Replace",
+            "Continue",
+            "Close",
             "Results",
             "No results found.",
             "Select All",

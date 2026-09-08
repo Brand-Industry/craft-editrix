@@ -8,6 +8,7 @@ use craft\elements\Entry;
 use craft\elements\GlobalSet;
 use craft\elements\Category;
 use craft\elements\MatrixBlock;
+use benf\neo\elements\Block as NeoBlock;
 use brandindustry\editrix\models\SearchResult;
 use brandindustry\editrix\Editrix;
 
@@ -102,8 +103,45 @@ class ReplaceService extends Component
         return preg_replace($pattern, $replaceWith, $value);
     }
 
+    /**
+     * Fields whose values aren't a plain string we can safely overwrite (e.g.
+     * a Tags field, where the "value" shown is a related Tag element's
+     * title, not something stored on this element) must never be written to
+     * here - the frontend already hides Replace for these, this is the
+     * server-side backstop.
+     */
+    private function isReplaceableField(array $result): bool
+    {
+        if ($result["elementType"] !== "entry") {
+            return true;
+        }
+
+        if ($result["fieldHandle"] === "title") {
+            return true;
+        }
+
+        $field = Craft::$app
+            ->getFields()
+            ->getFieldByHandle($result["fieldHandle"]);
+
+        if (!$field) {
+            return false;
+        }
+
+        $settings = Editrix::$plugin->getSettings();
+        return in_array(get_class($field), $settings->searchableFieldTypes);
+    }
+
     private function saveElementField(array $result, string $newValue): bool
     {
+        if (!$this->isReplaceableField($result)) {
+            Craft::warning(
+                "Editrix: Refused to replace non-replaceable field '{$result["fieldHandle"]}'",
+                __METHOD__
+            );
+            return false;
+        }
+
         try {
             $element = $this->getElement($result);
 
@@ -111,26 +149,16 @@ class ReplaceService extends Component
                 return false;
             }
 
-            $element->setFieldValue($result["fieldHandle"], $newValue);
-
-            if (
-                $result["elementType"] === "matrixBlock" &&
-                isset($result["parentId"])
-            ) {
-                $parentEntry = Entry::find()
-                    ->id($result["parentId"])
-                    ->siteId($result["siteId"])
-                    ->status(null)
-                    ->one();
-
-                if ($parentEntry) {
-                    return Craft::$app
-                        ->getElements()
-                        ->saveElement($parentEntry);
-                }
-                return false;
+            if ($result["fieldHandle"] === "title") {
+                $element->title = $newValue;
+            } else {
+                $element->setFieldValue($result["fieldHandle"], $newValue);
             }
 
+            // A MatrixBlock is a first-class element - save it directly.
+            // (Re-fetching and saving the owner entry here would silently
+            // discard this change, since that's a separate, unmodified
+            // instance of the same content.)
             return Craft::$app->getElements()->saveElement($element);
         } catch (\Throwable $e) {
             Craft::error(
@@ -159,12 +187,28 @@ class ReplaceService extends Component
                 ->id($result["elementId"])
                 ->siteId($result["siteId"])
                 ->one(),
+            "neoBlock" => NeoBlock::find()
+                ->id($result["elementId"])
+                ->siteId($result["siteId"])
+                ->one(),
             "category" => Category::find()
                 ->id($result["elementId"])
                 ->siteId($result["siteId"])
                 ->one(),
             default => null,
         };
+    }
+
+    /**
+     * Reads a field value the same way saveElementField()/revert() write it,
+     * so title-based replacements can be compared without hitting
+     * getFieldValue('title'), which isn't a real custom field.
+     */
+    private function getElementValue($element, string $fieldHandle): mixed
+    {
+        return $fieldHandle === "title"
+            ? $element->title
+            : $element->getFieldValue($fieldHandle);
     }
 
     /**
@@ -194,7 +238,8 @@ class ReplaceService extends Component
                 continue;
             }
 
-            $currentValue = (string) $element->getFieldValue(
+            $currentValue = (string) $this->getElementValue(
+                $element,
                 $replacement["fieldHandle"]
             );
             $expectedValue = (string) ($replacement["newValue"] ?? "");
@@ -229,6 +274,10 @@ class ReplaceService extends Component
 
     public function revert(array $replacement): bool
     {
+        if (!$this->isReplaceableField($replacement)) {
+            return false;
+        }
+
         try {
             $element = $this->getElement($replacement);
 
@@ -236,31 +285,17 @@ class ReplaceService extends Component
                 return false;
             }
 
-            $element->setFieldValue(
-                $replacement["fieldHandle"],
-                $replacement["oldValue"]
-            );
-
-            if (
-                $replacement["elementType"] === "matrixBlock" &&
-                isset($replacement["parentId"])
-            ) {
-                $parentEntry = Entry::find()
-                    ->id($replacement["parentId"])
-                    ->siteId($replacement["siteId"])
-                    ->status(null)
-                    ->drafts(false)
-                    ->revisions(false)
-                    ->one();
-
-                if ($parentEntry) {
-                    return Craft::$app
-                        ->getElements()
-                        ->saveElement($parentEntry);
-                }
-                return false;
+            if ($replacement["fieldHandle"] === "title") {
+                $element->title = $replacement["oldValue"];
+            } else {
+                $element->setFieldValue(
+                    $replacement["fieldHandle"],
+                    $replacement["oldValue"]
+                );
             }
 
+            // See saveElementField() - a MatrixBlock saves directly, not via
+            // a freshly-queried (and therefore unmodified) owner entry.
             return Craft::$app->getElements()->saveElement($element);
         } catch (\Throwable $e) {
             Craft::error(

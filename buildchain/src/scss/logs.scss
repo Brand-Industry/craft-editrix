@@ -232,6 +232,51 @@
     background: $gray-100;
     color: $gray-600;
   }
+
+  &--info {
+    background: $info-light;
+    color: darken($info, 20%);
+  }
+}
+
+// Search / Replace type tabs, matching the same control on the main page.
+.editrix-mode-toggle {
+  display: inline-flex;
+  padding: 3px;
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: $radius-lg;
+  margin-bottom: $spacing-sm;
+
+  &__option {
+    padding: $spacing-sm $spacing-md;
+    border: none;
+    background: transparent;
+    border-radius: $radius-md;
+    font-size: 13px;
+    font-weight: 500;
+    color: $text-secondary;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover:not(.is-active) {
+      background: $gray-100;
+      color: $text-primary;
+    }
+
+    &.is-active {
+      background: $secondary;
+      color: $text-inverse;
+      font-weight: 600;
+      box-shadow: $shadow-sm;
+    }
+  }
+
+  &__hint {
+    font-size: 12px;
+    color: $text-muted;
+    margin: 0 0 $spacing-md;
+  }
 }
 
 .editrix-btn--danger-text {

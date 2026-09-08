@@ -32,11 +32,11 @@ class Editrix extends Plugin
 {
     public static Editrix $plugin;
 
-    public string $schemaVersion = "1.0.0";
+    public string $schemaVersion = "1.0.1";
     public bool $hasCpSettings = true;
     public bool $hasCpSection = true;
 
-    public string $edition = self::EDITION_STANDARD;
+    public string $edition = "";
 
     public const EDITION_STANDARD = "standard";
     public const EDITION_PRO = "pro";
@@ -221,7 +221,6 @@ class Editrix extends Plugin
             "editrix" => "editrix/search/index",
             "editrix/search" => "editrix/search/index",
             "editrix/logs" => "editrix/log/index",
-            "editrix/logs/<siteHandle:{handle}>" => "editrix/log/site",
             "editrix/settings" => "editrix/settings/index",
 
             "editrix/api/search" => "editrix/search/search",

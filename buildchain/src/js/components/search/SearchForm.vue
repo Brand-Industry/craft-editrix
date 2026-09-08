@@ -1,6 +1,6 @@
 <template>
   <div class="editrix-form">
-    <div class="editrix-form__row">
+    <div class="editrix-form__row" :class="{ 'editrix-form__row--single': actionMode !== 'replace' }">
       <div class="editrix-form__group">
         <label class="editrix-form__label">
           {{ t('Find') }}
@@ -15,7 +15,7 @@
         ></textarea>
       </div>
 
-      <div class="editrix-form__group">
+      <div v-if="actionMode === 'replace'" class="editrix-form__group">
         <label class="editrix-form__label">
           {{ t('Replace with') }}
           <span class="editrix-form__label--hint">{{ t('OUTPUT STRING') }}</span>
@@ -105,11 +105,10 @@
     </div>
 
     <div class="editrix-form__footer">
-      <div v-if="!query" class="editrix-form__warning">
-      </div>
-      <div v-else class="editrix-form__warning">
+      <div v-if="actionMode === 'replace' && query" class="editrix-form__warning">
         ⚠️ {{ t('Changes will be applied across your database.') }}
       </div>
+      <div v-else class="editrix-form__warning"></div>
 
       <button
         class="editrix-btn editrix-btn--primary editrix-btn--lg"
@@ -117,7 +116,8 @@
         @click="$emit('search')"
       >
         <span v-if="loading">{{ t('Searching...') }}</span>
-        <span v-else>{{ t('Preview Changes') }}</span>
+        <span v-else-if="actionMode === 'replace'">{{ t('Preview Changes') }}</span>
+        <span v-else>{{ t('Search') }}</span>
       </button>
     </div>
   </div>
@@ -144,6 +144,7 @@ defineProps({
   searchCategories: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
   showScopeInline: { type: Boolean, default: false },
+  actionMode: { type: String, default: 'replace' },
 });
 
 defineEmits([

@@ -15,6 +15,17 @@
         </button>
 
         <button
+          v-if="actionMode === 'search'"
+          class="editrix-btn editrix-btn--primary editrix-btn--sm"
+          :disabled="totalResults === 0"
+          @click="exportCsv"
+        >
+          {{ t('Export CSV') }}
+          <span v-if="selectedCount > 0">({{ selectedCount }})</span>
+        </button>
+
+        <button
+          v-else
           class="editrix-btn editrix-btn--primary"
           :disabled="selectedCount === 0"
           @click="$emit('replace')"
@@ -82,6 +93,7 @@
             </td>
             <td class="editrix-results__field">
               {{ result.fieldName }}
+              <span class="editrix-badge editrix-badge--neutral">{{ elementTypeLabel(result.elementType) }}</span>
             </td>
             <td class="editrix-results__preview" v-html="formatPreview(result.matchContext)"></td>
             <td>
@@ -110,15 +122,18 @@
 
 <script setup>
 import { inject } from 'vue';
+import { elementTypeLabel } from '../../utils/elementType';
 
 const t = inject('t');
 
-defineProps({
+const props = defineProps({
   results: { type: Object, required: true },
   totalResults: { type: Number, required: true },
   selectedCount: { type: Number, required: true },
   allSelected: { type: Boolean, default: false },
   isSelected: { type: Function, required: true },
+  actionMode: { type: String, default: 'replace' },
+  searchQuery: { type: String, default: '' },
 });
 
 defineEmits(['toggle', 'toggle-all', 'view', 'replace']);
@@ -129,6 +144,47 @@ const formatPreview = (context) => {
   return context
     .replace(/\[\[MATCH\]\]/g, '<span class="match">')
     .replace(/\[\[\/MATCH\]\]/g, '</span>');
+};
+
+const csvCell = (value) => {
+  const str = String(value ?? '');
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+};
+
+const exportCsv = () => {
+  const exportAll = props.selectedCount === 0;
+  const rows = [
+    ['Site', 'Type', 'Element', 'Section', 'Field', 'Match', 'Edit URL'],
+  ];
+
+  Object.values(props.results).forEach(siteData => {
+    siteData.results.forEach(result => {
+      if (!exportAll && !props.isSelected(result)) return;
+
+      rows.push([
+        siteData.siteName,
+        elementTypeLabel(result.elementType),
+        result.elementTitle,
+        result.sectionName,
+        result.fieldName,
+        result.matchContext.replace(/\[\[\/?MATCH\]\]/g, ''),
+        result.cpEditUrl || '',
+      ]);
+    });
+  });
+
+  const csv = rows.map(row => row.map(csvCell).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const query = props.searchQuery.replace(/[^a-z0-9]+/gi, '-').slice(0, 40);
+
+  link.href = url;
+  link.download = `editrix-search${query ? `-${query}` : ''}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 </script>
 

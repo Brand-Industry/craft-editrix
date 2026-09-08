@@ -23,12 +23,20 @@ class SearchResult extends Model
     public ?string $parentTitle = null;
     public ?string $blockTypeHandle = null;
 
+    /**
+     * True for matches inside a relational field (e.g. a Tags field's tag
+     * titles) where there's no single field value to safely overwrite -
+     * these are shown for discovery but can't go through Replace.
+     */
+    public bool $readOnly = false;
+
     public function getCpEditUrl(): string
     {
         return match ($this->elementType) {
             "entry" => "entries/{$this->sectionHandle}/{$this->elementId}",
             "global" => "globals/{$this->siteHandle}/{$this->sectionHandle}",
-            "matrixBlock" => "entries/{$this->sectionHandle}/{$this->parentId}",
+            "matrixBlock", "neoBlock"
+                => "entries/{$this->sectionHandle}/{$this->parentId}",
             "category"
                 => "categories/{$this->sectionHandle}/{$this->elementId}",
             default => "#",
@@ -45,7 +53,7 @@ class SearchResult extends Model
         return match ($this->elementType) {
             "entry" => "file-text",
             "global" => "globe",
-            "matrixBlock" => "grid",
+            "matrixBlock", "neoBlock" => "grid",
             "category" => "folder",
             default => "file",
         };
@@ -57,6 +65,7 @@ class SearchResult extends Model
             "entry" => "Entry",
             "global" => "Global",
             "matrixBlock" => "Matrix Block",
+            "neoBlock" => "Neo Block",
             "category" => "Category",
             default => "Element",
         };

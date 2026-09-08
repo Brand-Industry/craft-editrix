@@ -22,9 +22,34 @@
         </div>
       </header>
 
+      <!-- Type tabs -->
+      <div class="editrix-mode-toggle">
+        <button
+          type="button"
+          class="editrix-mode-toggle__option"
+          :class="{ 'is-active': filters.type === 'replace' }"
+          @click="setLogType('replace')"
+        >
+          Replacements
+        </button>
+        <button
+          type="button"
+          class="editrix-mode-toggle__option"
+          :class="{ 'is-active': filters.type === 'search' }"
+          @click="setLogType('search')"
+        >
+          Searches
+        </button>
+      </div>
+      <p class="editrix-mode-toggle__hint">
+        {{ filters.type === 'replace'
+          ? 'Content changes made and whether they can still be reverted.'
+          : 'Searches performed, whether or not anything was replaced.' }}
+      </p>
+
       <!-- Filters -->
       <div class="editrix-logs__filters">
-        <select v-model="filters.status" @change="resetAndFetch">
+        <select v-if="filters.type === 'replace'" v-model="filters.status" @change="resetAndFetch">
           <option :value="null">All Statuses</option>
           <option value="success">Success</option>
           <option value="reverted">Reverted</option>
@@ -52,8 +77,12 @@
 
       <!-- Empty -->
       <div v-else-if="logs.length === 0" class="editrix-logs__empty">
-        <h3>No logs found</h3>
-        <p>Operation logs will appear here after you perform search &amp; replace operations.</p>
+        <h3>No {{ filters.type === 'replace' ? 'replacements' : 'searches' }} found</h3>
+        <p>
+          {{ filters.type === 'replace'
+            ? 'Content changes will appear here after you replace something.'
+            : 'Searches will appear here as soon as you run one.' }}
+        </p>
       </div>
 
       <!-- Table -->
@@ -65,9 +94,9 @@
               <th>User</th>
               <th v-if="sites.length > 1">Site</th>
               <th>Search</th>
-              <th>Replace With</th>
+              <th v-if="filters.type === 'replace'">Replace With</th>
               <th>Count</th>
-              <th>Status</th>
+              <th v-if="filters.type === 'replace'">Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -77,16 +106,25 @@
               <td>{{ log.userFullName || log.username }}</td>
               <td v-if="sites.length > 1">{{ log.siteName }}</td>
               <td class="editrix-logs__query"><code>{{ log.searchQuery }}</code></td>
-              <td class="editrix-logs__query"><code>{{ log.replaceWith }}</code></td>
+              <td v-if="filters.type === 'replace'" class="editrix-logs__query">
+                <code>{{ log.replaceWith }}</code>
+              </td>
               <td>{{ log.count }}</td>
-              <td>
+              <td v-if="filters.type === 'replace'">
                 <span :class="'editrix-badge editrix-badge--' + badgeClass(log.status)">
                   {{ log.status }}
                 </span>
               </td>
               <td class="editrix-logs__actions-cell">
+                <a
+                  v-if="filters.type === 'search'"
+                  class="editrix-btn editrix-btn--sm editrix-btn--ghost"
+                  :href="rerunUrl(log)"
+                >
+                  Re-run
+                </a>
                 <button
-                  v-if="canRevert && log.status !== 'reverted'"
+                  v-if="filters.type === 'replace' && canRevert && log.status !== 'reverted'"
                   class="editrix-btn editrix-btn--sm editrix-btn--ghost"
                   :disabled="actionInProgress"
                   @click="confirmRevert(log)"
@@ -157,6 +195,7 @@ const validateRevertUrl = config.validateRevertUrl || '';
 const revertUrl = config.revertUrl || '';
 const deleteUrl = config.deleteUrl || '';
 const exportUrl = config.exportUrl || '';
+const searchPageUrl = config.searchPageUrl || '';
 const canRevert = config.canRevert || false;
 const canDelete = config.canDelete || false;
 const canExport = config.canExport || false;
@@ -179,8 +218,15 @@ const pendingAction = ref(null);
 const filters = reactive({
   siteId: null,
   userId: null,
+  type: 'replace',
   status: null,
 });
+
+const setLogType = (type) => {
+  filters.type = type;
+  filters.status = null;
+  resetAndFetch();
+};
 
 // Methods
 const fetchLogs = async () => {
@@ -192,6 +238,7 @@ const fetchLogs = async () => {
     };
     if (filters.siteId) params.siteId = filters.siteId;
     if (filters.userId) params.userId = filters.userId;
+    if (filters.type) params.type = filters.type;
     if (filters.status) params.status = filters.status;
 
     const data = await get(apiUrl, params);
@@ -303,9 +350,26 @@ const executeAction = async () => {
 const handleExport = (format) => {
   const params = new URLSearchParams();
   params.append('format', format);
+  params.append('type', filters.type);
   if (filters.siteId) params.append('siteId', filters.siteId);
   if (filters.status) params.append('status', filters.status);
   window.location.href = exportUrl + '?' + params.toString();
+};
+
+const rerunUrl = (log) => {
+  const params = new URLSearchParams();
+  params.set('q', log.searchQuery);
+  if (log.useRegex) params.set('regex', '1');
+  if (!log.caseSensitive) params.set('ci', '1');
+  if (log.wholeWords) params.set('ww', '1');
+
+  const scope = log.scope || {};
+  if (scope.allSites) params.set('allSites', '1');
+  (scope.sections || []).forEach(v => params.append('sections[]', v));
+  (scope.fields || []).forEach(v => params.append('fields[]', v));
+  (scope.entryTypes || []).forEach(v => params.append('entryTypes[]', v));
+
+  return `${searchPageUrl}?${params.toString()}`;
 };
 
 const badgeClass = (status) => {

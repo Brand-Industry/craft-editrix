@@ -102,7 +102,8 @@ export function useApi() {
     });
 
     const queryString = searchParams.toString();
-    const fullUrl = queryString ? `${url}?${queryString}` : url;
+    const separator = url.includes('?') ? '&' : '?';
+    const fullUrl = queryString ? `${url}${separator}${queryString}` : url;
 
     return request(fullUrl, {
       method: 'GET',

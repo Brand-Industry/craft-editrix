@@ -9,6 +9,7 @@ use craft\elements\Entry;
 use craft\elements\GlobalSet;
 use craft\elements\Category;
 use craft\fields\Matrix;
+use craft\fields\Tags;
 use brandindustry\editrix\models\SearchResult;
 use brandindustry\editrix\Editrix;
 
@@ -130,14 +131,45 @@ class SearchService extends Component
             $entryQuery->type($entryTypeFilter);
         }
 
-        $entries = $entryQuery->all();
-
-        foreach ($entries as $entry) {
+        // Batch instead of ->all() so we never hold every entry (and every
+        // custom field value) on the site in memory at the same time.
+        foreach ($entryQuery->each() as $entry) {
             $section = $entry->getSection();
             $fieldLayout = $entry->getFieldLayout();
 
             if (!$fieldLayout) {
                 continue;
+            }
+
+            if (
+                (empty($fieldFilter) || in_array("title", $fieldFilter)) &&
+                $entry->getType()->hasTitleField
+            ) {
+                $matches = $this->findMatches(
+                    $entry->title,
+                    $query,
+                    $useRegex,
+                    $caseSensitive,
+                    $wholeWords
+                );
+
+                foreach ($matches as $match) {
+                    $result = new SearchResult();
+                    $result->elementType = "entry";
+                    $result->elementId = $entry->id;
+                    $result->elementTitle = $entry->title ?? "Untitled";
+                    $result->sectionHandle = $section->handle;
+                    $result->sectionName = $section->name;
+                    $result->fieldHandle = "title";
+                    $result->fieldName = Craft::t("editrix", "Title");
+                    $result->siteId = $siteId;
+                    $result->siteHandle = $site->handle;
+                    $result->matchContext = $match["context"];
+                    $result->fieldValue = (string) $entry->title;
+                    $result->matchStart = $match["start"];
+                    $result->matchEnd = $match["end"];
+                    $results[] = $result;
+                }
             }
 
             foreach ($fieldLayout->getCustomFields() as $field) {
@@ -177,7 +209,11 @@ class SearchService extends Component
                     }
                 }
 
-                if ($searchMatrix && $field instanceof Matrix) {
+                if (
+                    $searchMatrix &&
+                    $field instanceof Matrix &&
+                    $this->matrixFieldMayMatch($field->handle, $fieldFilter)
+                ) {
                     $matrixResults = $this->searchInMatrixField(
                         $entry,
                         $field,
@@ -192,6 +228,98 @@ class SearchService extends Component
                     );
                     $results = array_merge($results, $matrixResults);
                 }
+
+                if (
+                    $searchMatrix &&
+                    $this->isNeoField($field) &&
+                    $this->matrixFieldMayMatch($field->handle, $fieldFilter)
+                ) {
+                    $neoResults = $this->searchInNeoField(
+                        $entry,
+                        $field,
+                        $query,
+                        $siteId,
+                        $site->handle,
+                        $section,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords,
+                        $fieldFilter
+                    );
+                    $results = array_merge($results, $neoResults);
+                }
+
+                if (
+                    $field instanceof Tags &&
+                    (empty($fieldFilter) || in_array($field->handle, $fieldFilter))
+                ) {
+                    $tagResults = $this->searchInTagsField(
+                        $entry,
+                        $field,
+                        $query,
+                        $siteId,
+                        $site->handle,
+                        $section,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords
+                    );
+                    $results = array_merge($results, $tagResults);
+                }
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Tags fields link to Tag elements rather than storing text directly, so
+     * matches here are shown for discovery only - see SearchResult::$readOnly.
+     */
+    private function searchInTagsField(
+        Entry $entry,
+        Tags $tagsField,
+        string $query,
+        int $siteId,
+        string $siteHandle,
+        $section,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $wholeWords
+    ): array {
+        $results = [];
+
+        $tagQuery = $entry->getFieldValue($tagsField->handle);
+        if (!$tagQuery) {
+            return $results;
+        }
+
+        foreach ($tagQuery->all() as $tag) {
+            $matches = $this->findMatches(
+                $tag->title,
+                $query,
+                $useRegex,
+                $caseSensitive,
+                $wholeWords
+            );
+
+            foreach ($matches as $match) {
+                $result = new SearchResult();
+                $result->elementType = "entry";
+                $result->elementId = $entry->id;
+                $result->elementTitle = $entry->title ?? "Untitled";
+                $result->sectionHandle = $section->handle;
+                $result->sectionName = $section->name;
+                $result->fieldHandle = $tagsField->handle;
+                $result->fieldName = $tagsField->name;
+                $result->siteId = $siteId;
+                $result->siteHandle = $siteHandle;
+                $result->matchContext = $match["context"];
+                $result->fieldValue = (string) $tag->title;
+                $result->matchStart = $match["start"];
+                $result->matchEnd = $match["end"];
+                $result->readOnly = true;
+                $results[] = $result;
             }
         }
 
@@ -273,6 +401,97 @@ class SearchService extends Component
         return $results;
     }
 
+    /**
+     * Whether the Neo plugin (an optional third-party dependency, not
+     * required by this plugin) is installed and this field is one of its
+     * Neo fields.
+     */
+    private function isNeoField(FieldInterface $field): bool
+    {
+        return class_exists(\benf\neo\Field::class) &&
+            $field instanceof \benf\neo\Field;
+    }
+
+    /**
+     * Neo fields work like Matrix (block types with their own field
+     * layouts), just via a different plugin's classes - same traversal,
+     * same compound "fieldHandle.subFieldHandle" filter matching.
+     */
+    private function searchInNeoField(
+        Entry $entry,
+        $neoField,
+        string $query,
+        int $siteId,
+        string $siteHandle,
+        $section,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $wholeWords,
+        array $fieldFilter
+    ): array {
+        $results = [];
+
+        $blockQuery = $entry->getFieldValue($neoField->handle);
+        if (!$blockQuery) {
+            return $results;
+        }
+
+        $blocks = $blockQuery->all();
+
+        foreach ($blocks as $block) {
+            $blockType = $block->getType();
+            $blockFields = $blockType->getCustomFields();
+
+            foreach ($blockFields as $field) {
+                if (!empty($fieldFilter)) {
+                    $neoFieldHandle = "{$neoField->handle}.{$field->handle}";
+                    if (
+                        !in_array($field->handle, $fieldFilter) &&
+                        !in_array($neoFieldHandle, $fieldFilter)
+                    ) {
+                        continue;
+                    }
+                }
+
+                if (!$this->isSearchableField($field)) {
+                    continue;
+                }
+
+                $value = $block->getFieldValue($field->handle);
+                $matches = $this->findMatches(
+                    $value,
+                    $query,
+                    $useRegex,
+                    $caseSensitive,
+                    $wholeWords
+                );
+
+                foreach ($matches as $match) {
+                    $result = new SearchResult();
+                    $result->elementType = "neoBlock";
+                    $result->elementId = $block->id;
+                    $result->elementTitle = "Block #{$block->sortOrder}";
+                    $result->sectionHandle = $section->handle;
+                    $result->sectionName = $section->name;
+                    $result->fieldHandle = $field->handle;
+                    $result->fieldName = "{$neoField->name} → {$field->name}";
+                    $result->siteId = $siteId;
+                    $result->siteHandle = $siteHandle;
+                    $result->matchContext = $match["context"];
+                    $result->fieldValue = (string) $value;
+                    $result->matchStart = $match["start"];
+                    $result->matchEnd = $match["end"];
+                    $result->parentId = $entry->id;
+                    $result->parentTitle = $entry->title ?? "Untitled";
+                    $result->blockTypeHandle = $blockType->handle;
+                    $results[] = $result;
+                }
+            }
+        }
+
+        return $results;
+    }
+
     private function searchInGlobals(
         string $query,
         int $siteId,
@@ -285,6 +504,7 @@ class SearchService extends Component
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $globalSets = GlobalSet::find()->siteId($siteId)->all();
 
+        // Global sets are few per site, so ->all() here is fine.
         foreach ($globalSets as $globalSet) {
             $fieldLayout = $globalSet->getFieldLayout();
 
@@ -347,9 +567,9 @@ class SearchService extends Component
         $results = [];
         $site = Craft::$app->getSites()->getSiteById($siteId);
 
-        $categories = Category::find()->siteId($siteId)->status(null)->all();
+        $categoryQuery = Category::find()->siteId($siteId)->status(null);
 
-        foreach ($categories as $category) {
+        foreach ($categoryQuery->each() as $category) {
             $group = $category->getGroup();
             $fieldLayout = $category->getFieldLayout();
 
@@ -402,6 +622,30 @@ class SearchService extends Component
     }
 
     /**
+     * Whether a field filter still leaves room for a match inside this
+     * Matrix field, so we can skip loading its blocks entirely when not.
+     */
+    private function matrixFieldMayMatch(
+        string $matrixHandle,
+        array $fieldFilter
+    ): bool {
+        if (empty($fieldFilter)) {
+            return true;
+        }
+
+        foreach ($fieldFilter as $filterHandle) {
+            if (
+                $filterHandle === $matrixHandle ||
+                str_starts_with($filterHandle, "{$matrixHandle}.")
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Check if field is searchable
      */
     private function isSearchableField(FieldInterface $field): bool
@@ -418,7 +662,13 @@ class SearchService extends Component
         bool $caseSensitive,
         bool $wholeWords
     ): array {
-        if (!is_string($value) || empty($value) || empty($query)) {
+        // Rich text fields (Redactor, CKEditor, Matrix/relation values, etc.)
+        // return a FieldData/Markup wrapper object, not a plain string.
+        if ($value instanceof \Stringable) {
+            $value = (string) $value;
+        }
+
+        if (!is_string($value) || $value === "" || $query === "") {
             return [];
         }
 

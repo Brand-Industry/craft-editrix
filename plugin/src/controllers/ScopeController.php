@@ -4,6 +4,8 @@ namespace brandindustry\editrix\controllers;
 
 use Craft;
 use craft\web\Controller;
+use craft\fields\Matrix;
+use craft\fields\Tags;
 use yii\web\Response;
 use brandindustry\editrix\Editrix;
 
@@ -58,11 +60,99 @@ class ScopeController extends Controller
         $this->requireAcceptsJson();
 
         $settings = Editrix::$plugin->getSettings();
-        $allFields = Craft::$app->getFields()->getAllFields();
 
-        $fields = array_filter($allFields, function ($field) use ($settings) {
-            return in_array(get_class($field), $settings->searchableFieldTypes);
-        });
+        $entryTypeIds = array_map(
+            "intval",
+            (array) Craft::$app->getRequest()->getParam("entryTypeId", [])
+        );
+
+        $isSearchable = fn($field) => in_array(
+            get_class($field),
+            $settings->searchableFieldTypes
+        );
+
+        if (!empty($entryTypeIds)) {
+            $fieldsByHandle = [];
+
+            foreach ($entryTypeIds as $entryTypeId) {
+                $entryType = Craft::$app
+                    ->getSections()
+                    ->getEntryTypeById($entryTypeId);
+
+                if (!$entryType) {
+                    continue;
+                }
+
+                if ($entryType->hasTitleField && !isset($fieldsByHandle["title"])) {
+                    $fieldsByHandle["title"] = [
+                        "id" => null,
+                        "name" => Craft::t("editrix", "Title"),
+                        "handle" => "title",
+                        "type" => "Title",
+                        "readOnly" => false,
+                    ];
+                }
+
+                $fieldLayout = $entryType->getFieldLayout();
+
+                if (!$fieldLayout) {
+                    continue;
+                }
+
+                foreach ($fieldLayout->getCustomFields() as $field) {
+                    if ($isSearchable($field)) {
+                        $fieldsByHandle[$field->handle] = [
+                            "id" => $field->id,
+                            "name" => $field->name,
+                            "handle" => $field->handle,
+                            "type" => (new \ReflectionClass(
+                                $field
+                            ))->getShortName(),
+                            "readOnly" => false,
+                        ];
+                        continue;
+                    }
+
+                    if ($field instanceof Matrix) {
+                        foreach (
+                            $this->matrixSubFields($field, $isSearchable)
+                            as $subHandle => $subField
+                        ) {
+                            $fieldsByHandle[$subHandle] = $subField;
+                        }
+                        continue;
+                    }
+
+                    if ($this->isNeoField($field)) {
+                        foreach (
+                            $this->neoSubFields($field, $isSearchable)
+                            as $subHandle => $subField
+                        ) {
+                            $fieldsByHandle[$subHandle] = $subField;
+                        }
+                        continue;
+                    }
+
+                    if ($field instanceof Tags) {
+                        $fieldsByHandle[$field->handle] = [
+                            "id" => $field->id,
+                            "name" => $field->name,
+                            "handle" => $field->handle,
+                            "type" => "Tags",
+                            "readOnly" => true,
+                        ];
+                    }
+                }
+            }
+
+            return $this->asJson([
+                "success" => true,
+                "fields" => array_values($fieldsByHandle),
+            ]);
+        }
+
+        $allFields = Craft::$app->getFields()->getAllFields();
+        $fields = array_filter($allFields, $isSearchable);
 
         $data = array_map(
             fn($field) => [
@@ -70,6 +160,7 @@ class ScopeController extends Controller
                 "name" => $field->name,
                 "handle" => $field->handle,
                 "type" => (new \ReflectionClass($field))->getShortName(),
+                "readOnly" => false,
             ],
             $fields
         );
@@ -80,11 +171,91 @@ class ScopeController extends Controller
         ]);
     }
 
+    /**
+     * Searchable fields nested inside a Matrix field's block types, keyed by
+     * "matrixHandle.fieldHandle" - the same compound handle SearchService
+     * matches against when a Matrix field is scoped down to specific fields.
+     */
+    private function matrixSubFields(Matrix $matrixField, callable $isSearchable): array
+    {
+        $subFields = [];
+
+        foreach ($matrixField->getBlockTypes() as $blockType) {
+            foreach ($blockType->getCustomFields() as $field) {
+                if (!$isSearchable($field)) {
+                    continue;
+                }
+
+                $handle = "{$matrixField->handle}.{$field->handle}";
+                $subFields[$handle] = [
+                    "id" => $field->id,
+                    "name" => "{$matrixField->name} → {$field->name}",
+                    "handle" => $handle,
+                    "type" => (new \ReflectionClass($field))->getShortName(),
+                    "readOnly" => false,
+                ];
+            }
+        }
+
+        return $subFields;
+    }
+
+    /**
+     * Whether the Neo plugin (an optional third-party dependency, not
+     * required by this plugin) is installed and this field is one of its
+     * Neo fields.
+     */
+    private function isNeoField($field): bool
+    {
+        return class_exists(\benf\neo\Field::class) &&
+            $field instanceof \benf\neo\Field;
+    }
+
+    /**
+     * Same as matrixSubFields(), for a Neo field's block types.
+     */
+    private function neoSubFields($neoField, callable $isSearchable): array
+    {
+        $subFields = [];
+
+        foreach ($neoField->getBlockTypes() as $blockType) {
+            foreach ($blockType->getCustomFields() as $field) {
+                if (!$isSearchable($field)) {
+                    continue;
+                }
+
+                $handle = "{$neoField->handle}.{$field->handle}";
+                $subFields[$handle] = [
+                    "id" => $field->id,
+                    "name" => "{$neoField->name} → {$field->name}",
+                    "handle" => $handle,
+                    "type" => (new \ReflectionClass($field))->getShortName(),
+                    "readOnly" => false,
+                ];
+            }
+        }
+
+        return $subFields;
+    }
+
     public function actionEntryTypes(): Response
     {
         $this->requireAcceptsJson();
 
+        $sectionIds = array_map(
+            "intval",
+            (array) Craft::$app->getRequest()->getParam("sectionId", [])
+        );
+
         $sections = Craft::$app->getSections()->getAllSections();
+
+        if (!empty($sectionIds)) {
+            $sections = array_filter(
+                $sections,
+                fn($section) => in_array($section->id, $sectionIds)
+            );
+        }
+
         $entryTypes = [];
 
         foreach ($sections as $section) {

@@ -1,7 +1,7 @@
 {
   "name": "brand-industry/craft-editrix",
   "description": "The safest way to update content at scale in Craft CMS. Advanced search & replace with visual diff, dry-run, logs, and rollback.",
-  "version": "1.0.0",
+  "version": "1.0.0-beta.1",
   "type": "craft-plugin",
   "license": "proprietary",
   "keywords": [

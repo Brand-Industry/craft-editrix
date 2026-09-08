@@ -31,12 +31,14 @@ class Install extends Migration
             'id' => $this->primaryKey(),
             'siteId' => $this->integer()->notNull(),
             'userId' => $this->integer()->notNull(),
+            'type' => $this->string(20)->notNull()->defaultValue('replace'), // search, replace
             'searchQuery' => $this->text()->notNull(),
             'replaceWith' => $this->text()->notNull(),
             'useRegex' => $this->boolean()->defaultValue(false),
             'caseSensitive' => $this->boolean()->defaultValue(true),
             'wholeWords' => $this->boolean()->defaultValue(false),
-            'replacementCount' => $this->integer()->defaultValue(0),
+            'scope' => $this->text(), // JSON: sections, fields, entryTypes, search toggles
+            'replacementCount' => $this->integer()->defaultValue(0), // result count for search logs
             'replacements' => $this->longText(),
             'status' => $this->string(20)->defaultValue('success'), // success, reverted, partial
             'revertedAt' => $this->dateTime(),
@@ -71,6 +73,7 @@ class Install extends Migration
         // Logs indexes
         $this->createIndex(null, self::TABLE_LOGS, ['siteId']);
         $this->createIndex(null, self::TABLE_LOGS, ['userId']);
+        $this->createIndex(null, self::TABLE_LOGS, ['type']);
         $this->createIndex(null, self::TABLE_LOGS, ['status']);
         $this->createIndex(null, self::TABLE_LOGS, ['dateCreated']);
 

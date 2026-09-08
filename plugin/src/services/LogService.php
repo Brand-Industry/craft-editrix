@@ -38,6 +38,7 @@ class LogService extends Component
             ->insert(Install::TABLE_LOGS, [
                 "siteId" => $siteId,
                 "userId" => $userId,
+                "type" => "replace",
                 "searchQuery" => $searchQuery,
                 "replaceWith" => $replaceWith,
                 "useRegex" => $useRegex,
@@ -45,6 +46,53 @@ class LogService extends Component
                 "wholeWords" => $wholeWords,
                 "replacementCount" => count($replacements),
                 "replacements" => json_encode($replacements),
+                "status" => "success",
+                "dateCreated" => Db::prepareDateForDb($now),
+                "dateUpdated" => Db::prepareDateForDb($now),
+                "uid" => Craft::$app->getSecurity()->generateRandomString(),
+            ])
+            ->execute();
+
+        return (int) Craft::$app->getDb()->getLastInsertID();
+    }
+
+    /**
+     * Log a plain search - no field content is touched, so we only keep
+     * enough to show it in History and let the user re-run the same
+     * query/scope later, not a snapshot of the results themselves.
+     */
+    public function createSearchLog(
+        int $siteId,
+        string $searchQuery,
+        int $resultsCount,
+        array $scope,
+        bool $useRegex = false,
+        bool $caseSensitive = true,
+        bool $wholeWords = false
+    ): ?int {
+        $userId = Craft::$app->getUser()->getId();
+
+        if (!$userId) {
+            return null;
+        }
+
+        $now = new DateTime();
+
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->insert(Install::TABLE_LOGS, [
+                "siteId" => $siteId,
+                "userId" => $userId,
+                "type" => "search",
+                "searchQuery" => $searchQuery,
+                "replaceWith" => "",
+                "useRegex" => $useRegex,
+                "caseSensitive" => $caseSensitive,
+                "wholeWords" => $wholeWords,
+                "scope" => json_encode($scope),
+                "replacementCount" => $resultsCount,
+                "replacements" => null,
                 "status" => "success",
                 "dateCreated" => Db::prepareDateForDb($now),
                 "dateUpdated" => Db::prepareDateForDb($now),
@@ -88,6 +136,10 @@ class LogService extends Component
             $query->andWhere(["l.userId" => $filters["userId"]]);
         }
 
+        if (!empty($filters["type"])) {
+            $query->andWhere(["l.type" => $filters["type"]]);
+        }
+
         if (!empty($filters["status"])) {
             $query->andWhere(["l.status" => $filters["status"]]);
         }
@@ -128,6 +180,10 @@ class LogService extends Component
 
         if (!empty($filters["userId"])) {
             $query->andWhere(["l.userId" => $filters["userId"]]);
+        }
+
+        if (!empty($filters["type"])) {
+            $query->andWhere(["l.type" => $filters["type"]]);
         }
 
         if (!empty($filters["status"])) {
@@ -199,6 +255,7 @@ class LogService extends Component
         fputcsv($output, [
             "ID",
             "Date",
+            "Type",
             "User",
             "Site",
             "Search Query",
@@ -211,6 +268,7 @@ class LogService extends Component
             fputcsv($output, [
                 $log["id"],
                 $log["dateCreated"],
+                $log["type"] ?? "replace",
                 $log["username"] ?? "Unknown",
                 $log["siteName"] ?? "Unknown",
                 $log["searchQuery"],
@@ -235,12 +293,14 @@ class LogService extends Component
             return [
                 "id" => $log["id"],
                 "date" => $log["dateCreated"],
+                "type" => $log["type"] ?? "replace",
                 "user" => $log["username"] ?? "Unknown",
                 "site" => $log["siteName"] ?? "Unknown",
                 "searchQuery" => $log["searchQuery"],
                 "replaceWith" => $log["replaceWith"],
                 "count" => (int) $log["replacementCount"],
                 "status" => $log["status"],
+                "scope" => json_decode($log["scope"] ?? "", true),
                 "replacements" => json_decode($log["replacements"], true),
             ];
         }, $logs);

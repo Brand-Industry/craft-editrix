@@ -48,6 +48,7 @@ class LogController extends Controller
         $filters = [
             "siteId" => $request->getParam("siteId"),
             "userId" => $request->getParam("userId"),
+            "type" => $request->getParam("type"),
             "status" => $request->getParam("status"),
             "limit" => (int) $request->getParam("limit", 20),
             "offset" => (int) $request->getParam("offset", 0),
@@ -61,6 +62,7 @@ class LogController extends Controller
                 "id" => $log["id"],
                 "date" => $log["dateCreated"],
                 "relativeDate" => $this->getRelativeDate($log["dateCreated"]),
+                "type" => $log["type"] ?? "replace",
                 "userId" => $log["userId"],
                 "username" => $log["username"] ?? "Unknown",
                 "userFullName" =>
@@ -74,6 +76,10 @@ class LogController extends Controller
                 "siteName" => $log["siteName"] ?? "Unknown",
                 "searchQuery" => $log["searchQuery"],
                 "replaceWith" => $log["replaceWith"],
+                "useRegex" => (bool) $log["useRegex"],
+                "caseSensitive" => (bool) $log["caseSensitive"],
+                "wholeWords" => (bool) $log["wholeWords"],
+                "scope" => json_decode($log["scope"] ?? "", true),
                 "count" => (int) $log["replacementCount"],
                 "status" => $log["status"],
                 "revertedAt" => $log["revertedAt"],
@@ -264,6 +270,7 @@ class LogController extends Controller
         $format = $request->getParam("format", "csv");
         $filters = [
             "siteId" => $request->getParam("siteId"),
+            "type" => $request->getParam("type"),
             "status" => $request->getParam("status"),
         ];
 
@@ -347,6 +354,9 @@ class LogController extends Controller
             ),
             "exportUrl" => \craft\helpers\UrlHelper::cpUrl(
                 "editrix/api/logs/export"
+            ),
+            "searchPageUrl" => \craft\helpers\UrlHelper::cpUrl(
+                "editrix/search"
             ),
             "canRevert" => Editrix::$plugin->userCan("editrix:revert"),
             "canDelete" => Editrix::$plugin->userCan("editrix:deleteLogs"),
