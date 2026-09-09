@@ -2,8 +2,8 @@
 /buildchain/node_modules/
 /vendor/
 
-# Build output
-/plugin/src/web/dist/
+# Build output - committed intentionally: this plugin is installed via
+# Composer/Packagist, and consumers don't run the buildchain themselves.
 
 # IDE
 .idea/

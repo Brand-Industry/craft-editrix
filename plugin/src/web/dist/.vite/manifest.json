@@ -1,0 +1,30 @@
+{
+  "_LoadingSpinner-Bq_bSmiY.js": {
+    "file": "js/LoadingSpinner-Bq_bSmiY.js",
+    "name": "LoadingSpinner"
+  },
+  "src/js/app/logs.js": {
+    "file": "js/editrix-logs.js",
+    "name": "editrix-logs",
+    "src": "src/js/app/logs.js",
+    "isEntry": true,
+    "imports": [
+      "_LoadingSpinner-Bq_bSmiY.js"
+    ],
+    "css": [
+      "css/editrix-logs.css"
+    ]
+  },
+  "src/js/app/main.js": {
+    "file": "js/editrix.js",
+    "name": "editrix",
+    "src": "src/js/app/main.js",
+    "isEntry": true,
+    "imports": [
+      "_LoadingSpinner-Bq_bSmiY.js"
+    ],
+    "css": [
+      "css/editrix.css"
+    ]
+  }
+}
