@@ -180,7 +180,7 @@ class ScopeController extends Controller
     {
         $subFields = [];
 
-        foreach ($matrixField->getBlockTypes() as $blockType) {
+        foreach ($matrixField->getEntryTypes() as $blockType) {
             foreach ($blockType->getCustomFields() as $field) {
                 if (!$isSearchable($field)) {
                     continue;

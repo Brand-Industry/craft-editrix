@@ -135,6 +135,15 @@ class SearchService extends Component
         // custom field value) on the site in memory at the same time.
         foreach ($entryQuery->each() as $entry) {
             $section = $entry->getSection();
+
+            // On Craft 5, nested entries (e.g. Matrix blocks, which are now
+            // regular Entry elements) don't belong to a section. They're
+            // reached separately via searchInMatrixField() through their
+            // owner, so skip them here to avoid duplicate/orphaned results.
+            if (!$section) {
+                continue;
+            }
+
             $fieldLayout = $entry->getFieldLayout();
 
             if (!$fieldLayout) {
