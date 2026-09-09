@@ -1,7 +1,7 @@
 {
   "name": "brand-industry/craft-editrix",
   "description": "The safest way to update content at scale in Craft CMS. Advanced search & replace with visual diff, dry-run, logs, and rollback.",
-  "version": "1.0.0-beta.1",
+  "version": "2.0.0-beta.1",
   "type": "craft-plugin",
   "license": "proprietary",
   "keywords": [
@@ -31,8 +31,8 @@
     "docs": "https://github.com/brand-industry/craft-editrix"
   },
   "require": {
-    "php": "^8.0.2",
-    "craftcms/cms": "^4.0"
+    "php": "^8.2",
+    "craftcms/cms": "^5.0.0"
   },
   "autoload": {
     "psr-4": {
