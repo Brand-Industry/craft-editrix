@@ -20,6 +20,10 @@ class LicenseService extends Component
     public const FEATURE_SEARCH_ASSETS = "search.assets";
     public const FEATURE_SEARCH_USERS = "search.users";
 
+    // Which entries a category/tag is assigned to - a relationship lookup,
+    // not a text search (see AssignmentService).
+    public const FEATURE_ASSIGNMENT_SEARCH = "assignmentSearch";
+
     public const FEATURE_REGEX = "regex";
     public const FEATURE_REGEX_ADVANCED = "regex.advanced";
     public const FEATURE_CASE_INSENSITIVE = "caseInsensitive";
@@ -53,22 +57,28 @@ class LicenseService extends Component
     public const FEATURE_ENV_INDICATOR = "envIndicator";
 
     private array $featureMatrix = [
+        // Standard is the free edition: general Search and Search & Replace
+        // (Entries + Globals, no segmented scope) stay useful without a
+        // license. Everything that used to be "Standard or Pro" (Matrix/Neo,
+        // Categories, segmented scope, multi-site, CSV export) now requires
+        // Pro.
         Editrix::EDITION_STANDARD => [
             self::FEATURE_SEARCH_ENTRIES => true,
             self::FEATURE_SEARCH_GLOBALS => true,
-            self::FEATURE_SEARCH_MATRIX => true,
-            self::FEATURE_SEARCH_CATEGORIES => true,
+            self::FEATURE_SEARCH_MATRIX => false,
+            self::FEATURE_SEARCH_CATEGORIES => false,
             self::FEATURE_SEARCH_SEO => false,
             self::FEATURE_SEARCH_ASSETS => false,
             self::FEATURE_SEARCH_USERS => false,
+            self::FEATURE_ASSIGNMENT_SEARCH => false,
 
             self::FEATURE_REGEX => true,
             self::FEATURE_REGEX_ADVANCED => false,
             self::FEATURE_CASE_INSENSITIVE => true,
             self::FEATURE_WHOLE_WORDS => true,
 
-            self::FEATURE_MULTISITE => true,
-            self::FEATURE_SCOPE_FILTERS => true, // Sections, Sites only
+            self::FEATURE_MULTISITE => false,
+            self::FEATURE_SCOPE_FILTERS => false,
             self::FEATURE_SCOPE_FILTERS_FULL => false,
 
             self::FEATURE_DIFF_PREVIEW => true, // Text only
@@ -77,7 +87,7 @@ class LicenseService extends Component
 
             self::FEATURE_LOGS => true, // 30 days
             self::FEATURE_REVERT => true,
-            self::FEATURE_EXPORT_CSV => true,
+            self::FEATURE_EXPORT_CSV => false,
             self::FEATURE_EXPORT_JSON => false,
 
             self::FEATURE_PRESETS => true, // 5 max
@@ -103,6 +113,7 @@ class LicenseService extends Component
             self::FEATURE_SEARCH_SEO => true,
             self::FEATURE_SEARCH_ASSETS => true,
             self::FEATURE_SEARCH_USERS => true,
+            self::FEATURE_ASSIGNMENT_SEARCH => true,
 
             self::FEATURE_REGEX => true,
             self::FEATURE_REGEX_ADVANCED => true,

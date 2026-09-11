@@ -18,6 +18,7 @@ use brandindustry\editrix\services\SearchService;
 use brandindustry\editrix\services\ReplaceService;
 use brandindustry\editrix\services\LogService;
 use brandindustry\editrix\services\LicenseService;
+use brandindustry\editrix\services\AssignmentService;
 
 /**
  * Editrix - The safest way to update content at scale in Craft CMS
@@ -26,6 +27,7 @@ use brandindustry\editrix\services\LicenseService;
  * @property ReplaceService $replace
  * @property LogService $log
  * @property LicenseService $license
+ * @property AssignmentService $assignment
  */
 
 class Editrix extends Plugin
@@ -89,6 +91,7 @@ class Editrix extends Plugin
             "replace" => ReplaceService::class,
             "log" => LogService::class,
             "license" => LicenseService::class,
+            "assignment" => AssignmentService::class,
         ]);
 
         $this->installCpEventListeners();
