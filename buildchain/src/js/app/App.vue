@@ -21,7 +21,7 @@
         <header class="editrix-search__header">
           <h1 class="editrix-search__title">
             {{ t('Find & Replace') }}
-            <EnvironmentBadge v-if="hasFeature('envIndicator')" />
+            <EnvironmentBadge v-if="hasFeature('envIndicator') && safety.showEnvironmentIndicator" />
           </h1>
 
         </header>
@@ -228,6 +228,8 @@
       :title="t('Confirm Replacement')"
       :count="confirmCount"
       :loading="replacing"
+      :require-confirmation-code="requiresConfirmationCode"
+      :confirmation-reasons="confirmationReasons"
       @confirm="handleReplace"
       @cancel="cancelReplaceConfirm"
     />
@@ -256,7 +258,7 @@ import AssignmentResultsList from '../components/assignments/AssignmentResultsLi
 import RecentActivity from '../components/search/RecentActivity.vue';
 import ActivityChart from '../components/logs/ActivityChart.vue';
 
-const { t, hasFeature, currentSiteId, logsUrl, dailyCountsUrl } = useConfig();
+const { t, hasFeature, currentSiteId, logsUrl, dailyCountsUrl, safety, isProduction } = useConfig();
 const { get: apiGet } = useApi();
 
 provide('t', t);
@@ -478,6 +480,34 @@ const confirmCount = computed(() =>
   singleReplaceTarget.value ? 1 : selectedCount.value
 );
 
+// Safety settings make a large or production replace a deliberate act:
+// past the bulk threshold, or in production with Safe Mode on, the
+// confirm modal requires typing "REPLACE" (also enforced server-side).
+const requiresConfirmationCode = computed(() => {
+  const threshold = safety.value.bulkConfirmationThreshold;
+  const overThreshold =
+    typeof threshold === 'number' && confirmCount.value > threshold;
+  const productionRisk = safety.value.productionSafeMode && isProduction.value;
+  return overThreshold || productionRisk;
+});
+
+const confirmationReasons = computed(() => {
+  const reasons = [];
+  const threshold = safety.value.bulkConfirmationThreshold;
+  if (typeof threshold === 'number' && confirmCount.value > threshold) {
+    reasons.push(
+      t('This will affect {count} entries, above your bulk confirmation threshold of {threshold}.', {
+        count: confirmCount.value,
+        threshold,
+      })
+    );
+  }
+  if (safety.value.productionSafeMode && isProduction.value) {
+    reasons.push(t('You are replacing content in a production environment.'));
+  }
+  return reasons;
+});
+
 const handleRequestSingleReplace = ({ result, replaceWith }) => {
   singleReplaceTarget.value = result;
   singleReplaceValue.value = replaceWith;
@@ -491,7 +521,7 @@ const cancelReplaceConfirm = () => {
   singleReplaceTarget.value = null;
 };
 
-const handleReplace = async () => {
+const handleReplace = async (confirmationCode) => {
   replacing.value = true;
 
   try {
@@ -499,8 +529,9 @@ const handleReplace = async () => {
       ? await replace({
           results: [singleReplaceTarget.value],
           replaceWith: singleReplaceValue.value,
+          confirmationCode,
         })
-      : await replace();
+      : await replace({ confirmationCode });
 
     if (data?.success) {
       window.Craft?.cp?.displayNotice?.(data.message);

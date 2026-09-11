@@ -271,6 +271,7 @@ class SearchController extends Controller
         $sites = Craft::$app->getSites()->getAllSites();
         $currentSite = Craft::$app->getSites()->getCurrentSite();
         $license = Editrix::$plugin->license;
+        $settings = Editrix::$plugin->getSettings();
 
         return [
             "sites" => array_map(
@@ -328,6 +329,14 @@ class SearchController extends Controller
 
             "canReplace" => Editrix::$plugin->userCan("editrix:replace"),
             "canExport" => Editrix::$plugin->userCan("editrix:export"),
+
+            "safety" => [
+                "bulkConfirmationThreshold" =>
+                    $settings->bulkConfirmationThreshold,
+                "productionSafeMode" => $settings->productionSafeMode,
+                "showEnvironmentIndicator" =>
+                    $settings->showEnvironmentIndicator,
+            ],
 
             "license" => $license->getFeaturesConfig(),
 
@@ -425,6 +434,10 @@ class SearchController extends Controller
             "Recent Activity",
             "Re-run",
             "View all",
+            "Confirmation required",
+            "This will affect {count} entries, above your bulk confirmation threshold of {threshold}.",
+            "You are replacing content in a production environment.",
+            'Type "REPLACE" below to confirm.',
         ];
 
         $translations = [];
