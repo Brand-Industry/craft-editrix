@@ -140,7 +140,11 @@ export function useSearch(actionMode) {
 
   // Replace methods. Pass `results`/`replaceWith` to replace a single match
   // (e.g. from the detail modal) instead of the current bulk selection.
-  const replace = async ({ results: targets, replaceWith } = {}) => {
+  const replace = async ({
+    results: targets,
+    replaceWith,
+    confirmationCode,
+  } = {}) => {
     const toReplace = (targets ?? selectedResults.value).filter(
       r => !r.readOnly
     );
@@ -158,6 +162,7 @@ export function useSearch(actionMode) {
         useRegex: searchParams.useRegex,
         caseInsensitive: searchParams.caseInsensitive,
         wholeWords: searchParams.wholeWords,
+        confirmationCode: confirmationCode ?? '',
       });
 
       return data;
