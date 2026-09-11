@@ -10,6 +10,7 @@ use craft\elements\GlobalSet;
 use craft\elements\Category;
 use craft\fields\Matrix;
 use craft\fields\Tags;
+use brandindustry\editrix\helpers\HtmlText;
 use brandindustry\editrix\models\SearchResult;
 use brandindustry\editrix\Editrix;
 
@@ -182,13 +183,22 @@ class SearchService extends Component
 
                 if ($this->isSearchableField($field)) {
                     $value = $entry->getFieldValue($field->handle);
-                    $matches = $this->findMatches(
-                        $value,
-                        $query,
-                        $useRegex,
-                        $caseSensitive,
-                        $wholeWords
-                    );
+                    $isRich = $this->isRichTextField($field);
+                    $matches = $isRich
+                        ? $this->findMatchesInHtml(
+                            $value,
+                            $query,
+                            $useRegex,
+                            $caseSensitive,
+                            $wholeWords
+                        )
+                        : $this->findMatches(
+                            $value,
+                            $query,
+                            $useRegex,
+                            $caseSensitive,
+                            $wholeWords
+                        );
 
                     foreach ($matches as $match) {
                         $result = new SearchResult();
@@ -205,6 +215,7 @@ class SearchService extends Component
                         $result->fieldValue = (string) $value;
                         $result->matchStart = $match["start"];
                         $result->matchEnd = $match["end"];
+                        $result->isRichText = $isRich;
                         $results[] = $result;
                     }
                 }
@@ -319,6 +330,7 @@ class SearchService extends Component
                 $result->matchStart = $match["start"];
                 $result->matchEnd = $match["end"];
                 $result->readOnly = true;
+                $result->readOnlyReason = "tag";
                 $results[] = $result;
             }
         }
@@ -367,13 +379,22 @@ class SearchService extends Component
                 }
 
                 $value = $block->getFieldValue($field->handle);
-                $matches = $this->findMatches(
-                    $value,
-                    $query,
-                    $useRegex,
-                    $caseSensitive,
-                    $wholeWords
-                );
+                $isRich = $this->isRichTextField($field);
+                $matches = $isRich
+                    ? $this->findMatchesInHtml(
+                        $value,
+                        $query,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords
+                    )
+                    : $this->findMatches(
+                        $value,
+                        $query,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords
+                    );
 
                 foreach ($matches as $match) {
                     $result = new SearchResult();
@@ -393,6 +414,7 @@ class SearchService extends Component
                     $result->parentId = $entry->id;
                     $result->parentTitle = $entry->title ?? "Untitled";
                     $result->blockTypeHandle = $blockType->handle;
+                    $result->isRichText = $isRich;
                     $results[] = $result;
                 }
             }
@@ -458,13 +480,22 @@ class SearchService extends Component
                 }
 
                 $value = $block->getFieldValue($field->handle);
-                $matches = $this->findMatches(
-                    $value,
-                    $query,
-                    $useRegex,
-                    $caseSensitive,
-                    $wholeWords
-                );
+                $isRich = $this->isRichTextField($field);
+                $matches = $isRich
+                    ? $this->findMatchesInHtml(
+                        $value,
+                        $query,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords
+                    )
+                    : $this->findMatches(
+                        $value,
+                        $query,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords
+                    );
 
                 foreach ($matches as $match) {
                     $result = new SearchResult();
@@ -484,6 +515,7 @@ class SearchService extends Component
                     $result->parentId = $entry->id;
                     $result->parentTitle = $entry->title ?? "Untitled";
                     $result->blockTypeHandle = $blockType->handle;
+                    $result->isRichText = $isRich;
                     $results[] = $result;
                 }
             }
@@ -525,13 +557,22 @@ class SearchService extends Component
                 }
 
                 $value = $globalSet->getFieldValue($field->handle);
-                $matches = $this->findMatches(
-                    $value,
-                    $query,
-                    $useRegex,
-                    $caseSensitive,
-                    $wholeWords
-                );
+                $isRich = $this->isRichTextField($field);
+                $matches = $isRich
+                    ? $this->findMatchesInHtml(
+                        $value,
+                        $query,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords
+                    )
+                    : $this->findMatches(
+                        $value,
+                        $query,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords
+                    );
 
                 foreach ($matches as $match) {
                     $result = new SearchResult();
@@ -548,6 +589,7 @@ class SearchService extends Component
                     $result->fieldValue = (string) $value;
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
+                    $result->isRichText = $isRich;
                     $results[] = $result;
                 }
             }
@@ -590,13 +632,22 @@ class SearchService extends Component
                 }
 
                 $value = $category->getFieldValue($field->handle);
-                $matches = $this->findMatches(
-                    $value,
-                    $query,
-                    $useRegex,
-                    $caseSensitive,
-                    $wholeWords
-                );
+                $isRich = $this->isRichTextField($field);
+                $matches = $isRich
+                    ? $this->findMatchesInHtml(
+                        $value,
+                        $query,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords
+                    )
+                    : $this->findMatches(
+                        $value,
+                        $query,
+                        $useRegex,
+                        $caseSensitive,
+                        $wholeWords
+                    );
 
                 foreach ($matches as $match) {
                     $result = new SearchResult();
@@ -613,6 +664,7 @@ class SearchService extends Component
                     $result->fieldValue = (string) $value;
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
+                    $result->isRichText = $isRich;
                     $results[] = $result;
                 }
             }
@@ -655,7 +707,122 @@ class SearchService extends Component
         return in_array($fieldClass, $settings->searchableFieldTypes);
     }
 
-    private function findMatches(
+    /**
+     * Whether this field stores HTML (Redactor/CKEditor) rather than plain
+     * text - these need tag-aware matching so a phrase isn't missed just
+     * because a word in the middle happens to be wrapped in <i>/<a>/etc.
+     */
+    public function isRichTextField(FieldInterface $field): bool
+    {
+        return (class_exists(\craft\redactor\Field::class) &&
+            $field instanceof \craft\redactor\Field) ||
+            (class_exists(\craft\ckeditor\Field::class) &&
+                $field instanceof \craft\ckeditor\Field);
+    }
+
+    /**
+     * Like findMatches(), but for HTML field values: matches are found
+     * against the tag-stripped text (so a phrase split by an inline tag,
+     * e.g. "Our <i>Featured</i> Offers", still matches "Our Featured
+     * Offers"), then mapped back to their real position in the raw HTML for
+     * display/highlighting. A match is flagged "crossesTag" when its raw
+     * HTML span contains a tag boundary - Replace intentionally treats
+     * those as read-only, since blindly overwriting that span would corrupt
+     * the markup rather than just the text.
+     */
+    public function findMatchesInHtml(
+        mixed $value,
+        string $query,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $wholeWords
+    ): array {
+        if ($value instanceof \Stringable) {
+            $value = (string) $value;
+        }
+
+        if (!is_string($value) || $value === "" || $query === "") {
+            return [];
+        }
+
+        [$plain, $charMap] = HtmlText::stripTagsWithCharMap($value);
+
+        if ($plain === "") {
+            return [];
+        }
+
+        $plainMatches = $this->findMatches(
+            $plain,
+            $query,
+            $useRegex,
+            $caseSensitive,
+            $wholeWords
+        );
+
+        if (empty($plainMatches)) {
+            return [];
+        }
+
+        // findMatches() itself mixes units depending on which branch
+        // handles the search: the regex, whole-word, and multi-word-phrase
+        // paths report BYTE offsets (preg's PREG_OFFSET_CAPTURE always
+        // does, even with the /u flag), while the plain single-word path
+        // reports CHARACTER offsets (mb_strpos/mb_substr) - the same
+        // convention getMatchContext() and the frontend's JS string
+        // slicing both expect. $charMap is keyed by character position, so
+        // byte-based offsets need converting first. Must stay in sync with
+        // findMatches()'s own control flow.
+        $offsetsAreBytes =
+            $useRegex || $wholeWords || mb_strpos($query, " ") !== false;
+
+        $plainCharLen = count($charMap);
+        $results = [];
+
+        foreach ($plainMatches as $match) {
+            $startChar = $offsetsAreBytes
+                ? mb_strlen(substr($plain, 0, $match["start"]))
+                : $match["start"];
+            $endChar = $offsetsAreBytes
+                ? mb_strlen(substr($plain, 0, $match["end"]))
+                : $match["end"];
+
+            if (
+                !isset($charMap[$startChar]) ||
+                $endChar <= $startChar ||
+                $endChar > $plainCharLen
+            ) {
+                continue;
+            }
+
+            $rawStart = $charMap[$startChar];
+            $rawEnd = isset($charMap[$endChar - 1])
+                ? $charMap[$endChar - 1] + 1
+                : $rawStart;
+
+            $crossesTag = str_contains(
+                mb_substr($value, $rawStart, $rawEnd - $rawStart),
+                "<"
+            );
+
+            $results[] = [
+                "start" => $rawStart,
+                "end" => $rawEnd,
+                "match" => mb_substr($value, $rawStart, $rawEnd - $rawStart),
+                "context" => $this->getMatchContext(
+                    $value,
+                    $rawStart,
+                    $rawEnd,
+                    50
+                ),
+                "crossesTag" => $crossesTag,
+            ];
+        }
+
+        return $results;
+    }
+
+
+    public function findMatches(
         mixed $value,
         string $query,
         bool $useRegex,

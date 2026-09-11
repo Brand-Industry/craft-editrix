@@ -95,6 +95,34 @@ class LogController extends Controller
         ]);
     }
 
+    public function actionDailyCounts(): Response
+    {
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
+
+        $request = Craft::$app->getRequest();
+        $days = (int) $request->getParam("days", 14);
+        $siteId = $request->getParam("siteId");
+
+        $days = min(max($days, 1), 90);
+
+        $counts = Editrix::$plugin->log->getDailyCounts(
+            $days,
+            $siteId !== null ? (int) $siteId : null
+        );
+
+        return $this->asJson([
+            "success" => true,
+            "days" => $counts,
+        ]);
+    }
+
     public function actionValidateRevert(int $logId): Response
     {
         $this->requireAcceptsJson();
@@ -343,6 +371,9 @@ class LogController extends Controller
             "users" => $users,
             "currentSiteId" => Craft::$app->getSites()->getCurrentSite()->id,
             "apiUrl" => \craft\helpers\UrlHelper::cpUrl("editrix/api/logs"),
+            "dailyCountsUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/log/daily-counts"
+            ),
             "validateRevertUrl" => \craft\helpers\UrlHelper::cpUrl(
                 "editrix/api/logs/validate-revert"
             ),

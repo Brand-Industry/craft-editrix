@@ -24,11 +24,27 @@ class SearchResult extends Model
     public ?string $blockTypeHandle = null;
 
     /**
-     * True for matches inside a relational field (e.g. a Tags field's tag
-     * titles) where there's no single field value to safely overwrite -
-     * these are shown for discovery but can't go through Replace.
+     * True for matches that can be found but not safely overwritten by
+     * Replace - shown for discovery in Search mode only. See
+     * $readOnlyReason for why.
      */
     public bool $readOnly = false;
+
+    /**
+     * Why this match is readOnly: "tag" (a Tags field's tag titles - there's
+     * no single field value to overwrite) or "formatting" (a rich text
+     * match that straddles an HTML tag, e.g. a phrase with a word in the
+     * middle italicized - rewriting it as plain substring would corrupt the
+     * markup). Null when the match isn't readOnly.
+     */
+    public ?string $readOnlyReason = null;
+
+    /**
+     * Whether this field stores HTML (Redactor/CKEditor) - Replace uses
+     * this to rewrite only the part of the raw HTML that actually changed,
+     * rather than a blind substring replace that would corrupt markup.
+     */
+    public bool $isRichText = false;
 
     public function getCpEditUrl(): string
     {

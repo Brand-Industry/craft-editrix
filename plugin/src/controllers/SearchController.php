@@ -121,7 +121,7 @@ class SearchController extends Controller
                 "success" => false,
                 "error" => Craft::t(
                     "editrix",
-                    "Multi-site search requires Standard or Pro edition"
+                    "Multi-site search requires Pro edition"
                 ),
                 "upgradeRequired" => true,
             ]);
@@ -309,6 +309,23 @@ class SearchController extends Controller
                 ),
             ],
 
+            "logsUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/log/list"
+            ),
+            "logsPageUrl" => \craft\helpers\UrlHelper::cpUrl("editrix/logs"),
+            "dailyCountsUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/log/daily-counts"
+            ),
+
+            "assignmentUrls" => [
+                "categories" => \craft\helpers\UrlHelper::actionUrl(
+                    "editrix/assignment/categories"
+                ),
+                "tags" => \craft\helpers\UrlHelper::actionUrl(
+                    "editrix/assignment/tags"
+                ),
+            ],
+
             "canReplace" => Editrix::$plugin->userCan("editrix:replace"),
             "canExport" => Editrix::$plugin->userCan("editrix:export"),
 
@@ -391,6 +408,23 @@ class SearchController extends Controller
             "occurrences found",
             "This feature requires {edition} edition",
             "Upgrade",
+            "What do you want to search?",
+            "Text",
+            "Tags",
+            "Search for text within field content.",
+            "See which entries a category is assigned to.",
+            "See which entries a tag is assigned to.",
+            "Category & tag assignment search requires Pro edition.",
+            "CATEGORY NAME",
+            "TAG NAME",
+            "Enter a category name...",
+            "Enter a tag name...",
+            "Limit to sections (optional)",
+            "entries",
+            "Choose a different tool",
+            "Recent Activity",
+            "Re-run",
+            "View all",
         ];
 
         $translations = [];
