@@ -2,4 +2,86 @@
 
 {% block content %}
   {% block pluginContent %}{% endblock %}
+
+  <div class="editrix-brand-badge">
+    <a
+      class="editrix-brand-badge__link"
+      href="https://thebrandindustry.com/"
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      <p class="editrix-brand-badge__text">
+        {{ "Developed by"|t('editrix') }}<br />
+        <strong>Brand Industry</strong>
+      </p>
+      <div class="editrix-brand-badge__logo">
+        <svg width="20" height="22" viewBox="0 0 35 38" xmlns="http://www.w3.org/2000/svg">
+          <g fill="#FFFFFF" fill-rule="evenodd">
+            <polygon points="0 37.45 21 37.45 0 19.25"></polygon>
+            <polygon points="0 0.35 0 18.55 21 18.55"></polygon>
+            <polygon points="24.5 37.45 35 37.45 35 0.35 24.5 0.35"></polygon>
+          </g>
+        </svg>
+      </div>
+    </a>
+  </div>
+
+  <style>
+    .editrix-brand-badge {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      justify-content: center;
+      align-items: flex-end;
+      width: 100%;
+      padding: 8px 0;
+      background-color: #fff;
+    }
+    .editrix-brand-badge__logo {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-end;
+    }
+    .editrix-brand-badge__link {
+      position: relative;
+      display: inline-block;
+      width: 80px;
+      margin-left: auto;
+    }
+    .editrix-brand-badge__link:hover .editrix-brand-badge__text {
+      opacity: 1;
+      transform: translateY(0px);
+    }
+    .editrix-brand-badge__link:hover .editrix-brand-badge__logo {
+      border-radius: 10%;
+      opacity: 1;
+    }
+    .editrix-brand-badge__text,
+    .editrix-brand-badge__logo {
+      transition: all 0.3s ease;
+      transition-delay: 0.3s;
+    }
+    .editrix-brand-badge__text {
+      margin: 0;
+      opacity: 0;
+      transform: translateY(10px);
+      position: absolute;
+      left: -100%;
+      bottom: 0;
+      font-size: 14px;
+      color: #09091a;
+      white-space: nowrap;
+    }
+    .editrix-brand-badge__logo {
+      transition-delay: 0.2s;
+      margin-left: auto;
+      padding: 0.3rem;
+      border-radius: 50%;
+      align-items: center;
+      width: 35px;
+      height: 35px;
+      background-color: #09091a;
+    }
+  </style>
 {% endblock %}

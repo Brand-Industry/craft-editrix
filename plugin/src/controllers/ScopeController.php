@@ -15,7 +15,7 @@ class ScopeController extends Controller
     {
         $this->requireAcceptsJson();
 
-        $sections = Craft::$app->getSections()->getAllSections();
+        $sections = Craft::$app->getEntries()->getAllSections();
 
         $data = array_map(
             fn($section) => [
@@ -76,7 +76,7 @@ class ScopeController extends Controller
 
             foreach ($entryTypeIds as $entryTypeId) {
                 $entryType = Craft::$app
-                    ->getSections()
+                    ->getEntries()
                     ->getEntryTypeById($entryTypeId);
 
                 if (!$entryType) {
@@ -247,7 +247,7 @@ class ScopeController extends Controller
             (array) Craft::$app->getRequest()->getParam("sectionId", [])
         );
 
-        $sections = Craft::$app->getSections()->getAllSections();
+        $sections = Craft::$app->getEntries()->getAllSections();
 
         if (!empty($sectionIds)) {
             $sections = array_filter(

@@ -100,7 +100,7 @@
           @change="$emit('update:searchMatrix', $event.target.checked)"
         />
         <span>{{ t('Matrix fields') }}</span>
-        <span v-if="!hasFeature('search.matrix')" class="editrix-badge editrix-badge--info">Standard</span>
+        <span v-if="!hasFeature('search.matrix')" class="editrix-badge editrix-badge--info">Pro</span>
       </label>
     </div>
 

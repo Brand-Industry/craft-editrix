@@ -1,0 +1,91 @@
+<template>
+  <div class="editrix-form">
+    <div class="editrix-form__row editrix-form__row--single">
+      <div class="editrix-form__group">
+        <label class="editrix-form__label">
+          {{ t('Find') }}
+          <span class="editrix-form__label--hint">
+            {{ type === 'category' ? t('CATEGORY NAME') : t('TAG NAME') }}
+          </span>
+        </label>
+        <input
+          type="text"
+          :value="query"
+          class="editrix-form__input"
+          :placeholder="type === 'category' ? t('Enter a category name...') : t('Enter a tag name...')"
+          @input="$emit('update:query', $event.target.value)"
+          @keyup.enter="query && $emit('search')"
+        />
+      </div>
+    </div>
+
+    <div v-if="availableSections.length > 0" class="editrix-form__group" style="margin-top: 16px;">
+      <label class="editrix-form__label">{{ t('Limit to sections (optional)') }}</label>
+      <div class="editrix-assignment-scope">
+        <label
+          v-for="section in availableSections"
+          :key="section.handle"
+          class="editrix-form__checkbox"
+        >
+          <input
+            type="checkbox"
+            :checked="sections.includes(section.handle)"
+            @change="toggleSection(section.handle)"
+          />
+          <span>{{ section.name }}</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="editrix-form__footer">
+      <div></div>
+      <button
+        class="editrix-btn editrix-btn--primary editrix-btn--lg"
+        :disabled="!query || loading"
+        @click="$emit('search')"
+      >
+        <span v-if="loading">{{ t('Searching...') }}</span>
+        <span v-else>{{ t('Search') }}</span>
+      </button>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { inject, onMounted, ref } from 'vue';
+import { useConfig } from '../../composables/useConfig';
+import { useApi } from '../../composables/useApi';
+
+const t = inject('t');
+const { scopeUrls } = useConfig();
+const { get } = useApi();
+
+const props = defineProps({
+  query: { type: String, default: '' },
+  sections: { type: Array, default: () => [] },
+  loading: { type: Boolean, default: false },
+  type: { type: String, default: 'category' }, // 'category' | 'tag'
+});
+
+const emit = defineEmits(['update:query', 'update:sections', 'search']);
+
+const availableSections = ref([]);
+
+const toggleSection = (handle) => {
+  const current = props.sections;
+  const next = current.includes(handle)
+    ? current.filter((h) => h !== handle)
+    : [...current, handle];
+  emit('update:sections', next);
+};
+
+onMounted(async () => {
+  if (!scopeUrls.value.sections) return;
+  try {
+    const data = await get(scopeUrls.value.sections);
+    availableSections.value = data.sections || [];
+  } catch (err) {
+    console.error('Failed to load sections:', err);
+  }
+});
+</script>
