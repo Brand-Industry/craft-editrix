@@ -40,18 +40,20 @@
 
     {{ forms.checkboxField({
         label: "Search in Matrix fields"|t('editrix'),
-        instructions: "Requires Standard or Pro edition"|t('editrix'),
+        instructions: "Requires Pro edition"|t('editrix'),
         id: 'searchMatrix',
         name: 'searchMatrix',
         checked: settings.searchMatrix,
+        disabled: edition != 'pro',
     }) }}
 
     {{ forms.checkboxField({
         label: "Search in Categories"|t('editrix'),
-        instructions: "Requires Standard or Pro edition"|t('editrix'),
+        instructions: "Requires Pro edition"|t('editrix'),
         id: 'searchCategories',
         name: 'searchCategories',
         checked: settings.searchCategories,
+        disabled: edition != 'pro',
     }) }}
 
     <hr>

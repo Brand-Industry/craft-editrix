@@ -24,106 +24,185 @@
             <EnvironmentBadge v-if="hasFeature('envIndicator')" />
           </h1>
 
-          <div class="editrix-search__actions">
-            <button
-              v-if="hasFeature('presets')"
-              class="editrix-btn editrix-btn--secondary"
-              @click="showPresets = true"
-            >
-            {{ t('Presets') }}
-            </button>
-          </div>
         </header>
 
-        <div class="editrix-mode-toggle">
-          <button
-            type="button"
-            class="editrix-mode-toggle__option"
-            :class="{ 'is-active': actionMode === 'search' }"
-            @click="setActionMode('search')"
-          >
-            {{ t('Search') }}
-          </button>
-          <button
-            type="button"
-            class="editrix-mode-toggle__option"
-            :class="{ 'is-active': actionMode === 'replace' }"
-            @click="setActionMode('replace')"
-          >
-            {{ t('Search & Replace') }}
-          </button>
-        </div>
-        <p class="editrix-mode-toggle__hint">
-          {{ actionMode === 'search'
-            ? t('Find where content lives and export the results - nothing gets changed.')
-            : t('Find content and replace it. Only fields safe to overwrite are offered.') }}
-        </p>
-
-        <div v-if="hasFeature('scopeFilters')" class="editrix-mode-toggle">
-          <button
-            type="button"
-            class="editrix-mode-toggle__option"
-            :class="{ 'is-active': searchMode === 'general' }"
-            @click="setSearchMode('general')"
-          >
-            {{ t('General Search') }}
-          </button>
-          <button
-            type="button"
-            class="editrix-mode-toggle__option"
-            :class="{ 'is-active': searchMode === 'segmented' }"
-            @click="setSearchMode('segmented')"
-          >
-            {{ t('Segmented Search') }}
-          </button>
-        </div>
-        <p v-if="hasFeature('scopeFilters')" class="editrix-mode-toggle__hint">
-          {{ searchMode === 'general'
-            ? t('Searches every entry and field across the selected site(s).')
-            : t('Narrow the search down to a section, entry type, and fields.') }}
-        </p>
-
-        <SearchForm
-          v-model:query="searchParams.query"
-          v-model:replace-with="searchParams.replaceWith"
-          v-model:site-id="searchParams.siteId"
-          v-model:all-sites="searchParams.allSites"
-          v-model:use-regex="searchParams.useRegex"
-          v-model:case-insensitive="searchParams.caseInsensitive"
-          v-model:whole-words="searchParams.wholeWords"
-          v-model:dry-run="searchParams.dryRun"
-          v-model:search-entries="searchParams.searchEntries"
-          v-model:search-globals="searchParams.searchGlobals"
-          v-model:search-matrix="searchParams.searchMatrix"
-          v-model:search-categories="searchParams.searchCategories"
-          :loading="loading"
-          :show-scope-inline="!hasFeature('scopeFilters')"
-          :action-mode="actionMode"
-          @search="handleSearch"
+        <ActivityChart
+          v-if="!searchType"
+          :days="dailyCounts"
+          :loading="dailyCountsLoading"
         />
 
-        <LoadingSpinner v-if="loading" :text="t('Searching...')" />
+        <h2 v-if="!searchType" class="editrix-section-title">{{ t('What do you want to search?') }}</h2>
 
-        <div v-else-if="error" class="editrix-form__warning" style="margin-top: 16px;">
-          ⚠️ {{ error }}
+        <div v-if="!searchType" class="editrix-tool-picker">
+          <button type="button" class="editrix-tool-card editrix-tool-card--text" @click="searchType = 'text'">
+            <span class="editrix-tool-card__icon">🔤</span>
+            <h3>{{ t('Text') }}</h3>
+            <p>{{ t('Search for text within field content.') }}</p>
+            <span class="editrix-tool-card__arrow">→</span>
+          </button>
+          <button
+            type="button"
+            class="editrix-tool-card editrix-tool-card--category"
+            :class="{ 'editrix-tool-card--locked': !hasFeature('assignmentSearch') }"
+            :disabled="!hasFeature('assignmentSearch')"
+            @click="searchType = 'category'"
+          >
+            <span class="editrix-tool-card__icon">🏷️</span>
+            <h3>
+              {{ t('Categories') }}
+              <span v-if="!hasFeature('assignmentSearch')" class="editrix-badge editrix-badge--info">Pro</span>
+            </h3>
+            <p>{{ t('See which entries a category is assigned to.') }}</p>
+            <span class="editrix-tool-card__arrow">→</span>
+          </button>
+          <button
+            type="button"
+            class="editrix-tool-card editrix-tool-card--tag"
+            :class="{ 'editrix-tool-card--locked': !hasFeature('assignmentSearch') }"
+            :disabled="!hasFeature('assignmentSearch')"
+            @click="searchType = 'tag'"
+          >
+            <span class="editrix-tool-card__icon">🔖</span>
+            <h3>
+              {{ t('Tags') }}
+              <span v-if="!hasFeature('assignmentSearch')" class="editrix-badge editrix-badge--info">Pro</span>
+            </h3>
+            <p>{{ t('See which entries a tag is assigned to.') }}</p>
+            <span class="editrix-tool-card__arrow">→</span>
+          </button>
         </div>
 
-        <ResultsTable
-          v-else-if="hasSearched"
-          :results="visibleResults"
-          :total-results="visibleTotalResults"
-          :selected-count="selectedCount"
-          :all-selected="allSelected"
-          :is-selected="isSelected"
-          :action-mode="actionMode"
-          :search-query="searchParams.query"
-          @toggle="toggleResult"
-          @toggle-all="toggleSelectAll"
-          @view="openView"
-          @replace="showReplaceConfirm = true"
+        <RecentActivity
+          v-if="!searchType"
+          :logs="recentLogs"
+          :loading="recentLogsLoading"
+          @rerun="rerunLog"
         />
 
-        <!-- <EmptyState v-else /> -->
+        <template v-else>
+          <p class="editrix-tool-back">
+            <a href="#" @click.prevent="searchType = null">← {{ t('Choose a different tool') }}</a>
+          </p>
+
+          <template v-if="searchType === 'text'">
+          <div class="editrix-mode-toggle">
+            <button
+              type="button"
+              class="editrix-mode-toggle__option"
+              :class="{ 'is-active': actionMode === 'search' }"
+              @click="setActionMode('search')"
+            >
+              {{ t('Search') }}
+            </button>
+            <button
+              type="button"
+              class="editrix-mode-toggle__option"
+              :class="{ 'is-active': actionMode === 'replace' }"
+              @click="setActionMode('replace')"
+            >
+              {{ t('Search & Replace') }}
+            </button>
+          </div>
+          <p class="editrix-mode-toggle__hint">
+            {{ actionMode === 'search'
+              ? t('Find where content lives and export the results - nothing gets changed.')
+              : t('Find content and replace it. Only fields safe to overwrite are offered.') }}
+          </p>
+
+          <div v-if="hasFeature('scopeFilters')" class="editrix-mode-toggle">
+            <button
+              type="button"
+              class="editrix-mode-toggle__option"
+              :class="{ 'is-active': searchMode === 'general' }"
+              @click="setSearchMode('general')"
+            >
+              {{ t('General Search') }}
+            </button>
+            <button
+              type="button"
+              class="editrix-mode-toggle__option"
+              :class="{ 'is-active': searchMode === 'segmented' }"
+              @click="setSearchMode('segmented')"
+            >
+              {{ t('Segmented Search') }}
+            </button>
+          </div>
+          <p v-if="hasFeature('scopeFilters')" class="editrix-mode-toggle__hint">
+            {{ searchMode === 'general'
+              ? t('Searches every entry and field across the selected site(s).')
+              : t('Narrow the search down to a section, entry type, and fields.') }}
+          </p>
+        </template>
+
+        <div v-if="searchType !== 'text' && !hasFeature('assignmentSearch')" class="editrix-form__warning" style="margin-top: 16px;">
+          🔒 {{ t('Category & tag assignment search requires Pro edition.') }}
+        </div>
+
+        <template v-else-if="searchType !== 'text'">
+          <AssignmentSearchForm
+            v-model:query="assignmentParams.query"
+            v-model:sections="assignmentParams.sections"
+            :type="searchType"
+            :loading="assignmentLoading"
+            @search="handleAssignmentSearch"
+          />
+
+          <LoadingSpinner v-if="assignmentLoading" :text="t('Searching...')" />
+
+          <div v-else-if="assignmentError" class="editrix-form__warning" style="margin-top: 16px;">
+            ⚠️ {{ assignmentError }}
+          </div>
+
+          <AssignmentResultsList
+            v-else-if="assignmentHasSearched"
+            :results="assignmentResults"
+            :type="searchType"
+          />
+        </template>
+
+        <template v-if="searchType === 'text'">
+          <SearchForm
+            v-model:query="searchParams.query"
+            v-model:replace-with="searchParams.replaceWith"
+            v-model:site-id="searchParams.siteId"
+            v-model:all-sites="searchParams.allSites"
+            v-model:use-regex="searchParams.useRegex"
+            v-model:case-insensitive="searchParams.caseInsensitive"
+            v-model:whole-words="searchParams.wholeWords"
+            v-model:dry-run="searchParams.dryRun"
+            v-model:search-entries="searchParams.searchEntries"
+            v-model:search-globals="searchParams.searchGlobals"
+            v-model:search-matrix="searchParams.searchMatrix"
+            v-model:search-categories="searchParams.searchCategories"
+            :loading="loading"
+            :show-scope-inline="!hasFeature('scopeFilters')"
+            :action-mode="actionMode"
+            @search="handleSearch"
+          />
+
+          <LoadingSpinner v-if="loading" :text="t('Searching...')" />
+
+          <div v-else-if="error" class="editrix-form__warning" style="margin-top: 16px;">
+            ⚠️ {{ error }}
+          </div>
+
+          <ResultsTable
+            v-else-if="hasSearched"
+            :results="visibleResults"
+            :total-results="visibleTotalResults"
+            :selected-count="selectedCount"
+            :all-selected="allSelected"
+            :is-selected="isSelected"
+            :action-mode="actionMode"
+            :search-query="searchParams.query"
+            @toggle="toggleResult"
+            @toggle-all="toggleSelectAll"
+            @view="openView"
+            @replace="showReplaceConfirm = true"
+          />
+          </template>
+        </template>
       </main>
     </div>
 
@@ -159,6 +238,8 @@
 import { ref, computed, onMounted, provide } from 'vue';
 import { useConfig } from '../composables/useConfig';
 import { useSearch } from '../composables/useSearch';
+import { useAssignmentSearch } from '../composables/useAssignmentSearch';
+import { useApi } from '../composables/useApi';
 
 import SearchForm from '../components/search/SearchForm.vue';
 import ResultsTable from '../components/results/ResultsTable.vue';
@@ -170,11 +251,96 @@ import ConfirmModal from '../components/common/ConfirmModal.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import EmptyState from '../components/common/EmptyState.vue';
 import EnvironmentBadge from '../components/common/EnvironmentBadge.vue';
+import AssignmentSearchForm from '../components/assignments/AssignmentSearchForm.vue';
+import AssignmentResultsList from '../components/assignments/AssignmentResultsList.vue';
+import RecentActivity from '../components/search/RecentActivity.vue';
+import ActivityChart from '../components/logs/ActivityChart.vue';
 
-const { t, hasFeature, currentSiteId } = useConfig();
+const { t, hasFeature, currentSiteId, logsUrl, dailyCountsUrl } = useConfig();
+const { get: apiGet } = useApi();
 
 provide('t', t);
 provide('hasFeature', hasFeature);
+
+// null = no tool chosen yet (shows the picker). 'text' = search field
+// content (existing flow); 'category'/'tag' = which entries have this
+// category/tag assigned (Pro only, search-only for now).
+const searchType = ref(null);
+
+const {
+  loading: assignmentLoading,
+  error: assignmentError,
+  results: assignmentResults,
+  hasSearched: assignmentHasSearched,
+  params: assignmentParams,
+  search: searchAssignments,
+} = useAssignmentSearch();
+
+const handleAssignmentSearch = async () => {
+  try {
+    await searchAssignments(searchType.value);
+  } catch (err) {
+    window.Craft?.cp?.displayError?.(err.message || 'Search failed');
+  }
+};
+
+// Shown on the tool-picker landing screen so users don't have to visit
+// Logs & History just to see (or repeat) what they last searched.
+const recentLogs = ref([]);
+const recentLogsLoading = ref(false);
+
+const fetchRecentActivity = async () => {
+  if (!logsUrl.value) return;
+
+  recentLogsLoading.value = true;
+  try {
+    const data = await apiGet(logsUrl.value, { limit: 5 });
+    recentLogs.value = data?.logs || [];
+  } catch (err) {
+    // Non-critical - the panel just stays hidden.
+    recentLogs.value = [];
+  } finally {
+    recentLogsLoading.value = false;
+  }
+};
+
+// Daily search/replace activity chart shown above the tool-picker cards.
+const dailyCounts = ref([]);
+const dailyCountsLoading = ref(false);
+
+const fetchDailyCounts = async () => {
+  if (!dailyCountsUrl.value) return;
+
+  dailyCountsLoading.value = true;
+  try {
+    const data = await apiGet(dailyCountsUrl.value, { days: 14 });
+    dailyCounts.value = data?.success ? data.days || [] : [];
+  } catch (err) {
+    dailyCounts.value = [];
+  } finally {
+    dailyCountsLoading.value = false;
+  }
+};
+
+const rerunLog = (log) => {
+  searchParams.query = log.searchQuery;
+  searchParams.useRegex = !!log.useRegex;
+  searchParams.caseInsensitive = !log.caseSensitive;
+  searchParams.wholeWords = !!log.wholeWords;
+
+  const scope = log.scope || {};
+  searchParams.allSites = !!scope.allSites;
+  searchParams.sections = scope.sections || [];
+  searchParams.fields = scope.fields || [];
+  searchParams.entryTypes = scope.entryTypes || [];
+
+  searchType.value = 'text';
+  actionMode.value = 'search';
+  searchMode.value =
+    searchParams.sections.length > 0 ? 'segmented' : 'general';
+
+  handleSearch();
+};
 
 const searchMode = ref('general');
 // Default to 'search' - replacing content is a deliberate, separate step.
@@ -203,7 +369,6 @@ const {
   reset,
 } = useSearch(actionMode);
 
-const showPresets = ref(false);
 const showReplaceConfirm = ref(false);
 const replacing = ref(false);
 const previewResult = ref(null);
@@ -265,7 +430,10 @@ const totalEntries = computed(() => {
 
 onMounted(() => {
   searchParams.siteId = currentSiteId.value;
+  assignmentParams.siteId = currentSiteId.value;
   restoreFromHistory();
+  fetchRecentActivity();
+  fetchDailyCounts();
 });
 
 // "Re-run" from Logs & History links here with the original query/scope in
@@ -285,6 +453,7 @@ const restoreFromHistory = () => {
   searchParams.fields = params.getAll('fields[]');
   searchParams.entryTypes = params.getAll('entryTypes[]');
 
+  searchType.value = 'text';
   actionMode.value = 'search';
   searchMode.value =
     searchParams.sections.length > 0 ? 'segmented' : 'general';

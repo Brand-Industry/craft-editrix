@@ -170,6 +170,56 @@ class LogService extends Component
         return $query->all();
     }
 
+    /**
+     * Operation counts per day for the last $days days, split by type - for
+     * the activity chart on Logs & History. Buckets are built and summed in
+     * PHP (not a DB date-truncation function) so this works the same on
+     * MySQL and Postgres. Days with no activity are included as zero, so
+     * the chart's x-axis stays continuous.
+     */
+    public function getDailyCounts(int $days = 14, ?int $siteId = null): array
+    {
+        $days = max(1, $days);
+        $since = (new DateTime())->modify(
+            "-" . ($days - 1) . " days"
+        );
+        $since->setTime(0, 0, 0);
+
+        $query = (new Query())
+            ->select(["dateCreated", "type"])
+            ->from(Install::TABLE_LOGS)
+            ->where([">=", "dateCreated", Db::prepareDateForDb($since)]);
+
+        if ($siteId !== null) {
+            $query->andWhere(["siteId" => $siteId]);
+        }
+
+        $buckets = [];
+        for ($i = 0; $i < $days; $i++) {
+            $day = (new DateTime())
+                ->modify("-" . ($days - 1 - $i) . " days")
+                ->format("Y-m-d");
+            $buckets[$day] = [
+                "date" => $day,
+                "search" => 0,
+                "replace" => 0,
+            ];
+        }
+
+        foreach ($query->all() as $row) {
+            $day = (new DateTime($row["dateCreated"]))->format("Y-m-d");
+            if (!isset($buckets[$day])) {
+                continue;
+            }
+            $type = ($row["type"] ?? "replace") === "search"
+                ? "search"
+                : "replace";
+            $buckets[$day][$type]++;
+        }
+
+        return array_values($buckets);
+    }
+
     public function getLogsCount(array $filters = []): int
     {
         $query = (new Query())->from(["l" => Install::TABLE_LOGS]);

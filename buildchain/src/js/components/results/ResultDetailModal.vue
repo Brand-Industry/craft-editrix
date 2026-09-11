@@ -36,7 +36,7 @@
 
           <div class="editrix-modal__context" v-html="highlightedContext"></div>
 
-          <p v-if="result.readOnly" class="editrix-form__warning" style="margin-top: 12px;">
+          <p v-if="result.readOnlyReason === 'tag'" class="editrix-form__warning" style="margin-top: 12px;">
             ℹ️ {{ t('Rename the tag directly - it may be shared by other entries.') }}
           </p>
 

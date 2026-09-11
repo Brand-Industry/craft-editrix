@@ -21,7 +21,6 @@
 
 .editrix-layout {
   display: flex;
-  min-height: calc(100vh - 100px);
   margin: -24px;
   
   &__sidebar {
@@ -37,7 +36,7 @@
     flex: 1;
     padding: $spacing-lg;
     overflow-y: auto;
-    background: $bg-page;
+    background: #ffffff;
   }
 }
 
@@ -116,6 +115,17 @@
 // Search mode toggle
 // ==========================================
 
+.editrix-search__header {
+  margin-bottom: $spacing-lg;
+}
+
+.editrix-search__title {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin: 0 0 $spacing-md;
+}
+
 .editrix-mode-toggle {
   display: inline-flex;
   padding: 3px;
@@ -123,6 +133,7 @@
   border: 1px solid $border-color;
   border-radius: $radius-lg;
   margin-bottom: $spacing-sm;
+  margin-top: $spacing-sm;
 
   &__option {
     padding: $spacing-sm $spacing-md;
@@ -1058,5 +1069,365 @@
   &--dev {
     background: $success-light;
     color: darken($success, 10%);
+  }
+}
+
+// ==========================================
+// Category/Tag Assignment Search
+// ==========================================
+
+.editrix-assignment-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm $spacing-md;
+  margin-top: $spacing-xs;
+}
+
+.editrix-assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.editrix-assignment-card {
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-md;
+    flex-wrap: wrap;
+
+    strong {
+      margin-right: $spacing-sm;
+    }
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  &__entries {
+    list-style: none;
+    margin: $spacing-sm 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: $spacing-xs $spacing-md;
+
+    li {
+      display: flex;
+      align-items: baseline;
+      gap: $spacing-xs;
+      font-size: 13px;
+    }
+  }
+
+  &__entry-meta {
+    color: $text-secondary;
+    font-size: 12px;
+  }
+}
+
+// ==========================================
+// Tool picker (New Operation landing screen)
+// ==========================================
+
+.editrix-activity-chart {
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  margin-bottom: $spacing-lg;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: $spacing-md;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: $text-secondary;
+  }
+
+  &__legend {
+    display: flex;
+    gap: $spacing-md;
+    font-size: 12px;
+    color: $text-secondary;
+  }
+
+  &__legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-xs;
+  }
+
+  &__swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+
+    &--search {
+      background: $secondary;
+    }
+
+    &--replace {
+      background: $success;
+    }
+  }
+
+  &__loading {
+    color: $text-secondary;
+    font-size: 13px;
+  }
+
+  &__bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 120px;
+  }
+
+  &__col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $spacing-xs;
+    height: 100%;
+  }
+
+  &__track {
+    width: 100%;
+    max-width: 24px;
+    height: 100px;
+    display: flex;
+    flex-direction: column-reverse;
+    background: $gray-100;
+    border-radius: $radius-sm;
+    overflow: hidden;
+  }
+
+  &__bar {
+    width: 100%;
+    min-height: 0;
+    transition: height 0.2s ease;
+
+    &--replace {
+      background: $success;
+    }
+
+    &--search {
+      background: $secondary;
+    }
+  }
+
+  &__label {
+    font-size: 10px;
+    color: $text-muted;
+    white-space: nowrap;
+    transform: rotate(0deg);
+  }
+}
+
+.editrix-section-title {
+  margin: 0 0 $spacing-sm;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: $text-secondary;
+}
+
+.editrix-tool-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+}
+
+.editrix-tool-card {
+  position: relative;
+  text-align: left;
+  background: $bg-card;
+  border: 1px solid $border-color;
+  border-left: 3px solid $border-color;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: $secondary;
+    border-left-color: $secondary;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+    .editrix-tool-card__arrow {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  &--text {
+    border-left-color: $secondary;
+  }
+
+  &--category {
+    border-left-color: $success;
+  }
+
+  &--tag {
+    border-left-color: $warning;
+  }
+
+  &--locked {
+    background: $gray-50;
+
+    p {
+      color: $text-muted;
+    }
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+
+    &:hover {
+      box-shadow: none;
+
+      .editrix-tool-card__arrow {
+        opacity: 0;
+        transform: translateX(-4px);
+      }
+    }
+  }
+
+  &__icon {
+    display: block;
+    font-size: 24px;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__arrow {
+    position: absolute;
+    top: $spacing-lg;
+    right: $spacing-lg;
+    color: $secondary;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: all 0.15s ease;
+  }
+
+  h3 {
+    margin: 0 0 $spacing-xs;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  p {
+    margin: 0;
+    color: $text-secondary;
+    font-size: 13px;
+  }
+}
+
+.editrix-tool-back {
+  margin: 0 0 $spacing-md;
+
+  a {
+    color: $text-secondary;
+    text-decoration: none;
+    font-size: 13px;
+
+    &:hover {
+      color: $secondary;
+      text-decoration: underline;
+    }
+  }
+}
+
+.editrix-recent-activity {
+  margin-top: $spacing-xl;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: $text-secondary;
+    margin: 0;
+  }
+
+  &__loading {
+    color: $text-secondary;
+    font-size: 13px;
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: $border-color;
+    border: 1px solid $border-color;
+    border-radius: $radius-md;
+    overflow: hidden;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-md;
+    background: $bg-card;
+    font-size: 13px;
+  }
+
+  &__query {
+    flex: 1;
+    color: $text-primary;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__count,
+  &__date {
+    color: $text-secondary;
+    white-space: nowrap;
+  }
+
+  &__rerun {
+    color: $secondary;
+    text-decoration: none;
+    font-weight: 500;
+    white-space: nowrap;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }

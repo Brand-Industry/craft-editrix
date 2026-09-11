@@ -11,6 +11,10 @@ export function useConfig() {
   const previewUrl = computed(() => config.value.previewUrl || '');
   const cpUrl = computed(() => config.value.cpUrl || '');
   const scopeUrls = computed(() => config.value.scopeUrls || {});
+  const assignmentUrls = computed(() => config.value.assignmentUrls || {});
+  const logsUrl = computed(() => config.value.logsUrl || '');
+  const logsPageUrl = computed(() => config.value.logsPageUrl || '');
+  const dailyCountsUrl = computed(() => config.value.dailyCountsUrl || '');
   
   // Permissions
   const canReplace = computed(() => config.value.canReplace || false);
@@ -61,6 +65,10 @@ export function useConfig() {
     previewUrl,
     cpUrl,
     scopeUrls,
+    assignmentUrls,
+    logsUrl,
+    logsPageUrl,
+    dailyCountsUrl,
     canReplace,
     canExport,
     license,
