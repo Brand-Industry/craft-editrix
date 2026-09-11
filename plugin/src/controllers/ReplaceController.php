@@ -47,6 +47,14 @@ class ReplaceController extends Controller
             ]);
         }
 
+        $confirmationError = $this->checkSafetyConfirmation(
+            count($selectedResults),
+            $request->getBodyParam("confirmationCode", "")
+        );
+        if ($confirmationError !== null) {
+            return $this->asJson($confirmationError);
+        }
+
         try {
             $replacements = Editrix::$plugin->replace->replace(
                 $selectedResults,
@@ -170,6 +178,42 @@ class ReplaceController extends Controller
 
         $pattern = "/" . preg_quote($query, "/") . "/i";
         return preg_replace($pattern, $replaceWith, $value);
+    }
+
+    /**
+     * The Safety settings (bulk threshold, production safe mode) exist to
+     * make a large or production replace a deliberate act, not a security
+     * boundary - so this is enforced here (not just in the UI) to make
+     * sure a direct API call can't skip the same "type REPLACE" step a
+     * user would hit in the CP.
+     */
+    private function checkSafetyConfirmation(
+        int $resultCount,
+        string $confirmationCode
+    ): ?array {
+        $settings = Editrix::$plugin->getSettings();
+
+        $overThreshold =
+            $resultCount > $settings->bulkConfirmationThreshold;
+        $productionRisk =
+            $settings->productionSafeMode && Craft::$app->env === "production";
+
+        if (!$overThreshold && !$productionRisk) {
+            return null;
+        }
+
+        if (strcasecmp(trim($confirmationCode), "REPLACE") === 0) {
+            return null;
+        }
+
+        return [
+            "success" => false,
+            "needsConfirmation" => true,
+            "error" => Craft::t(
+                "editrix",
+                'Type "REPLACE" to confirm this action.'
+            ),
+        ];
     }
 
     private function parseBoolean(mixed $value): bool

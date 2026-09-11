@@ -15,6 +15,7 @@ export function useConfig() {
   const logsUrl = computed(() => config.value.logsUrl || '');
   const logsPageUrl = computed(() => config.value.logsPageUrl || '');
   const dailyCountsUrl = computed(() => config.value.dailyCountsUrl || '');
+  const safety = computed(() => config.value.safety || {});
   
   // Permissions
   const canReplace = computed(() => config.value.canReplace || false);
@@ -69,6 +70,7 @@ export function useConfig() {
     logsUrl,
     logsPageUrl,
     dailyCountsUrl,
+    safety,
     canReplace,
     canExport,
     license,
