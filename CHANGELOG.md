@@ -2,6 +2,27 @@
 
 All notable changes to Editrix will be documented in this file.
 
+## [2.0.0-beta.2] - 2026-09-15
+
+Craft 5 release. Standard is now the free edition; Pro adds Category & Tag Assignment Search, Matrix/Category search, multisite, scope filters, and CSV export.
+
+### Added
+- Category & Tag Assignment Search (Pro): find which entries a category or tag is assigned to, optionally scoped by section
+- New Operation landing screen with a Text/Categories/Tags picker, a Recent Activity panel, and a 14-day search/replace activity chart
+- Pagination (5/10/25/50/100 per page) on the results table
+- Bulk-replace confirmation threshold and Production Safe Mode, requiring a typed confirmation before a large or production replacement, enforced server-side as well as in the UI
+- Brand Industry watermark on all Editrix CP pages
+
+### Changed
+- Segmented Search's Fields filter now shows one checkbox per Matrix/Neo field instead of one per nested sub-field (which could repeat names like "Title" once per block type)
+- "Find & Replace" renamed to "Category search"/"Tag search" on those tools' screens
+- Section filter in Category/Tag search is now a searchable, scrollable list instead of a checkbox grid
+
+### Fixed
+- Search/replace not matching text that spans an HTML tag or an encoded entity (e.g. "Terms & Conditions" vs. the stored "Terms &amp; Conditions")
+- Visual Diff Preview could show "no change" when a real change would occur, because it recomputed the diff independently in the browser instead of using the actual replace engine
+- A replacement whose edit span crossed a tag boundary could corrupt markup - now left untouched instead
+
 ## [1.0.0-beta.1] - 2026-09-08
 
 Beta release, compatible with Craft CMS 4.
