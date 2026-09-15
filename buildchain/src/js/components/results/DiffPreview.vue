@@ -18,27 +18,34 @@
       </header>
 
       <div class="editrix-diff__content">
-        <div class="editrix-diff__section">
-          <div class="editrix-diff__section-header">
-            <h4 class="editrix-diff__section-title">⊖ {{ t('ORIGINAL') }}</h4>
-            <span class="editrix-diff__badge editrix-diff__badge--remove">-1 deletion</span>
-          </div>
-          <div class="editrix-diff__text editrix-diff__text--original">
-            <span v-html="originalHtml"></span>
-          </div>
-        </div>
+        <div v-if="loading" class="editrix-diff__loading">{{ t('Loading...') }}</div>
 
-        <div class="editrix-diff__arrow">↓</div>
+        <template v-else>
+          <div v-if="!changed" class="editrix-diff__notice editrix-diff__notice--warning">
+            <span>⚠️</span>
+            <p>{{ t("This occurrence won't be changed by this replacement.") }}</p>
+          </div>
 
-        <div class="editrix-diff__section">
-          <div class="editrix-diff__section-header">
-            <h4 class="editrix-diff__section-title">⊕ {{ t('PROPOSED') }}</h4>
-            <span class="editrix-diff__badge editrix-diff__badge--add">+1 addition</span>
+          <div class="editrix-diff__section">
+            <div class="editrix-diff__section-header">
+              <h4 class="editrix-diff__section-title">⊖ {{ t('ORIGINAL') }}</h4>
+            </div>
+            <div class="editrix-diff__text editrix-diff__text--original">
+              <span v-html="originalHtml"></span>
+            </div>
           </div>
-          <div class="editrix-diff__text editrix-diff__text--proposed">
-            <span v-html="proposedHtml"></span>
+
+          <div class="editrix-diff__arrow">↓</div>
+
+          <div class="editrix-diff__section">
+            <div class="editrix-diff__section-header">
+              <h4 class="editrix-diff__section-title">⊕ {{ t('PROPOSED') }}</h4>
+            </div>
+            <div class="editrix-diff__text editrix-diff__text--proposed">
+              <span v-html="proposedHtml"></span>
+            </div>
           </div>
-        </div>
+        </template>
 
         <div class="editrix-diff__notice">
           <span>ℹ️</span>
@@ -59,6 +66,7 @@
         </button>
         <button
           class="editrix-btn editrix-btn--primary"
+          :disabled="loading || !changed"
           @click="$emit('apply', result)"
         >
           ✓ {{ t('Apply to this element') }}
@@ -76,53 +84,65 @@ const t = inject('t');
 const props = defineProps({
   show: { type: Boolean, default: false },
   result: { type: Object, default: null },
-  searchQuery: { type: String, default: '' },
-  replaceWith: { type: String, default: '' },
+  original: { type: String, default: '' },
+  proposed: { type: String, default: '' },
+  changed: { type: Boolean, default: false },
+  loading: { type: Boolean, default: false },
 });
 
 defineEmits(['close', 'apply', 'skip']);
 
-// Generate diff HTML
+// The before/after text comes straight from the server - the same
+// tag/entity-aware engine that would actually run on Apply - so the
+// highlight here just needs to show WHERE the two differ, via their
+// common prefix/suffix, rather than re-deriving the change itself.
+const diff = computed(() => {
+  const oldStr = props.original;
+  const newStr = props.proposed;
+
+  let prefixLen = 0;
+  const maxPrefix = Math.min(oldStr.length, newStr.length);
+  while (prefixLen < maxPrefix && oldStr[prefixLen] === newStr[prefixLen]) {
+    prefixLen++;
+  }
+
+  let suffixLen = 0;
+  const maxSuffix = maxPrefix - prefixLen;
+  while (
+    suffixLen < maxSuffix &&
+    oldStr[oldStr.length - 1 - suffixLen] === newStr[newStr.length - 1 - suffixLen]
+  ) {
+    suffixLen++;
+  }
+
+  return {
+    prefix: oldStr.slice(0, prefixLen),
+    oldMiddle: oldStr.slice(prefixLen, oldStr.length - suffixLen),
+    newMiddle: newStr.slice(prefixLen, newStr.length - suffixLen),
+    oldSuffix: oldStr.slice(oldStr.length - suffixLen),
+    newSuffix: newStr.slice(newStr.length - suffixLen),
+  };
+});
+
 const originalHtml = computed(() => {
-  if (!props.result?.fieldValue || !props.searchQuery) return '';
-
-  const value = props.result.fieldValue;
-  const query = props.searchQuery;
-
-  // Simple highlight for now - could use diff library for more complex
-  const escaped = escapeHtml(value);
-  const pattern = new RegExp(`(${escapeRegExp(query)})`, 'gi');
-
-  return escaped.replace(pattern, '<span class="diff-remove">$1</span>');
+  const d = diff.value;
+  const middle = d.oldMiddle
+    ? `<span class="diff-remove">${escapeHtml(d.oldMiddle)}</span>`
+    : '';
+  return escapeHtml(d.prefix) + middle + escapeHtml(d.oldSuffix);
 });
 
 const proposedHtml = computed(() => {
-  if (!props.result?.fieldValue || !props.searchQuery) return '';
-
-  const value = props.result.fieldValue;
-  const query = props.searchQuery;
-  const replacement = props.replaceWith;
-
-  // Replace and highlight
-  const newValue = value.replace(new RegExp(escapeRegExp(query), 'gi'), replacement);
-  const escaped = escapeHtml(newValue);
-
-  if (replacement) {
-    const pattern = new RegExp(`(${escapeRegExp(replacement)})`, 'gi');
-    return escaped.replace(pattern, '<span class="diff-add">$1</span>');
-  }
-
-  return escaped;
+  const d = diff.value;
+  const middle = d.newMiddle
+    ? `<span class="diff-add">${escapeHtml(d.newMiddle)}</span>`
+    : '';
+  return escapeHtml(d.prefix) + middle + escapeHtml(d.newSuffix);
 });
 
-// Helpers
 const escapeHtml = (text) => {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
-};
-
-const escapeRegExp = (string) => {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 </script>

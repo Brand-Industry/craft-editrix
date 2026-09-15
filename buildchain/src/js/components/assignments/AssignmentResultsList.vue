@@ -37,18 +37,27 @@
         </div>
 
         <ul class="editrix-assignment-card__entries">
-          <li v-for="entry in item.entries" :key="entry.id">
+          <li v-for="entry in visibleEntries(item)" :key="entry.id">
             <a :href="entry.cpEditUrl" target="_blank" rel="noopener">{{ entry.title }}</a>
             <span class="editrix-assignment-card__entry-meta">{{ entry.sectionName }}</span>
           </li>
         </ul>
+
+        <button
+          v-if="item.entries.length > entryLimit && !expanded[itemKey(item)]"
+          type="button"
+          class="editrix-assignment-card__show-more"
+          @click="expanded[itemKey(item)] = true"
+        >
+          {{ t('Show {count} more entries', { count: item.entries.length - entryLimit }) }}
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { inject, reactive } from 'vue';
 
 const t = inject('t');
 
@@ -56,4 +65,15 @@ defineProps({
   results: { type: Array, default: () => [] },
   type: { type: String, default: 'category' },
 });
+
+const entryLimit = 4;
+const expanded = reactive({});
+
+const itemKey = (item) => `${item.siteId}-${item.id}`;
+
+const visibleEntries = (item) => {
+  return expanded[itemKey(item)]
+    ? item.entries
+    : item.entries.slice(0, entryLimit);
+};
 </script>
