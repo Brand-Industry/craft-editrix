@@ -183,6 +183,7 @@ export function useSearch(actionMode) {
         replaceWith: searchParams.replaceWith,
         useRegex: searchParams.useRegex,
         caseInsensitive: searchParams.caseInsensitive,
+        wholeWords: searchParams.wholeWords,
       });
       return data;
     } catch (err) {

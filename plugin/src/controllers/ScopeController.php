@@ -114,21 +114,36 @@ class ScopeController extends Controller
                     }
 
                     if ($field instanceof Matrix) {
-                        foreach (
-                            $this->matrixSubFields($field, $isSearchable)
-                            as $subHandle => $subField
+                        // One checkbox for the whole Matrix field, not one
+                        // per nested sub-field - block types often reuse
+                        // names like "Title" across themselves, so listing
+                        // every sub-field individually reads as duplicates
+                        // with no way to tell them apart. Checking it
+                        // searches every field inside every block type; the
+                        // Results table already shows which one matched.
+                        if (
+                            !empty($this->matrixSubFields($field, $isSearchable))
                         ) {
-                            $fieldsByHandle[$subHandle] = $subField;
+                            $fieldsByHandle[$field->handle] = [
+                                "id" => $field->id,
+                                "name" => $field->name,
+                                "handle" => $field->handle,
+                                "type" => "Matrix",
+                                "readOnly" => false,
+                            ];
                         }
                         continue;
                     }
 
                     if ($this->isNeoField($field)) {
-                        foreach (
-                            $this->neoSubFields($field, $isSearchable)
-                            as $subHandle => $subField
-                        ) {
-                            $fieldsByHandle[$subHandle] = $subField;
+                        if (!empty($this->neoSubFields($field, $isSearchable))) {
+                            $fieldsByHandle[$field->handle] = [
+                                "id" => $field->id,
+                                "name" => $field->name,
+                                "handle" => $field->handle,
+                                "type" => "Neo",
+                                "readOnly" => false,
+                            ];
                         }
                         continue;
                     }

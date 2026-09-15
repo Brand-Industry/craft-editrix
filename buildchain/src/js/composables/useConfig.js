@@ -12,6 +12,9 @@ export function useConfig() {
   const cpUrl = computed(() => config.value.cpUrl || '');
   const scopeUrls = computed(() => config.value.scopeUrls || {});
   const assignmentUrls = computed(() => config.value.assignmentUrls || {});
+  const assignmentAvailability = computed(() => config.value.assignmentAvailability || {});
+  const categoriesSettingsUrl = computed(() => config.value.categoriesSettingsUrl || '');
+  const tagsSettingsUrl = computed(() => config.value.tagsSettingsUrl || '');
   const logsUrl = computed(() => config.value.logsUrl || '');
   const logsPageUrl = computed(() => config.value.logsPageUrl || '');
   const dailyCountsUrl = computed(() => config.value.dailyCountsUrl || '');
@@ -67,6 +70,9 @@ export function useConfig() {
     cpUrl,
     scopeUrls,
     assignmentUrls,
+    assignmentAvailability,
+    categoriesSettingsUrl,
+    tagsSettingsUrl,
     logsUrl,
     logsPageUrl,
     dailyCountsUrl,

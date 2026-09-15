@@ -253,6 +253,7 @@ class SearchController extends Controller
                 "fieldValue" => $result->fieldValue,
                 "matchStart" => $result->matchStart,
                 "matchEnd" => $result->matchEnd,
+                "isRichText" => $result->isRichText,
                 "cpEditUrl" => $result->getCpEditUrl(),
                 "parentId" => $result->parentId,
                 "parentTitle" => $result->parentTitle,
@@ -326,6 +327,23 @@ class SearchController extends Controller
                     "editrix/assignment/tags"
                 ),
             ],
+
+            // Searching "which entries is this category/tag assigned to"
+            // makes no sense on a site with zero category/tag groups - the
+            // frontend uses this to show a "create some first" notice
+            // instead of a search form that could never find anything.
+            "assignmentAvailability" => [
+                "categories" => count(
+                    Craft::$app->getCategories()->getAllGroups()
+                ) > 0,
+                "tags" => count(Craft::$app->getTags()->getAllTagGroups()) > 0,
+            ],
+            "categoriesSettingsUrl" => \craft\helpers\UrlHelper::cpUrl(
+                "settings/categories"
+            ),
+            "tagsSettingsUrl" => \craft\helpers\UrlHelper::cpUrl(
+                "settings/tags"
+            ),
 
             "canReplace" => Editrix::$plugin->userCan("editrix:replace"),
             "canExport" => Editrix::$plugin->userCan("editrix:export"),
@@ -438,6 +456,22 @@ class SearchController extends Controller
             "This will affect {count} entries, above your bulk confirmation threshold of {threshold}.",
             "You are replacing content in a production environment.",
             'Type "REPLACE" below to confirm.',
+            "Show",
+            "of",
+            "Previous",
+            "Next",
+            "This occurrence won't be changed by this replacement.",
+            "Category search",
+            "Tag search",
+            "Filter sections",
+            "No sections match your filter.",
+            "Clear",
+            "{count} selected",
+            "Show {count} more entries",
+            "There are no categories yet. Create categories and assign them to entries to search them here.",
+            "There are no tags yet. Create tags and assign them to entries to search them here.",
+            "Go to Categories settings",
+            "Go to Tags settings",
         ];
 
         $translations = [];
