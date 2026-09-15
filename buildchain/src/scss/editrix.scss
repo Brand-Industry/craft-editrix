@@ -515,6 +515,7 @@
   
   &__actions {
     display: flex;
+    align-items: center;
     gap: $spacing-sm;
   }
   
@@ -620,11 +621,37 @@
     gap: $spacing-sm;
     font-size: 13px;
     color: $text-secondary;
-    
+
     strong {
       color: $secondary;
       font-weight: 600;
     }
+  }
+
+  &__pagination {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    font-size: 13px;
+    color: $text-secondary;
+  }
+
+  &__page-size {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+
+    select {
+      padding: 2px $spacing-sm;
+      border: 1px solid $border-color;
+      border-radius: $radius-sm;
+      background: $bg-input;
+      font-size: 13px;
+    }
+  }
+
+  &__page-range {
+    white-space: nowrap;
   }
 }
 
@@ -708,22 +735,6 @@
     }
   }
   
-  &__badge {
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    
-    &--remove {
-      background: $danger-light;
-      color: $diff-remove-text;
-    }
-    
-    &--add {
-      background: $success-light;
-      color: $diff-add-text;
-    }
-  }
-  
   &__text {
     background: $gray-50;
     border: 1px solid $border-color;
@@ -764,8 +775,22 @@
     font-size: 13px;
     color: $secondary;
     margin-top: $spacing-lg;
+
+    &--warning {
+      background: $warning-light;
+      color: darken($warning, 20%);
+      margin-top: 0;
+      margin-bottom: $spacing-lg;
+    }
   }
-  
+
+  &__loading {
+    color: $text-muted;
+    font-size: 13px;
+    padding: $spacing-lg 0;
+    text-align: center;
+  }
+
   &__footer {
     display: flex;
     justify-content: flex-end;
@@ -1077,10 +1102,90 @@
 // ==========================================
 
 .editrix-assignment-scope {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $spacing-sm $spacing-md;
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  overflow: hidden;
   margin-top: $spacing-xs;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-md;
+    border-bottom: 1px solid $border-color;
+
+    input {
+      flex: 1;
+      border: none;
+      height: auto;
+      padding: 2px 0;
+      background: transparent;
+
+      &:focus {
+        outline: none;
+        box-shadow: none;
+      }
+    }
+  }
+
+  &__count {
+    font-size: 12px;
+    color: $text-secondary;
+    white-space: nowrap;
+  }
+
+  &__list {
+    max-height: 180px;
+    overflow-y: auto;
+    padding: $spacing-xs;
+  }
+
+  &__option {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: 6px $spacing-xs;
+    border-radius: $radius-sm;
+    font-size: 13px;
+    cursor: pointer;
+
+    &:hover {
+      background: $gray-50;
+    }
+
+    input {
+      margin: 0;
+    }
+  }
+
+  &__empty {
+    padding: $spacing-md;
+    text-align: center;
+    font-size: 13px;
+    color: $text-muted;
+  }
+
+  &__footer {
+    display: flex;
+    gap: $spacing-md;
+    padding: $spacing-sm $spacing-md;
+    border-top: 1px solid $border-color;
+    font-size: 13px;
+
+    a {
+      color: $secondary;
+      cursor: pointer;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+
+      &.editrix-assignment-scope__footer-link--muted {
+        color: $text-secondary;
+      }
+    }
+  }
 }
 
 .editrix-assignment-list {
@@ -1115,22 +1220,48 @@
   &__entries {
     list-style: none;
     margin: $spacing-sm 0 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: $spacing-xs $spacing-md;
+    padding-top: $spacing-xs;
+    border-top: 1px solid $border-color;
 
     li {
       display: flex;
-      align-items: baseline;
-      gap: $spacing-xs;
+      align-items: center;
+      justify-content: space-between;
+      gap: $spacing-md;
+      padding: 6px 0;
       font-size: 13px;
+
+      & + li {
+        border-top: 1px solid $border-color;
+      }
+
+      a {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     }
   }
 
   &__entry-meta {
     color: $text-secondary;
     font-size: 12px;
+    white-space: nowrap;
+  }
+
+  &__show-more {
+    display: inline-block;
+    margin-top: $spacing-sm;
+    background: none;
+    border: none;
+    padding: 0;
+    color: $secondary;
+    font-size: 13px;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 

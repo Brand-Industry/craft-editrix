@@ -364,14 +364,14 @@ class SearchService extends Component
             $blockFields = $blockType->getCustomFields();
 
             foreach ($blockFields as $field) {
-                if (!empty($fieldFilter)) {
-                    $matrixFieldHandle = "{$matrixField->handle}.{$field->handle}";
-                    if (
-                        !in_array($field->handle, $fieldFilter) &&
-                        !in_array($matrixFieldHandle, $fieldFilter)
-                    ) {
-                        continue;
-                    }
+                if (
+                    !$this->fieldInFilterScope(
+                        $matrixField->handle,
+                        $field->handle,
+                        $fieldFilter
+                    )
+                ) {
+                    continue;
                 }
 
                 if (!$this->isSearchableField($field)) {
@@ -465,14 +465,14 @@ class SearchService extends Component
             $blockFields = $blockType->getCustomFields();
 
             foreach ($blockFields as $field) {
-                if (!empty($fieldFilter)) {
-                    $neoFieldHandle = "{$neoField->handle}.{$field->handle}";
-                    if (
-                        !in_array($field->handle, $fieldFilter) &&
-                        !in_array($neoFieldHandle, $fieldFilter)
-                    ) {
-                        continue;
-                    }
+                if (
+                    !$this->fieldInFilterScope(
+                        $neoField->handle,
+                        $field->handle,
+                        $fieldFilter
+                    )
+                ) {
+                    continue;
                 }
 
                 if (!$this->isSearchableField($field)) {
@@ -698,6 +698,30 @@ class SearchService extends Component
     }
 
     /**
+     * Whether a field nested inside a Matrix/Neo block (identified by its
+     * own bare handle, e.g. "titleField") is in scope for $fieldFilter.
+     * The Fields filter only ever offers one checkbox per Matrix/Neo field
+     * (not one per nested sub-field - there'd be far too many, often with
+     * duplicate names across block types), so selecting that checkbox
+     * puts the bare PARENT handle in $fieldFilter, meaning "search every
+     * field inside it." The compound "parent.field" form is also accepted
+     * since ReplaceService/log history may carry it from an older scope.
+     */
+    private function fieldInFilterScope(
+        string $parentHandle,
+        string $fieldHandle,
+        array $fieldFilter
+    ): bool {
+        if (empty($fieldFilter)) {
+            return true;
+        }
+
+        return in_array($fieldHandle, $fieldFilter) ||
+            in_array("{$parentHandle}.{$fieldHandle}", $fieldFilter) ||
+            in_array($parentHandle, $fieldFilter);
+    }
+
+    /**
      * Check if field is searchable
      */
     private function isSearchableField(FieldInterface $field): bool
@@ -794,9 +818,9 @@ class SearchService extends Component
                 continue;
             }
 
-            $rawStart = $charMap[$startChar];
+            $rawStart = $charMap[$startChar][0];
             $rawEnd = isset($charMap[$endChar - 1])
-                ? $charMap[$endChar - 1] + 1
+                ? $charMap[$endChar - 1][1]
                 : $rawStart;
 
             $crossesTag = str_contains(

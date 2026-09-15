@@ -4,6 +4,13 @@
       <h2 class="editrix-results__title">
         {{ t('Results') }}
         <span class="editrix-results__count">{{ totalResults }}</span>
+
+        <label v-if="totalResults > 0" class="editrix-results__page-size">
+          {{ t('Show') }}
+          <select v-model.number="pageSize">
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+          </select>
+        </label>
       </h2>
 
       <div class="editrix-results__actions">
@@ -60,47 +67,45 @@
         </tr>
       </thead>
       <tbody>
-        <template v-for="(siteData, siteHandle) in results" :key="siteHandle">
-          <tr v-if="Object.keys(results).length > 1" class="editrix-results__site-row">
+        <template v-for="row in pagedRows" :key="row.result.uniqueKey">
+          <tr v-if="row.showSiteHeader" class="editrix-results__site-row">
             <td colspan="5">
-              <strong>📍 {{ siteData.siteName }}</strong>
-              <span class="editrix-badge editrix-badge--neutral">{{ siteData.results.length }}</span>
+              <strong>📍 {{ row.siteName }}</strong>
+              <span class="editrix-badge editrix-badge--neutral">{{ row.siteCount }}</span>
             </td>
           </tr>
 
           <tr
-            v-for="result in siteData.results"
-            :key="result.uniqueKey"
-            :class="{ 'is-selected': isSelected(result) }"
-            @click="$emit('toggle', result)"
+            :class="{ 'is-selected': isSelected(row.result) }"
+            @click="$emit('toggle', row.result)"
           >
             <td class="editrix-results__checkbox" @click.stop>
               <input
                 type="checkbox"
-                :checked="isSelected(result)"
-                @change="$emit('toggle', result)"
+                :checked="isSelected(row.result)"
+                @change="$emit('toggle', row.result)"
               />
             </td>
             <td>
               <div class="editrix-results__element">
                 <div class="editrix-results__element-title">
-                  {{ result.elementTitle }}
+                  {{ row.result.elementTitle }}
                 </div>
                 <div class="editrix-results__element-meta">
-                  {{ result.sectionName }}
-                  <span v-if="result.parentTitle"> → {{ result.parentTitle }}</span>
+                  {{ row.result.sectionName }}
+                  <span v-if="row.result.parentTitle"> → {{ row.result.parentTitle }}</span>
                 </div>
               </div>
             </td>
             <td class="editrix-results__field">
-              {{ result.fieldName }}
-              <span class="editrix-badge editrix-badge--neutral">{{ elementTypeLabel(result.elementType) }}</span>
+              {{ row.result.fieldName }}
+              <span class="editrix-badge editrix-badge--neutral">{{ elementTypeLabel(row.result.elementType) }}</span>
             </td>
-            <td class="editrix-results__preview" v-html="formatPreview(result.matchContext)"></td>
+            <td class="editrix-results__preview" v-html="formatPreview(row.result.matchContext)"></td>
             <td>
               <button
                 class="editrix-btn editrix-btn--ghost editrix-btn--sm"
-                @click.stop="$emit('view', result)"
+                @click.stop="$emit('view', row.result)"
               >
                 {{ t('View') }}
               </button>
@@ -117,12 +122,33 @@
         </span>
         <span>{{ t('Total occurrences:') }} <strong>{{ totalResults }}</strong></span>
       </div>
+
+      <div class="editrix-results__pagination">
+        <span class="editrix-results__page-range">
+          {{ pageRangeStart }}–{{ pageRangeEnd }} {{ t('of') }} {{ flatRows.length }}
+        </span>
+
+        <button
+          class="editrix-btn editrix-btn--sm editrix-btn--secondary"
+          :disabled="currentPage === 1"
+          @click="currentPage--"
+        >
+          {{ t('Previous') }}
+        </button>
+        <button
+          class="editrix-btn editrix-btn--sm editrix-btn--secondary"
+          :disabled="currentPage >= totalPages"
+          @click="currentPage++"
+        >
+          {{ t('Next') }}
+        </button>
+      </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { inject, ref, computed, watch } from 'vue';
 import { elementTypeLabel } from '../../utils/elementType';
 
 const t = inject('t');
@@ -137,6 +163,59 @@ const props = defineProps({
   actionMode: { type: String, default: 'replace' },
   searchQuery: { type: String, default: '' },
 });
+
+// Results come from the backend as one big grouped-by-site batch (the
+// search endpoint has no offset/limit of its own), so pagination here is
+// purely a client-side slice over that already-fetched list.
+const pageSizeOptions = [5, 10, 25, 50, 100];
+const pageSize = ref(10);
+const currentPage = ref(1);
+
+const flatRows = computed(() => {
+  const rows = [];
+  Object.values(props.results).forEach(siteData => {
+    siteData.results.forEach((result, index) => {
+      rows.push({
+        result,
+        siteName: siteData.siteName,
+        siteCount: siteData.results.length,
+        isFirstInSite: index === 0,
+      });
+    });
+  });
+  return rows;
+});
+
+const showSiteHeaders = computed(() => Object.keys(props.results).length > 1);
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(flatRows.value.length / pageSize.value))
+);
+
+const pagedRows = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  const slice = flatRows.value.slice(start, start + pageSize.value);
+
+  let lastSiteName = null;
+  return slice.map((row, index) => {
+    const showSiteHeader =
+      showSiteHeaders.value && (index === 0 || row.siteName !== lastSiteName);
+    lastSiteName = row.siteName;
+    return { ...row, showSiteHeader };
+  });
+});
+
+const pageRangeStart = computed(() =>
+  flatRows.value.length === 0 ? 0 : (currentPage.value - 1) * pageSize.value + 1
+);
+const pageRangeEnd = computed(() =>
+  Math.min(currentPage.value * pageSize.value, flatRows.value.length)
+);
+
+// A new search result set, or a page size change, both invalidate whatever
+// page we were on.
+watch(() => props.results, () => { currentPage.value = 1; });
+watch(pageSize, () => { currentPage.value = 1; });
 
 defineEmits(['toggle', 'toggle-all', 'view', 'replace']);
 

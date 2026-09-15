@@ -21,19 +21,42 @@
 
     <div v-if="availableSections.length > 0" class="editrix-form__group" style="margin-top: 16px;">
       <label class="editrix-form__label">{{ t('Limit to sections (optional)') }}</label>
+
       <div class="editrix-assignment-scope">
-        <label
-          v-for="section in availableSections"
-          :key="section.handle"
-          class="editrix-form__checkbox"
-        >
+        <div class="editrix-assignment-scope__header">
           <input
-            type="checkbox"
-            :checked="sections.includes(section.handle)"
-            @change="toggleSection(section.handle)"
+            v-model="sectionFilter"
+            type="text"
+            :placeholder="t('Filter sections')"
           />
-          <span>{{ section.name }}</span>
-        </label>
+          <span class="editrix-assignment-scope__count">
+            {{ t('{count} selected', { count: sections.length }) }}
+          </span>
+        </div>
+
+        <div class="editrix-assignment-scope__list">
+          <label
+            v-for="section in filteredSections"
+            :key="section.handle"
+            class="editrix-assignment-scope__option"
+          >
+            <input
+              type="checkbox"
+              :checked="sections.includes(section.handle)"
+              @change="toggleSection(section.handle)"
+            />
+            <span>{{ section.name }}</span>
+          </label>
+
+          <p v-if="filteredSections.length === 0" class="editrix-assignment-scope__empty">
+            {{ t('No sections match your filter.') }}
+          </p>
+        </div>
+
+        <div class="editrix-assignment-scope__footer">
+          <a @click="selectAllSections">{{ t('Select All') }}</a>
+          <a class="editrix-assignment-scope__footer-link--muted" @click="clearSections">{{ t('Clear') }}</a>
+        </div>
       </div>
     </div>
 
@@ -52,7 +75,7 @@
 </template>
 
 <script setup>
-import { inject, onMounted, ref } from 'vue';
+import { computed, inject, onMounted, ref } from 'vue';
 import { useConfig } from '../../composables/useConfig';
 import { useApi } from '../../composables/useApi';
 
@@ -70,6 +93,15 @@ const props = defineProps({
 const emit = defineEmits(['update:query', 'update:sections', 'search']);
 
 const availableSections = ref([]);
+const sectionFilter = ref('');
+
+const filteredSections = computed(() => {
+  const term = sectionFilter.value.trim().toLowerCase();
+  if (!term) return availableSections.value;
+  return availableSections.value.filter((section) =>
+    section.name.toLowerCase().includes(term)
+  );
+});
 
 const toggleSection = (handle) => {
   const current = props.sections;
@@ -77,6 +109,14 @@ const toggleSection = (handle) => {
     ? current.filter((h) => h !== handle)
     : [...current, handle];
   emit('update:sections', next);
+};
+
+const selectAllSections = () => {
+  emit('update:sections', filteredSections.value.map((section) => section.handle));
+};
+
+const clearSections = () => {
+  emit('update:sections', []);
 };
 
 onMounted(async () => {

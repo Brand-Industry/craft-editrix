@@ -20,7 +20,7 @@
       <main class="editrix-layout__main">
         <header class="editrix-search__header">
           <h1 class="editrix-search__title">
-            {{ t('Find & Replace') }}
+            {{ pageTitle }}
             <EnvironmentBadge v-if="hasFeature('envIndicator') && safety.showEnvironmentIndicator" />
           </h1>
 
@@ -139,6 +139,21 @@
           🔒 {{ t('Category & tag assignment search requires Pro edition.') }}
         </div>
 
+        <div v-else-if="searchType !== 'text' && !hasAssignmentGroups" class="editrix-form__warning" style="margin-top: 16px;">
+          <div>
+            <p style="margin: 0 0 8px;">ℹ️ {{ assignmentEmptyMessage }}</p>
+            <a
+              v-if="assignmentSettingsUrl"
+              :href="assignmentSettingsUrl"
+              target="_blank"
+              rel="noopener"
+              class="editrix-btn editrix-btn--secondary editrix-btn--sm"
+            >
+              {{ assignmentSettingsLabel }}
+            </a>
+          </div>
+        </div>
+
         <template v-else-if="searchType !== 'text'">
           <AssignmentSearchForm
             v-model:query="assignmentParams.query"
@@ -209,8 +224,10 @@
     <DiffPreview
       :show="!!previewResult"
       :result="previewResult"
-      :search-query="searchParams.query"
-      :replace-with="searchParams.replaceWith"
+      :original="previewData?.original ?? previewResult?.fieldValue ?? ''"
+      :proposed="previewData?.proposed ?? previewResult?.fieldValue ?? ''"
+      :changed="previewData?.changed ?? false"
+      :loading="previewLoading"
       @close="previewResult = null"
       @apply="applyToSingle"
       @skip="skipToNext"
@@ -237,7 +254,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, provide } from 'vue';
+import { ref, computed, watch, onMounted, provide } from 'vue';
 import { useConfig } from '../composables/useConfig';
 import { useSearch } from '../composables/useSearch';
 import { useAssignmentSearch } from '../composables/useAssignmentSearch';
@@ -258,7 +275,18 @@ import AssignmentResultsList from '../components/assignments/AssignmentResultsLi
 import RecentActivity from '../components/search/RecentActivity.vue';
 import ActivityChart from '../components/logs/ActivityChart.vue';
 
-const { t, hasFeature, currentSiteId, logsUrl, dailyCountsUrl, safety, isProduction } = useConfig();
+const {
+  t,
+  hasFeature,
+  currentSiteId,
+  logsUrl,
+  dailyCountsUrl,
+  safety,
+  isProduction,
+  assignmentAvailability,
+  categoriesSettingsUrl,
+  tagsSettingsUrl,
+} = useConfig();
 const { get: apiGet } = useApi();
 
 provide('t', t);
@@ -268,6 +296,40 @@ provide('hasFeature', hasFeature);
 // content (existing flow); 'category'/'tag' = which entries have this
 // category/tag assigned (Pro only, search-only for now).
 const searchType = ref(null);
+
+// "Find & Replace" only fits the text tool - Categories/Tags don't replace
+// anything, so both the on-page heading and the browser tab title need to
+// change with it rather than showing a misleading fixed name.
+const pageTitle = computed(() => {
+  if (searchType.value === 'category') return t('Category search');
+  if (searchType.value === 'tag') return t('Tag search');
+  return t('Find & Replace');
+});
+
+// A site with zero category/tag groups can never have anything for this
+// search to find - show a "create some first" notice instead of a form
+// that would only ever come back empty.
+const hasAssignmentGroups = computed(() => {
+  if (searchType.value === 'category') return !!assignmentAvailability.value.categories;
+  if (searchType.value === 'tag') return !!assignmentAvailability.value.tags;
+  return true;
+});
+
+const assignmentEmptyMessage = computed(() => {
+  return searchType.value === 'tag'
+    ? t('There are no tags yet. Create tags and assign them to entries to search them here.')
+    : t('There are no categories yet. Create categories and assign them to entries to search them here.');
+});
+
+const assignmentSettingsUrl = computed(() => {
+  return searchType.value === 'tag' ? tagsSettingsUrl.value : categoriesSettingsUrl.value;
+});
+
+const assignmentSettingsLabel = computed(() => {
+  return searchType.value === 'tag'
+    ? t('Go to Tags settings')
+    : t('Go to Categories settings');
+});
 
 const {
   loading: assignmentLoading,
@@ -553,6 +615,27 @@ const handleReplace = async (confirmationCode) => {
 const openDiffPreview = (result) => {
   previewResult.value = result;
 };
+
+// The diff shown in DiffPreview must come from the same tag/entity-aware
+// engine that ReplaceService actually uses to save - computing it again
+// in JS (as this used to do) can disagree with what Apply would really
+// do. Whenever the previewed result changes, fetch the real before/after
+// from the server.
+const previewData = ref(null);
+const previewLoading = ref(false);
+
+watch(previewResult, async (result) => {
+  previewData.value = null;
+
+  if (!result) return;
+
+  previewLoading.value = true;
+  try {
+    previewData.value = await getPreview(result);
+  } finally {
+    previewLoading.value = false;
+  }
+});
 
 // Search mode gets the read-only details modal (info + link to Craft);
 // Search & Replace keeps the existing diff preview with Apply/Skip.

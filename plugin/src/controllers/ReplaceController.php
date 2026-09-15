@@ -130,6 +130,9 @@ class ReplaceController extends Controller
         $caseInsensitive = $this->parseBoolean(
             $request->getBodyParam("caseInsensitive", false)
         );
+        $wholeWords = $this->parseBoolean(
+            $request->getBodyParam("wholeWords", false)
+        );
 
         if (is_string($result)) {
             $result = json_decode($result, true) ?? [];
@@ -143,12 +146,14 @@ class ReplaceController extends Controller
         }
 
         $originalValue = $result["fieldValue"];
-        $newValue = $this->performPreviewReplacement(
+        $newValue = Editrix::$plugin->replace->computeNewValue(
+            $result,
             $originalValue,
             $searchQuery,
             $replaceWith,
             $useRegex,
-            !$caseInsensitive
+            !$caseInsensitive,
+            $wholeWords
         );
 
         return $this->asJson([
@@ -157,27 +162,6 @@ class ReplaceController extends Controller
             "proposed" => $newValue,
             "changed" => $originalValue !== $newValue,
         ]);
-    }
-
-    private function performPreviewReplacement(
-        string $value,
-        string $query,
-        string $replaceWith,
-        bool $useRegex,
-        bool $caseSensitive
-    ): string {
-        if ($useRegex) {
-            $flags = $caseSensitive ? "" : "i";
-            $pattern = "/{$query}/{$flags}";
-            return @preg_replace($pattern, $replaceWith, $value) ?? $value;
-        }
-
-        if ($caseSensitive) {
-            return str_replace($query, $replaceWith, $value);
-        }
-
-        $pattern = "/" . preg_quote($query, "/") . "/i";
-        return preg_replace($pattern, $replaceWith, $value);
     }
 
     /**
