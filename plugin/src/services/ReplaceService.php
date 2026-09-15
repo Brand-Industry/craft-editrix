@@ -41,23 +41,15 @@ class ReplaceService extends Component
             $result = $data["result"];
             $oldValue = $data["oldValue"];
 
-            $newValue = !empty($result["isRichText"])
-                ? $this->performReplacementInHtml(
-                    $oldValue,
-                    $searchQuery,
-                    $replaceWith,
-                    $useRegex,
-                    $caseSensitive,
-                    $wholeWords
-                )
-                : $this->performReplacement(
-                    $oldValue,
-                    $searchQuery,
-                    $replaceWith,
-                    $useRegex,
-                    $caseSensitive,
-                    $wholeWords
-                );
+            $newValue = $this->computeNewValue(
+                $result,
+                $oldValue,
+                $searchQuery,
+                $replaceWith,
+                $useRegex,
+                $caseSensitive,
+                $wholeWords
+            );
 
             if ($newValue === $oldValue) {
                 continue;
@@ -82,6 +74,42 @@ class ReplaceService extends Component
         }
 
         return $replacements;
+    }
+
+    /**
+     * The single place that decides which algorithm applies a replacement -
+     * shared by the real save (replace()) and ReplaceController's preview
+     * endpoint, so what a user is shown before confirming is guaranteed to
+     * be what actually gets written. $result only needs an "isRichText"
+     * key; the full result array works, but so does a minimal one built
+     * just for a preview call.
+     */
+    public function computeNewValue(
+        array $result,
+        string $value,
+        string $query,
+        string $replaceWith,
+        bool $useRegex = false,
+        bool $caseSensitive = true,
+        bool $wholeWords = false
+    ): string {
+        return !empty($result["isRichText"])
+            ? $this->performReplacementInHtml(
+                $value,
+                $query,
+                $replaceWith,
+                $useRegex,
+                $caseSensitive,
+                $wholeWords
+            )
+            : $this->performReplacement(
+                $value,
+                $query,
+                $replaceWith,
+                $useRegex,
+                $caseSensitive,
+                $wholeWords
+            );
     }
 
     private function performReplacement(
@@ -207,6 +235,23 @@ class ReplaceService extends Component
                 $innerRawStart
             );
 
+            // The matched PHRASE can span a tag (or now, a decoded entity)
+            // and still be safe to edit, as long as the part that actually
+            // CHANGED doesn't itself include a tag - inserting text next to
+            // an <i> is fine, overwriting a span that contains the <i>
+            // itself would delete only one side of it and corrupt the
+            // markup. When the diff span does include a tag, leave this
+            // occurrence untouched rather than risk that - same as any
+            // other no-op, it's just excluded from the result below.
+            $innerRawSlice = mb_substr(
+                $value,
+                $innerRawStart,
+                $innerRawEnd - $innerRawStart
+            );
+            if (str_contains($innerRawSlice, "<")) {
+                continue;
+            }
+
             $value =
                 mb_substr($value, 0, $innerRawStart) .
                 $newMiddle .
@@ -231,20 +276,21 @@ class ReplaceService extends Component
         $len = count($charMap);
 
         if ($plainIndex < $len) {
-            return $charMap[$plainIndex];
+            return $charMap[$plainIndex][0];
         }
 
-        return $len > 0 ? $charMap[$len - 1] + 1 : 0;
+        return $len > 0 ? $charMap[$len - 1][1] : 0;
     }
 
     /**
      * Raw position marking the END of a span (exclusive) that runs up to
-     * plain-text character $plainIndex - NOT $charMap[$plainIndex] itself,
-     * which is the position of the NEXT plain character and would skip
-     * over (and silently delete) any tag sitting between the two, e.g. a
-     * closing </i> right after the matched word. The correct boundary is
-     * always "right after the last INCLUDED character", i.e.
-     * $charMap[$plainIndex - 1] + 1. $fallback covers a zero-width span at
+     * plain-text character $plainIndex - NOT $charMap[$plainIndex][0]
+     * itself, which is the START of the NEXT plain character's span and
+     * would skip over (and silently delete) any tag sitting between the
+     * two, e.g. a closing </i> right after the matched word, or leave a
+     * partially-consumed entity behind. The correct boundary is always
+     * "right after the last INCLUDED character's span", i.e.
+     * $charMap[$plainIndex - 1][1]. $fallback covers a zero-width span at
      * the very start (nothing precedes it to measure from).
      */
     private function rawEndForPlainIndex(
@@ -253,7 +299,7 @@ class ReplaceService extends Component
         int $fallback
     ): int {
         if ($plainIndex > 0 && isset($charMap[$plainIndex - 1])) {
-            return $charMap[$plainIndex - 1] + 1;
+            return $charMap[$plainIndex - 1][1];
         }
 
         return $fallback;
