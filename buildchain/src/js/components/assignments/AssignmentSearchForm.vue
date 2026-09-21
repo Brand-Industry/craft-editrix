@@ -80,7 +80,7 @@ import { useConfig } from '../../composables/useConfig';
 import { useApi } from '../../composables/useApi';
 
 const t = inject('t');
-const { scopeUrls } = useConfig();
+const { assignmentUrls } = useConfig();
 const { get } = useApi();
 
 const props = defineProps({
@@ -120,9 +120,9 @@ const clearSections = () => {
 };
 
 onMounted(async () => {
-  if (!scopeUrls.value.sections) return;
+  if (!assignmentUrls.value.sections) return;
   try {
-    const data = await get(scopeUrls.value.sections);
+    const data = await get(assignmentUrls.value.sections, { type: props.type });
     availableSections.value = data.sections || [];
   } catch (err) {
     console.error('Failed to load sections:', err);
