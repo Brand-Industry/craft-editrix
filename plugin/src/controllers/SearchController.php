@@ -326,6 +326,9 @@ class SearchController extends Controller
                 "tags" => \craft\helpers\UrlHelper::actionUrl(
                     "editrix/assignment/tags"
                 ),
+                "sections" => \craft\helpers\UrlHelper::actionUrl(
+                    "editrix/scope/assignable-sections"
+                ),
             ],
 
             // Searching "which entries is this category/tag assigned to"

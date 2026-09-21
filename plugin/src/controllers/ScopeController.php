@@ -4,8 +4,10 @@ namespace brandindustry\editrix\controllers;
 
 use Craft;
 use craft\web\Controller;
+use craft\fields\Categories;
 use craft\fields\Matrix;
 use craft\fields\Tags;
+use craft\models\Section;
 use yii\web\Response;
 use brandindustry\editrix\Editrix;
 
@@ -31,6 +33,88 @@ class ScopeController extends Controller
             "success" => true,
             "sections" => array_values($data),
         ]);
+    }
+
+    /**
+     * Sections worth offering in the Category/Tag assignment search's
+     * "Limit to sections" filter - only ones where at least one entry type
+     * actually has a Categories (or Tags) field somewhere in its layout, so
+     * the list doesn't include sections that could never match anything.
+     */
+    public function actionAssignableSections(): Response
+    {
+        $this->requireAcceptsJson();
+
+        $type = Craft::$app->getRequest()->getParam("type", "category");
+        $targetClass = $type === "tag" ? Tags::class : Categories::class;
+
+        $sections = Craft::$app->getEntries()->getAllSections();
+
+        $data = [];
+        foreach ($sections as $section) {
+            if ($this->sectionHasRelationField($section, $targetClass)) {
+                $data[] = [
+                    "id" => $section->id,
+                    "name" => $section->name,
+                    "handle" => $section->handle,
+                    "type" => $section->type,
+                ];
+            }
+        }
+
+        return $this->asJson([
+            "success" => true,
+            "sections" => $data,
+        ]);
+    }
+
+    private function sectionHasRelationField(
+        Section $section,
+        string $targetClass
+    ): bool {
+        foreach ($section->getEntryTypes() as $entryType) {
+            $fieldLayout = $entryType->getFieldLayout();
+
+            if ($fieldLayout && $this->layoutHasRelationField($fieldLayout, $targetClass)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function layoutHasRelationField(
+        $fieldLayout,
+        string $targetClass
+    ): bool {
+        foreach ($fieldLayout->getCustomFields() as $field) {
+            if ($field instanceof $targetClass) {
+                return true;
+            }
+
+            if ($field instanceof Matrix) {
+                foreach ($field->getEntryTypes() as $blockType) {
+                    foreach ($blockType->getCustomFields() as $subField) {
+                        if ($subField instanceof $targetClass) {
+                            return true;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if ($this->isNeoField($field)) {
+                foreach ($field->getBlockTypes() as $blockType) {
+                    foreach ($blockType->getCustomFields() as $subField) {
+                        if ($subField instanceof $targetClass) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     public function actionSites(): Response
