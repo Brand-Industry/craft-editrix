@@ -2,6 +2,11 @@
 
 All notable changes to Editrix will be documented in this file.
 
+## [2.0.0-beta.3] - 2026-09-21
+
+### Changed
+- Section filter in Category/Tag search now only lists sections that actually have a Categories (or Tags) field, since the rest could never match
+
 ## [2.0.0-beta.2] - 2026-09-15
 
 Craft 5 release. Standard is now the free edition; Pro adds Category & Tag Assignment Search, Matrix/Category search, multisite, scope filters, and CSV export.
