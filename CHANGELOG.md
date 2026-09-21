@@ -16,6 +16,7 @@ All notable changes to Editrix will be documented in this file.
 - Segmented Search's Fields filter now shows one checkbox per Matrix/Neo field instead of one per nested sub-field (which could repeat names like "Title" once per block type)
 - "Find & Replace" renamed to "Category search"/"Tag search" on those tools' screens
 - Section filter in Category/Tag search is now a searchable, scrollable list instead of a checkbox grid
+- Section filter in Category/Tag search now only lists sections that actually have a Categories (or Tags) field, since the rest could never match
 
 ### Fixed
 - Search/replace not matching text that spans an HTML tag or an encoded entity (e.g. "Terms & Conditions" vs. the stored "Terms &amp; Conditions")
