@@ -397,6 +397,7 @@ class SearchController extends Controller
             "Globals",
             "Matrix fields",
             "Categories",
+            "All Sites",
             "Search & Replace",
             "Find where content lives and export the results - nothing gets changed.",
             "Find content and replace it. Only fields safe to overwrite are offered.",
