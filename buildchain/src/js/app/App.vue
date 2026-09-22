@@ -1,10 +1,10 @@
 <template>
   <div class="editrix">
     <div class="editrix-layout">
-      <aside v-if="hasFeature('scopeFilters') && searchMode === 'segmented'" class="editrix-layout__sidebar">
+      <aside v-if="searchType === 'text' && hasFeature('scopeFilters') && searchMode === 'segmented'" class="editrix-layout__sidebar">
         <ScopeFilters
           v-model:sections="searchParams.sections"
-          v-model:sites="selectedSites"
+          v-model:sites="searchParams.siteIds"
           v-model:fields="searchParams.fields"
           v-model:entry-types="searchParams.entryTypes"
           :action-mode="actionMode"
@@ -21,6 +21,7 @@
         <header class="editrix-search__header">
           <h1 class="editrix-search__title">
             {{ pageTitle }}
+            <EditionBadge />
             <EnvironmentBadge v-if="hasFeature('envIndicator') && safety.showEnvironmentIndicator" />
           </h1>
 
@@ -270,6 +271,7 @@ import ConfirmModal from '../components/common/ConfirmModal.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import EmptyState from '../components/common/EmptyState.vue';
 import EnvironmentBadge from '../components/common/EnvironmentBadge.vue';
+import EditionBadge from '../components/common/EditionBadge.vue';
 import AssignmentSearchForm from '../components/assignments/AssignmentSearchForm.vue';
 import AssignmentResultsList from '../components/assignments/AssignmentResultsList.vue';
 import RecentActivity from '../components/search/RecentActivity.vue';
@@ -298,8 +300,8 @@ provide('hasFeature', hasFeature);
 const searchType = ref(null);
 
 // "Find & Replace" only fits the text tool - Categories/Tags don't replace
-// anything, so both the on-page heading and the browser tab title need to
-// change with it rather than showing a misleading fixed name.
+// anything, so the on-page heading needs to change with it rather than
+// showing a misleading fixed name.
 const pageTitle = computed(() => {
   if (searchType.value === 'category') return t('Category search');
   if (searchType.value === 'tag') return t('Tag search');
@@ -338,6 +340,7 @@ const {
   hasSearched: assignmentHasSearched,
   params: assignmentParams,
   search: searchAssignments,
+  reset: resetAssignmentSearch,
 } = useAssignmentSearch();
 
 const handleAssignmentSearch = async () => {
@@ -347,6 +350,21 @@ const handleAssignmentSearch = async () => {
     window.Craft?.cp?.displayError?.(err.message || 'Search failed');
   }
 };
+
+// Category, Tag, and text search share this one App instance (it's an SPA,
+// so there's no page reload between them) - without this, switching away
+// from one tool kept showing its query/results/scope-filter sidebar as if
+// it were still active.
+watch(searchType, (newType, oldType) => {
+  if (oldType === 'category' || oldType === 'tag') {
+    assignmentParams.query = '';
+    assignmentParams.sections = [];
+    resetAssignmentSearch();
+  }
+  if (oldType === 'text') {
+    setSearchMode('general');
+  }
+});
 
 // Shown on the tool-picker landing screen so users don't have to visit
 // Logs & History just to see (or repeat) what they last searched.
@@ -437,7 +455,6 @@ const showReplaceConfirm = ref(false);
 const replacing = ref(false);
 const previewResult = ref(null);
 const detailResult = ref(null);
-const selectedSites = ref([]);
 
 const setSearchMode = (mode) => {
   searchMode.value = mode;
@@ -446,7 +463,7 @@ const setSearchMode = (mode) => {
     searchParams.sections = [];
     searchParams.fields = [];
     searchParams.entryTypes = [];
-    selectedSites.value = [];
+    searchParams.siteIds = [];
   }
 };
 
@@ -624,16 +641,26 @@ const openDiffPreview = (result) => {
 const previewData = ref(null);
 const previewLoading = ref(false);
 
+// Guards against a slower, older request resolving after a newer one and
+// overwriting the currently-displayed preview with mismatched data.
+let previewRequestId = 0;
+
 watch(previewResult, async (result) => {
+  const requestId = ++previewRequestId;
   previewData.value = null;
 
   if (!result) return;
 
   previewLoading.value = true;
   try {
-    previewData.value = await getPreview(result);
+    const data = await getPreview(result);
+    if (requestId === previewRequestId) {
+      previewData.value = data;
+    }
   } finally {
-    previewLoading.value = false;
+    if (requestId === previewRequestId) {
+      previewLoading.value = false;
+    }
   }
 });
 

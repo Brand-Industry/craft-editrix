@@ -18,6 +18,11 @@ export function useAssignmentSearch() {
     sections: [],
   });
 
+  // Guards against a slower, older request resolving after a newer search
+  // (or a reset(), e.g. from switching Category <-> Tag) and overwriting
+  // results/hasSearched with stale data.
+  let requestId = 0;
+
   const search = async (type) => {
     const url =
       type === 'category'
@@ -28,19 +33,24 @@ export function useAssignmentSearch() {
       return null;
     }
 
+    const thisRequestId = ++requestId;
+
     const data = await post(url, {
       query: params.query,
       siteId: params.siteId,
       sections: params.sections,
     });
 
-    hasSearched.value = true;
-    results.value = data?.success ? data.results || [] : [];
+    if (thisRequestId === requestId) {
+      hasSearched.value = true;
+      results.value = data?.success ? data.results || [] : [];
+    }
 
     return data;
   };
 
   const reset = () => {
+    requestId++;
     results.value = [];
     hasSearched.value = false;
   };
