@@ -73,7 +73,7 @@
       </label>
     </div>
 
-    <div v-if="showScopeInline" class="editrix-form__options" style="margin-top: 16px;">
+    <div class="editrix-form__options" style="margin-top: 16px;">
       <label class="editrix-form__checkbox">
         <input
           type="checkbox"
@@ -102,6 +102,38 @@
         <span>{{ t('Matrix fields') }}</span>
         <span v-if="!hasFeature('search.matrix')" class="editrix-badge editrix-badge--info">Pro</span>
       </label>
+
+      <label class="editrix-form__checkbox">
+        <input
+          type="checkbox"
+          :checked="searchCategories"
+          :disabled="!hasFeature('search.categories')"
+          @change="$emit('update:searchCategories', $event.target.checked)"
+        />
+        <span>{{ t('Categories') }}</span>
+        <span v-if="!hasFeature('search.categories')" class="editrix-badge editrix-badge--info">Pro</span>
+      </label>
+
+      <template v-if="hasFeature('multisite') && sites.length > 1">
+        <label class="editrix-form__checkbox">
+          <select
+            :value="siteId"
+            :disabled="allSites"
+            @change="$emit('update:siteId', Number($event.target.value))"
+          >
+            <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
+          </select>
+        </label>
+
+        <label class="editrix-form__checkbox">
+          <input
+            type="checkbox"
+            :checked="allSites"
+            @change="$emit('update:allSites', $event.target.checked)"
+          />
+          <span>{{ t('All Sites') }}</span>
+        </label>
+      </template>
     </div>
 
     <div class="editrix-form__footer">
@@ -125,9 +157,11 @@
 
 <script setup>
 import { inject } from 'vue';
+import { useConfig } from '../../composables/useConfig';
 
 const t = inject('t');
 const hasFeature = inject('hasFeature');
+const { sites } = useConfig();
 
 defineProps({
   query: { type: String, default: '' },
@@ -143,7 +177,6 @@ defineProps({
   searchMatrix: { type: Boolean, default: true },
   searchCategories: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
-  showScopeInline: { type: Boolean, default: false },
   actionMode: { type: String, default: 'replace' },
 });
 
