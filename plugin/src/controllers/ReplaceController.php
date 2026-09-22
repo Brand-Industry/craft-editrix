@@ -6,6 +6,7 @@ use Craft;
 use craft\web\Controller;
 use yii\web\Response;
 use brandindustry\editrix\Editrix;
+use brandindustry\editrix\services\LicenseService;
 
 class ReplaceController extends Controller
 {
@@ -35,6 +36,14 @@ class ReplaceController extends Controller
         $wholeWords = $this->parseBoolean(
             $request->getBodyParam("wholeWords", false)
         );
+
+        $licenseError = $this->checkRegexWholeWordsLicense(
+            $useRegex,
+            $wholeWords
+        );
+        if ($licenseError !== null) {
+            return $this->asJson($licenseError);
+        }
 
         if (is_string($selectedResults)) {
             $selectedResults = json_decode($selectedResults, true) ?? [];
@@ -134,11 +143,19 @@ class ReplaceController extends Controller
             $request->getBodyParam("wholeWords", false)
         );
 
+        $licenseError = $this->checkRegexWholeWordsLicense(
+            $useRegex,
+            $wholeWords
+        );
+        if ($licenseError !== null) {
+            return $this->asJson($licenseError);
+        }
+
         if (is_string($result)) {
             $result = json_decode($result, true) ?? [];
         }
 
-        if (empty($result) || empty($result["fieldValue"])) {
+        if (empty($result) || (string) ($result["fieldValue"] ?? "") === "") {
             return $this->asJson([
                 "success" => false,
                 "error" => "Invalid result data",
@@ -162,6 +179,45 @@ class ReplaceController extends Controller
             "proposed" => $newValue,
             "changed" => $originalValue !== $newValue,
         ]);
+    }
+
+    /**
+     * Mirrors SearchController::actionSearch()'s regex/whole-words license
+     * check - Search already blocks these by edition, so Replace needs the
+     * same server-side gate rather than relying on the UI not offering them.
+     */
+    private function checkRegexWholeWordsLicense(
+        bool $useRegex,
+        bool $wholeWords
+    ): ?array {
+        $license = Editrix::$plugin->license;
+
+        if ($useRegex && !$license->hasFeature(LicenseService::FEATURE_REGEX)) {
+            return [
+                "success" => false,
+                "error" => Craft::t(
+                    "editrix",
+                    "Regex is only available in Pro edition"
+                ),
+                "upgradeRequired" => true,
+            ];
+        }
+
+        if (
+            $wholeWords &&
+            !$license->hasFeature(LicenseService::FEATURE_WHOLE_WORDS)
+        ) {
+            return [
+                "success" => false,
+                "error" => Craft::t(
+                    "editrix",
+                    "Whole words matching requires Standard or Pro edition"
+                ),
+                "upgradeRequired" => true,
+            ];
+        }
+
+        return null;
     }
 
     /**

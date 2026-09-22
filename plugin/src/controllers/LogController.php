@@ -312,6 +312,16 @@ class LogController extends Controller
             ]);
         }
 
+        if (
+            $format !== "json" &&
+            !$license->hasFeature(LicenseService::FEATURE_EXPORT_CSV)
+        ) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "CSV export requires Pro edition",
+            ]);
+        }
+
         if ($format === "json") {
             $content = Editrix::$plugin->log->exportToJson($filters);
             $filename = "editrix-logs-" . date("Y-m-d") . ".json";
