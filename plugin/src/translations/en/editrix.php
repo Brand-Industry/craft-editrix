@@ -38,6 +38,7 @@ return [
     'Title' => 'Title',
     'Search only' => 'Search only',
     'Rename the tag directly - it may be shared by other entries.' => 'Rename the tag directly - it may be shared by other entries.',
+    'This match spans formatting (like bold or italic) and can\'t be replaced automatically - edit it directly in Craft.' => 'This match spans formatting (like bold or italic) and can\'t be replaced automatically - edit it directly in Craft.',
     'View' => 'View',
     'Match Details' => 'Match Details',
     'Element' => 'Element',
