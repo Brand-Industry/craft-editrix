@@ -163,85 +163,28 @@ class LicenseService extends Component
         ],
     ];
 
-    private ?string $cachedEdition = null;
-
     /**
-     * Get current edition
+     * The licensed edition, per Craft's own edition/licensing system -
+     * Editrix::$edition is managed by Craft core (project config, the CP's
+     * edition switcher, and the Plugin Store's license checks), not by us.
      */
-    public function getEdition(): string
-    {
-        if ($this->cachedEdition !== null) {
-            return $this->cachedEdition;
-        }
-
-        $envEdition = getenv("EDITRIX_EDITION"); // expected: 'standard' | 'pro'
-        if (
-            in_array(
-                $envEdition,
-                [Editrix::EDITION_STANDARD, Editrix::EDITION_PRO],
-                true
-            )
-        ) {
-            $this->cachedEdition = $envEdition;
-            return $this->cachedEdition;
-        }
-
-        $settings = Editrix::$plugin->getSettings();
-        $storeEdition = property_exists($settings, "edition")
-            ? $settings->edition
-            : null;
-        if (
-            in_array(
-                $storeEdition,
-                [Editrix::EDITION_STANDARD, Editrix::EDITION_PRO],
-                true
-            )
-        ) {
-            $this->cachedEdition = $storeEdition;
-            return $this->cachedEdition;
-        }
-
-        $this->cachedEdition = Editrix::EDITION_STANDARD;
-        return $this->cachedEdition;
-    }
-
     public function hasFeature(string $feature): bool
     {
-        $edition = $this->getEdition();
-        return $this->featureMatrix[$edition][$feature] ?? false;
-    }
-
-    public function isEdition(string $edition): bool
-    {
-        $editionOrder = [
-            Editrix::EDITION_STANDARD => 0,
-            Editrix::EDITION_PRO => 1,
-        ];
-
-        $currentOrder = $editionOrder[$this->getEdition()] ?? 0;
-        $requiredOrder = $editionOrder[$edition] ?? 0;
-
-        return $currentOrder >= $requiredOrder;
+        return $this->featureMatrix[Editrix::$plugin->edition][$feature] ?? false;
     }
 
     public function getLimit(string $limit): int
     {
-        $edition = $this->getEdition();
-        return $this->limits[$edition][$limit] ?? 0;
+        return $this->limits[Editrix::$plugin->edition][$limit] ?? 0;
     }
 
     public function getFeaturesConfig(): array
     {
-        $edition = $this->getEdition();
+        $edition = Editrix::$plugin->edition;
         return [
             "edition" => $edition,
             "features" => $this->featureMatrix[$edition],
             "limits" => $this->limits[$edition],
         ];
-    }
-
-    public function clearCache(): void
-    {
-        $this->cachedEdition = null;
     }
 }
