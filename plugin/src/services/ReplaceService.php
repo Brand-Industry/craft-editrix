@@ -121,24 +121,33 @@ class ReplaceService extends Component
         bool $wholeWords
     ): string {
         if ($useRegex) {
-            $flags = $caseSensitive ? "" : "i";
+            $flags = $caseSensitive ? "u" : "iu";
             $pattern = "/{$query}/{$flags}";
             return @preg_replace($pattern, $replaceWith, $value) ?? $value;
         }
 
+        // Not regex mode - $replaceWith is literal user text, not a regex
+        // replacement template, so preg_replace_callback() (which always
+        // inserts it as-is) is used instead of preg_replace() (which would
+        // treat a literal "$1"/"$100"/backslash in $replaceWith as a
+        // backreference and corrupt the saved content).
         if ($wholeWords) {
             $escapedQuery = preg_quote($query, "/");
             $flags = $caseSensitive ? "" : "i";
             $pattern = "/\\b{$escapedQuery}\\b/{$flags}u";
-            return preg_replace($pattern, $replaceWith, $value);
+            return preg_replace_callback(
+                $pattern,
+                fn() => $replaceWith,
+                $value
+            );
         }
 
         if ($caseSensitive) {
             return str_replace($query, $replaceWith, $value);
         }
 
-        $pattern = "/" . preg_quote($query, "/") . "/i";
-        return preg_replace($pattern, $replaceWith, $value);
+        $pattern = "/" . preg_quote($query, "/") . "/iu";
+        return preg_replace_callback($pattern, fn() => $replaceWith, $value);
     }
 
     /**
@@ -178,10 +187,9 @@ class ReplaceService extends Component
             return $value;
         }
 
-        // Mirrors SearchService::findMatchesInHtml()'s own unit handling -
-        // must stay in sync with findMatches()'s control flow.
-        $offsetsAreBytes =
-            $useRegex || $wholeWords || mb_strpos($query, " ") !== false;
+        // findMatches() always reports CHARACTER offsets, so no unit
+        // conversion is needed here - $charMap is keyed by character
+        // position too.
         $charMapLen = count($charMap);
 
         // Process back-to-front so each raw-string edit doesn't invalidate
@@ -189,12 +197,8 @@ class ReplaceService extends Component
         for ($i = count($plainMatches) - 1; $i >= 0; $i--) {
             $match = $plainMatches[$i];
 
-            $startChar = $offsetsAreBytes
-                ? mb_strlen(substr($plain, 0, $match["start"]))
-                : $match["start"];
-            $endChar = $offsetsAreBytes
-                ? mb_strlen(substr($plain, 0, $match["end"]))
-                : $match["end"];
+            $startChar = $match["start"];
+            $endChar = $match["end"];
 
             if ($endChar <= $startChar || $endChar > $charMapLen) {
                 continue;
@@ -358,14 +362,11 @@ class ReplaceService extends Component
      * a Tags field, where the "value" shown is a related Tag element's
      * title, not something stored on this element) must never be written to
      * here - the frontend already hides Replace for these, this is the
-     * server-side backstop.
+     * server-side backstop, for every element type this class can write to
+     * (entries, Matrix/Neo blocks, categories, globals).
      */
     private function isReplaceableField(array $result): bool
     {
-        if ($result["elementType"] !== "entry") {
-            return true;
-        }
-
         if ($result["fieldHandle"] === "title") {
             return true;
         }
@@ -436,14 +437,17 @@ class ReplaceService extends Component
             "matrixBlock" => MatrixBlock::find()
                 ->id($result["elementId"])
                 ->siteId($result["siteId"])
+                ->status(null)
                 ->one(),
             "neoBlock" => NeoBlock::find()
                 ->id($result["elementId"])
                 ->siteId($result["siteId"])
+                ->status(null)
                 ->one(),
             "category" => Category::find()
                 ->id($result["elementId"])
                 ->siteId($result["siteId"])
+                ->status(null)
                 ->one(),
             default => null,
         };

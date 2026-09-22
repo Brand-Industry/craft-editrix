@@ -17,6 +17,13 @@ class ScopeController extends Controller
     {
         $this->requireAcceptsJson();
 
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
+
         $sections = Craft::$app->getSections()->getAllSections();
 
         $data = array_map(
@@ -44,6 +51,13 @@ class ScopeController extends Controller
     public function actionAssignableSections(): Response
     {
         $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
 
         $type = Craft::$app->getRequest()->getParam("type", "category");
         $targetClass = $type === "tag" ? Tags::class : Categories::class;
@@ -121,6 +135,13 @@ class ScopeController extends Controller
     {
         $this->requireAcceptsJson();
 
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
+
         $sites = Craft::$app->getSites()->getAllSites();
 
         $data = array_map(
@@ -142,6 +163,13 @@ class ScopeController extends Controller
     public function actionFields(): Response
     {
         $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
 
         $settings = Editrix::$plugin->getSettings();
 
@@ -340,6 +368,13 @@ class ScopeController extends Controller
     public function actionEntryTypes(): Response
     {
         $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
 
         $sectionIds = array_map(
             "intval",

@@ -78,8 +78,12 @@ class SearchController extends Controller
         $sections = $request->getBodyParam("sections", []);
         $fields = $request->getBodyParam("fields", []);
         $entryTypes = $request->getBodyParam("entryTypes", []);
+        $siteIds = array_map(
+            "intval",
+            (array) $request->getBodyParam("siteIds", [])
+        );
 
-        if (empty($query)) {
+        if ((string) $query === "") {
             return $this->asJson([
                 "success" => false,
                 "error" => Craft::t("editrix", "Search query is required"),
@@ -114,7 +118,7 @@ class SearchController extends Controller
         }
 
         if (
-            $allSites &&
+            ($allSites || !empty($siteIds)) &&
             !$license->hasFeature(LicenseService::FEATURE_MULTISITE)
         ) {
             return $this->asJson([
@@ -165,6 +169,7 @@ class SearchController extends Controller
                     "sections" => is_array($sections) ? $sections : [],
                     "fields" => is_array($fields) ? $fields : [],
                     "entryTypes" => is_array($entryTypes) ? $entryTypes : [],
+                    "siteIds" => $siteIds,
                 ]
             );
 
@@ -180,6 +185,7 @@ class SearchController extends Controller
                 [
                     "siteId" => $searchSiteId,
                     "allSites" => $allSites,
+                    "siteIds" => $siteIds,
                     "searchEntries" => $searchEntries,
                     "searchGlobals" => $searchGlobals,
                     "searchMatrix" => $searchMatrix,
@@ -261,6 +267,7 @@ class SearchController extends Controller
                 "siteId" => $result->siteId,
                 "siteHandle" => $result->siteHandle,
                 "readOnly" => $result->readOnly,
+                "readOnlyReason" => $result->readOnlyReason,
             ];
         }
 
@@ -411,6 +418,7 @@ class SearchController extends Controller
             "Title",
             "Search only",
             "Rename the tag directly - it may be shared by other entries.",
+            "This match spans formatting (like bold or italic) and can't be replaced automatically - edit it directly in Craft.",
             "View",
             "Match Details",
             "Element",
