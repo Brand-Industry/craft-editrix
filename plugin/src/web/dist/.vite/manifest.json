@@ -1,6 +1,6 @@
 {
-  "_LoadingSpinner-Dyp7hjZb.js": {
-    "file": "js/LoadingSpinner-Dyp7hjZb.js",
+  "_LoadingSpinner-DRcqVtNO.js": {
+    "file": "js/LoadingSpinner-DRcqVtNO.js",
     "name": "LoadingSpinner"
   },
   "src/js/app/logs.js": {
@@ -9,7 +9,7 @@
     "src": "src/js/app/logs.js",
     "isEntry": true,
     "imports": [
-      "_LoadingSpinner-Dyp7hjZb.js"
+      "_LoadingSpinner-DRcqVtNO.js"
     ],
     "css": [
       "css/editrix-logs.css"
@@ -21,7 +21,7 @@
     "src": "src/js/app/main.js",
     "isEntry": true,
     "imports": [
-      "_LoadingSpinner-Dyp7hjZb.js"
+      "_LoadingSpinner-DRcqVtNO.js"
     ],
     "css": [
       "css/editrix.css"

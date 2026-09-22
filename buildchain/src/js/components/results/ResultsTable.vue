@@ -22,7 +22,7 @@
         </button>
 
         <button
-          v-if="actionMode === 'search'"
+          v-if="actionMode === 'search' && canExport"
           class="editrix-btn editrix-btn--primary editrix-btn--sm"
           :disabled="totalResults === 0 || !hasFeature('export.csv')"
           @click="exportCsv"
@@ -30,7 +30,7 @@
           {{ t('Export CSV') }}
           <span v-if="selectedCount > 0">({{ selectedCount }})</span>
         </button>
-        <span v-if="actionMode === 'search' && !hasFeature('export.csv')" class="editrix-badge editrix-badge--info">Pro</span>
+        <span v-if="actionMode === 'search' && canExport && !hasFeature('export.csv')" class="editrix-badge editrix-badge--info">Pro</span>
 
         <button
           v-else
@@ -153,6 +153,7 @@ import { elementTypeLabel } from '../../utils/elementType';
 
 const t = inject('t');
 const hasFeature = inject('hasFeature');
+const canExport = inject('canExport');
 
 const props = defineProps({
   results: { type: Object, required: true },
