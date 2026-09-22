@@ -38,8 +38,6 @@ class Editrix extends Plugin
     public bool $hasCpSettings = true;
     public bool $hasCpSection = true;
 
-    public string $edition = "";
-
     public const EDITION_STANDARD = "standard";
     public const EDITION_PRO = "pro";
 
@@ -68,17 +66,10 @@ class Editrix extends Plugin
 
     public function isEdition(string $edition): bool
     {
-        if (
-            !empty($this->edition) &&
-            in_array(
-                $this->edition,
-                [self::EDITION_STANDARD, self::EDITION_PRO],
-                true
-            )
-        ) {
-            return $this->edition === $edition;
-        }
-        return $this->license->isEdition($edition);
+        // "At least this edition" - Craft's own edition/licensing system
+        // (Plugin::is(), backed by the $edition property Craft manages via
+        // project config and the Plugin Store's license checks).
+        return $this->is($edition, ">=");
     }
 
     public function init(): void
@@ -99,7 +90,7 @@ class Editrix extends Plugin
         Craft::info(
             Craft::t("editrix", "{name} plugin loaded ({edition} edition)", [
                 "name" => $this->name,
-                "edition" => $this->license->getEdition(),
+                "edition" => $this->edition,
             ]),
             __METHOD__
         );
@@ -111,10 +102,6 @@ class Editrix extends Plugin
             UrlManager::class,
             UrlManager::EVENT_REGISTER_CP_URL_RULES,
             function (RegisterUrlRulesEvent $event) {
-                // Craft::debug(
-                //     "UrlManager::EVENT_REGISTER_CP_URL_RULES",
-                //     __METHOD__
-                // );
                 $event->rules = array_merge(
                     $event->rules,
                     $this->customAdminCpRoutes()
@@ -178,10 +165,7 @@ class Editrix extends Plugin
 
     public function getEdition(): string
     {
-        if (!empty($this->edition)) {
-            return $this->edition;
-        }
-        return $this->license->getEdition();
+        return $this->edition;
     }
 
     public function getSettingsResponse(): mixed
