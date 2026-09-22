@@ -38,7 +38,7 @@ class SearchService extends Component
         $fieldFilter = $options["fields"] ?? [];
         $entryTypeFilter = $options["entryTypes"] ?? [];
 
-        $sites = $this->getSitesToSearch($siteId);
+        $sites = $this->getSitesToSearch($siteId, $options["siteIds"] ?? []);
 
         foreach ($sites as $site) {
             if ($searchEntries) {
@@ -95,8 +95,19 @@ class SearchService extends Component
         return $results;
     }
 
-    private function getSitesToSearch(?int $siteId): array
-    {
+    private function getSitesToSearch(
+        ?int $siteId,
+        array $siteIds = []
+    ): array {
+        if (!empty($siteIds)) {
+            return array_values(
+                array_filter(
+                    Craft::$app->getSites()->getAllSites(),
+                    fn($site) => in_array($site->id, $siteIds)
+                )
+            );
+        }
+
         if ($siteId !== null) {
             $site = Craft::$app->getSites()->getSiteById($siteId);
             return $site ? [$site] : [];
@@ -225,6 +236,7 @@ class SearchService extends Component
                         $result->matchStart = $match["start"];
                         $result->matchEnd = $match["end"];
                         $result->isRichText = $isRich;
+                        $this->applyCrossesTagReadOnly($result, $match);
                         $results[] = $result;
                     }
                 }
@@ -424,6 +436,7 @@ class SearchService extends Component
                     $result->parentTitle = $entry->title ?? "Untitled";
                     $result->blockTypeHandle = $blockType->handle;
                     $result->isRichText = $isRich;
+                    $this->applyCrossesTagReadOnly($result, $match);
                     $results[] = $result;
                 }
             }
@@ -525,6 +538,7 @@ class SearchService extends Component
                     $result->parentTitle = $entry->title ?? "Untitled";
                     $result->blockTypeHandle = $blockType->handle;
                     $result->isRichText = $isRich;
+                    $this->applyCrossesTagReadOnly($result, $match);
                     $results[] = $result;
                 }
             }
@@ -599,6 +613,7 @@ class SearchService extends Component
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->isRichText = $isRich;
+                    $this->applyCrossesTagReadOnly($result, $match);
                     $results[] = $result;
                 }
             }
@@ -674,6 +689,7 @@ class SearchService extends Component
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->isRichText = $isRich;
+                    $this->applyCrossesTagReadOnly($result, $match);
                     $results[] = $result;
                 }
             }
@@ -796,28 +812,17 @@ class SearchService extends Component
             return [];
         }
 
-        // findMatches() itself mixes units depending on which branch
-        // handles the search: the regex, whole-word, and multi-word-phrase
-        // paths report BYTE offsets (preg's PREG_OFFSET_CAPTURE always
-        // does, even with the /u flag), while the plain single-word path
-        // reports CHARACTER offsets (mb_strpos/mb_substr) - the same
-        // convention getMatchContext() and the frontend's JS string
-        // slicing both expect. $charMap is keyed by character position, so
-        // byte-based offsets need converting first. Must stay in sync with
-        // findMatches()'s own control flow.
-        $offsetsAreBytes =
-            $useRegex || $wholeWords || mb_strpos($query, " ") !== false;
-
+        // findMatches() always reports CHARACTER offsets, regardless of
+        // which internal branch handles the search - the same convention
+        // getMatchContext() and the frontend's JS string slicing both
+        // expect. $charMap is keyed by character position, so no unit
+        // conversion is needed here.
         $plainCharLen = count($charMap);
         $results = [];
 
         foreach ($plainMatches as $match) {
-            $startChar = $offsetsAreBytes
-                ? mb_strlen(substr($plain, 0, $match["start"]))
-                : $match["start"];
-            $endChar = $offsetsAreBytes
-                ? mb_strlen(substr($plain, 0, $match["end"]))
-                : $match["end"];
+            $startChar = $match["start"];
+            $endChar = $match["end"];
 
             if (
                 !isset($charMap[$startChar]) ||
@@ -876,7 +881,7 @@ class SearchService extends Component
         $contextLength = 50;
 
         if ($useRegex) {
-            $flags = $caseSensitive ? "" : "i";
+            $flags = $caseSensitive ? "u" : "iu";
             $pattern = "/{$query}/{$flags}";
 
             if (
@@ -892,8 +897,8 @@ class SearchService extends Component
 
             foreach ($regexMatches[0] as $match) {
                 $matchText = $match[0];
-                $start = $match[1];
-                $end = $start + strlen($matchText);
+                $start = $this->bytePosToCharPos($value, $match[1]);
+                $end = $start + mb_strlen($matchText);
                 $matches[] = [
                     "start" => $start,
                     "end" => $end,
@@ -928,8 +933,8 @@ class SearchService extends Component
 
                 foreach ($regexMatches[0] as $match) {
                     $matchText = $match[0];
-                    $start = $match[1];
-                    $end = $start + strlen($matchText);
+                    $start = $this->bytePosToCharPos($value, $match[1]);
+                    $end = $start + mb_strlen($matchText);
                     $matches[] = [
                         "start" => $start,
                         "end" => $end,
@@ -963,9 +968,9 @@ class SearchService extends Component
                         return [];
                     }
                     foreach ($regexMatches[0] as $match) {
-                        $start = $match[1];
                         $matchText = $match[0];
-                        $end = $start + strlen($matchText);
+                        $start = $this->bytePosToCharPos($value, $match[1]);
+                        $end = $start + mb_strlen($matchText);
                         $matches[] = [
                             "start" => $start,
                             "end" => $end,
@@ -1007,6 +1012,32 @@ class SearchService extends Component
         }
 
         return $matches;
+    }
+
+    /**
+     * Converts a byte offset (what PREG_OFFSET_CAPTURE always returns, even
+     * with the /u flag) into a character offset (what getMatchContext() and
+     * the char-position "start"/"end" this class returns elsewhere expect).
+     */
+    private function bytePosToCharPos(string $value, int $bytePos): int
+    {
+        return mb_strlen(substr($value, 0, $bytePos));
+    }
+
+    /**
+     * A rich-text match whose span crosses an HTML tag boundary is found
+     * for discovery but can't be safely auto-replaced (see
+     * ReplaceService::performReplacementInHtml()'s tag guard) - flag it
+     * read-only so the UI doesn't offer a Replace that will silently no-op.
+     */
+    private function applyCrossesTagReadOnly(
+        SearchResult $result,
+        array $match
+    ): void {
+        if (!empty($match["crossesTag"])) {
+            $result->readOnly = true;
+            $result->readOnlyReason = "formatting";
+        }
     }
 
     private function getMatchContext(
