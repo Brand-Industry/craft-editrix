@@ -75,7 +75,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, ref } from 'vue';
+import { computed, inject, onMounted, ref, watch } from 'vue';
 import { useConfig } from '../../composables/useConfig';
 import { useApi } from '../../composables/useApi';
 
@@ -119,7 +119,8 @@ const clearSections = () => {
   emit('update:sections', []);
 };
 
-onMounted(async () => {
+const loadSections = async () => {
+  sectionFilter.value = '';
   if (!assignmentUrls.value.sections) return;
   try {
     const data = await get(assignmentUrls.value.sections, { type: props.type });
@@ -127,5 +128,11 @@ onMounted(async () => {
   } catch (err) {
     console.error('Failed to load sections:', err);
   }
-});
+};
+
+// This form stays mounted when switching between Category and Tag search
+// (only its `type` prop changes), so the section list has to be re-fetched
+// on that change too, not just once at mount.
+onMounted(loadSections);
+watch(() => props.type, loadSections);
 </script>
