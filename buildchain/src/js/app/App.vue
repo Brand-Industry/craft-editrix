@@ -97,6 +97,7 @@
               {{ t('Search') }}
             </button>
             <button
+              v-if="canReplace"
               type="button"
               class="editrix-mode-toggle__option"
               :class="{ 'is-active': actionMode === 'replace' }"
@@ -192,7 +193,6 @@
             v-model:search-matrix="searchParams.searchMatrix"
             v-model:search-categories="searchParams.searchCategories"
             :loading="loading"
-            :show-scope-inline="!hasFeature('scopeFilters')"
             :action-mode="actionMode"
             @search="handleSearch"
           />
@@ -217,6 +217,8 @@
             @view="openView"
             @replace="showReplaceConfirm = true"
           />
+
+          <EmptyState v-else />
           </template>
         </template>
       </main>
@@ -288,11 +290,14 @@ const {
   assignmentAvailability,
   categoriesSettingsUrl,
   tagsSettingsUrl,
+  canExport,
+  canReplace,
 } = useConfig();
 const { get: apiGet } = useApi();
 
 provide('t', t);
 provide('hasFeature', hasFeature);
+provide('canExport', canExport);
 
 // null = no tool chosen yet (shows the picker). 'text' = search field
 // content (existing flow); 'category'/'tag' = which entries have this
@@ -363,6 +368,7 @@ watch(searchType, (newType, oldType) => {
   }
   if (oldType === 'text') {
     setSearchMode('general');
+    reset();
   }
 });
 

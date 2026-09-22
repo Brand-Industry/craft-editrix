@@ -628,6 +628,36 @@ class SearchService extends Component
 
         foreach ($categoryQuery->each() as $category) {
             $group = $category->getGroup();
+
+            if (empty($fieldFilter) || in_array("title", $fieldFilter)) {
+                $titleMatches = $this->findMatches(
+                    $category->title,
+                    $query,
+                    $useRegex,
+                    $caseSensitive,
+                    $wholeWords
+                );
+
+                foreach ($titleMatches as $match) {
+                    $result = new SearchResult();
+                    $result->elementType = "category";
+                    $result->elementId = $category->id;
+                    $result->elementTitle = $category->title ?? "Untitled";
+                    $result->sectionHandle = $group->handle;
+                    $result->sectionName = $group->name;
+                    $result->fieldHandle = "title";
+                    $result->fieldName = Craft::t("editrix", "Title");
+                    $result->siteId = $siteId;
+                    $result->siteHandle = $site->handle;
+                    $result->matchContext = $match["context"];
+                    $result->fieldValue = (string) $category->title;
+                    $result->matchStart = $match["start"];
+                    $result->matchEnd = $match["end"];
+                    $result->isRichText = false;
+                    $results[] = $result;
+                }
+            }
+
             $fieldLayout = $category->getFieldLayout();
 
             if (!$fieldLayout) {

@@ -17,6 +17,7 @@ return [
     'Globals' => 'Globals',
     'Matrix fields' => 'Matrix fields',
     'Categories' => 'Categories',
+    'All Sites' => 'All Sites',
     'Search & Replace' => 'Search & Replace',
     'Find where content lives and export the results - nothing gets changed.' => 'Find where content lives and export the results - nothing gets changed.',
     'Find content and replace it. Only fields safe to overwrite are offered.' => 'Find content and replace it. Only fields safe to overwrite are offered.',
