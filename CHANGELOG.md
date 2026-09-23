@@ -2,6 +2,27 @@
 
 All notable changes to Editrix will be documented in this file.
 
+## [1.1.0-beta.2] - 2026-09-22
+
+### Added
+- A working site selector (dropdown + "All Sites") in General Search, shown only on multi-site installs
+- Rich-text matches that cross an HTML tag now show as read-only with an explanation, instead of silently failing to replace
+- "Search & Replace" is hidden for users without the editrix:replace permission
+
+### Changed
+- Pro/Standard licensing now uses Craft's own plugin edition system instead of an env-var/settings workaround
+- Category search now also matches a category's title, not just its custom fields
+- The Entries/Globals/Matrix/Categories search-scope checkboxes are no longer hidden for Pro-edition users
+
+### Fixed
+- A non-regex replacement (whole-words or case-insensitive) could corrupt saved content if the replacement text contained "$" followed by digits, or a backslash
+- CSV log export, and CSV result export, didn't check the same Pro/permission gates as their JSON/permission-gated counterparts
+- Disabled categories, Matrix blocks, and Neo blocks could be found by Search but not written to by Replace
+- Regex mode was missing the Unicode modifier, risking corrupted UTF-8 on multi-byte content and misaligned matches
+- Plain-text field search mixed byte and character offsets, producing wrong highlighted context for multi-byte content
+- Category/Tag search, and Segmented Search's sidebar, no longer leak state when switching between search modes
+- Several other silent-failure and permission-check gaps found in a code audit
+
 ## [1.1.0-beta.1] - 2026-09-17
 
 ### Added
