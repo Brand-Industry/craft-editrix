@@ -3,11 +3,17 @@
 namespace brandindustry\editrix\controllers;
 
 use Craft;
+use craft\db\Query;
+use craft\helpers\Db;
+use craft\helpers\Json;
+use craft\helpers\StringHelper;
 use craft\web\Controller;
 use craft\web\View;
 use yii\web\Response;
 use brandindustry\editrix\Editrix;
 use brandindustry\editrix\assetbundles\EditrixAsset;
+use brandindustry\editrix\jobs\SearchJob;
+use brandindustry\editrix\migrations\m260924_000000_add_search_sessions as SearchSessions;
 use brandindustry\editrix\services\LicenseService;
 
 class SearchController extends Controller
@@ -44,6 +50,229 @@ class SearchController extends Controller
             ]);
         }
 
+        $parsed = $this->parseSearchParams();
+        if (isset($parsed["error"])) {
+            return $this->asJson($parsed["error"]);
+        }
+        $p = $parsed["params"];
+
+        try {
+            $results = Editrix::$plugin->search->search(
+                $p["query"],
+                $p["searchSiteId"],
+                $p["useRegex"],
+                !$p["caseInsensitive"],
+                $this->searchOptions($p)
+            );
+
+            $groupedResults = Editrix::$plugin->search->groupResultsBySite(
+                $results
+            );
+
+            $logSiteId =
+                $p["searchSiteId"] ??
+                Craft::$app->getSites()->getCurrentSite()->id;
+
+            Editrix::$plugin->log->createSearchLog(
+                (int) $logSiteId,
+                $p["query"],
+                count($results),
+                $this->logScope($p),
+                $p["useRegex"],
+                !$p["caseInsensitive"],
+                $p["wholeWords"]
+            );
+
+            return $this->asJson([
+                "success" => true,
+                "totalResults" => count($results),
+                "groupedResults" => $groupedResults,
+                "dryRun" => $p["dryRun"],
+            ]);
+        } catch (\Throwable $e) {
+            Craft::error(
+                "Editrix search error: " . $e->getMessage(),
+                __METHOD__
+            );
+            return $this->asJson([
+                "success" => false,
+                "error" => Craft::t("editrix", "Search failed: {message}", [
+                    "message" => $e->getMessage(),
+                ]),
+            ]);
+        }
+    }
+
+    /**
+     * Starts a search as a background queue job instead of running it
+     * synchronously - for large sites, scanning every entry inside one web
+     * request risks hitting PHP's execution time limit or starving other
+     * requests of PHP-FPM workers. The frontend polls actionSearchStatus()
+     * for progress and picks up the results once the job finishes.
+     */
+    public function actionSearchStart(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
+
+        $parsed = $this->parseSearchParams();
+        if (isset($parsed["error"])) {
+            return $this->asJson($parsed["error"]);
+        }
+        $p = $parsed["params"];
+
+        $searchId = StringHelper::UUID();
+        $now = Db::prepareDateForDb(new \DateTime());
+
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->insert(SearchSessions::TABLE_SEARCHES, [
+                "searchId" => $searchId,
+                "userId" => Craft::$app->getUser()->getId(),
+                "status" => "running",
+                "dateCreated" => $now,
+                "dateUpdated" => $now,
+                "uid" => StringHelper::UUID(),
+            ])
+            ->execute();
+
+        Craft::$app->getQueue()->push(
+            new SearchJob([
+                "searchId" => $searchId,
+                "query" => $p["query"],
+                "siteId" => $p["searchSiteId"],
+                "siteIds" => $p["siteIds"],
+                "useRegex" => $p["useRegex"],
+                "caseSensitive" => !$p["caseInsensitive"],
+                "options" => $this->searchOptions($p),
+                "userId" => Craft::$app->getUser()->getId(),
+                "logScope" => $this->logScope($p),
+            ])
+        );
+
+        // Old sessions (finished long ago, or abandoned mid-search by a
+        // closed tab) don't need to stick around - sweep them on the way in
+        // rather than maintaining a separate cleanup job.
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->delete(SearchSessions::TABLE_SEARCHES, [
+                "<",
+                "dateCreated",
+                Db::prepareDateForDb((new \DateTime())->modify("-1 day")),
+            ])
+            ->execute();
+
+        return $this->asJson(["success" => true, "searchId" => $searchId]);
+    }
+
+    public function actionSearchStatus(): Response
+    {
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
+
+        $searchId = Craft::$app->getRequest()->getParam("id", "");
+        $userId = Craft::$app->getUser()->getId();
+
+        $row = (new Query())
+            ->select([
+                "status",
+                "scannedCount",
+                "totalCount",
+                "resultsJson",
+                "errorMessage",
+            ])
+            ->from(SearchSessions::TABLE_SEARCHES)
+            ->where(["searchId" => $searchId, "userId" => $userId])
+            ->one();
+
+        if (!$row) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Search not found",
+            ]);
+        }
+
+        $response = [
+            "success" => true,
+            "status" => $row["status"],
+            "scannedCount" => (int) $row["scannedCount"],
+            "totalCount" => (int) $row["totalCount"],
+        ];
+
+        if ($row["status"] === "error") {
+            $response["error"] = $row["errorMessage"];
+        }
+
+        if (in_array($row["status"], ["completed", "cancelled"], true)) {
+            $decoded = $row["resultsJson"]
+                ? Json::decode($row["resultsJson"])
+                : ["totalResults" => 0, "groupedResults" => []];
+            $response["totalResults"] = $decoded["totalResults"];
+            $response["groupedResults"] = $decoded["groupedResults"];
+        }
+
+        return $this->asJson($response);
+    }
+
+    public function actionSearchCancel(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
+
+        $searchId = Craft::$app->getRequest()->getBodyParam("id", "");
+        $userId = Craft::$app->getUser()->getId();
+
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->update(
+                SearchSessions::TABLE_SEARCHES,
+                [
+                    "status" => "cancelled",
+                    "dateUpdated" => Db::prepareDateForDb(new \DateTime()),
+                ],
+                [
+                    "searchId" => $searchId,
+                    "userId" => $userId,
+                    "status" => "running",
+                ]
+            )
+            ->execute();
+
+        return $this->asJson(["success" => true]);
+    }
+
+    /**
+     * Parses and validates the search request body - shared by the
+     * synchronous actionSearch() and the background actionSearchStart(), so
+     * both apply the exact same license gates and defaults.
+     *
+     * @return array{error?: array, params?: array}
+     */
+    private function parseSearchParams(): array
+    {
         $request = Craft::$app->getRequest();
 
         $query = $request->getBodyParam("query", "");
@@ -84,51 +313,62 @@ class SearchController extends Controller
         );
 
         if ((string) $query === "") {
-            return $this->asJson([
-                "success" => false,
-                "error" => Craft::t("editrix", "Search query is required"),
-            ]);
+            return [
+                "error" => [
+                    "success" => false,
+                    "error" => Craft::t(
+                        "editrix",
+                        "Search query is required"
+                    ),
+                ],
+            ];
         }
 
         $license = Editrix::$plugin->license;
 
         if ($useRegex && !$license->hasFeature(LicenseService::FEATURE_REGEX)) {
-            return $this->asJson([
-                "success" => false,
-                "error" => Craft::t(
-                    "editrix",
-                    "Regex is only available in Pro edition"
-                ),
-                "upgradeRequired" => true,
-            ]);
+            return [
+                "error" => [
+                    "success" => false,
+                    "error" => Craft::t(
+                        "editrix",
+                        "Regex is only available in Pro edition"
+                    ),
+                    "upgradeRequired" => true,
+                ],
+            ];
         }
 
         if (
             $wholeWords &&
             !$license->hasFeature(LicenseService::FEATURE_WHOLE_WORDS)
         ) {
-            return $this->asJson([
-                "success" => false,
-                "error" => Craft::t(
-                    "editrix",
-                    "Whole words matching requires Standard or Pro edition"
-                ),
-                "upgradeRequired" => true,
-            ]);
+            return [
+                "error" => [
+                    "success" => false,
+                    "error" => Craft::t(
+                        "editrix",
+                        "Whole words matching requires Standard or Pro edition"
+                    ),
+                    "upgradeRequired" => true,
+                ],
+            ];
         }
 
         if (
             ($allSites || !empty($siteIds)) &&
             !$license->hasFeature(LicenseService::FEATURE_MULTISITE)
         ) {
-            return $this->asJson([
-                "success" => false,
-                "error" => Craft::t(
-                    "editrix",
-                    "Multi-site search requires Pro edition"
-                ),
-                "upgradeRequired" => true,
-            ]);
+            return [
+                "error" => [
+                    "success" => false,
+                    "error" => Craft::t(
+                        "editrix",
+                        "Multi-site search requires Pro edition"
+                    ),
+                    "upgradeRequired" => true,
+                ],
+            ];
         }
 
         if (
@@ -146,77 +386,67 @@ class SearchController extends Controller
         }
 
         if ($useRegex && @preg_match("/{$query}/", "") === false) {
-            return $this->asJson([
-                "success" => false,
-                "error" => Craft::t("editrix", "Invalid regular expression"),
-            ]);
-        }
-
-        $searchSiteId = $allSites ? null : (int) $siteId;
-
-        try {
-            $results = Editrix::$plugin->search->search(
-                $query,
-                $searchSiteId,
-                $useRegex,
-                !$caseInsensitive,
-                [
-                    "searchEntries" => $searchEntries,
-                    "searchGlobals" => $searchGlobals,
-                    "searchMatrix" => $searchMatrix,
-                    "searchCategories" => $searchCategories,
-                    "wholeWords" => $wholeWords,
-                    "sections" => is_array($sections) ? $sections : [],
-                    "fields" => is_array($fields) ? $fields : [],
-                    "entryTypes" => is_array($entryTypes) ? $entryTypes : [],
-                    "siteIds" => $siteIds,
-                ]
-            );
-
-            $groupedResults = $this->groupResultsBySite($results);
-
-            $logSiteId =
-                $searchSiteId ?? Craft::$app->getSites()->getCurrentSite()->id;
-
-            Editrix::$plugin->log->createSearchLog(
-                (int) $logSiteId,
-                $query,
-                count($results),
-                [
-                    "siteId" => $searchSiteId,
-                    "allSites" => $allSites,
-                    "siteIds" => $siteIds,
-                    "searchEntries" => $searchEntries,
-                    "searchGlobals" => $searchGlobals,
-                    "searchMatrix" => $searchMatrix,
-                    "searchCategories" => $searchCategories,
-                    "sections" => is_array($sections) ? $sections : [],
-                    "fields" => is_array($fields) ? $fields : [],
-                    "entryTypes" => is_array($entryTypes) ? $entryTypes : [],
+            return [
+                "error" => [
+                    "success" => false,
+                    "error" => Craft::t(
+                        "editrix",
+                        "Invalid regular expression"
+                    ),
                 ],
-                $useRegex,
-                !$caseInsensitive,
-                $wholeWords
-            );
-
-            return $this->asJson([
-                "success" => true,
-                "totalResults" => count($results),
-                "groupedResults" => $groupedResults,
-                "dryRun" => $dryRun,
-            ]);
-        } catch (\Throwable $e) {
-            Craft::error(
-                "Editrix search error: " . $e->getMessage(),
-                __METHOD__
-            );
-            return $this->asJson([
-                "success" => false,
-                "error" => Craft::t("editrix", "Search failed: {message}", [
-                    "message" => $e->getMessage(),
-                ]),
-            ]);
+            ];
         }
+
+        return [
+            "params" => [
+                "query" => $query,
+                "searchSiteId" => $allSites ? null : (int) $siteId,
+                "allSites" => $allSites,
+                "useRegex" => $useRegex,
+                "caseInsensitive" => $caseInsensitive,
+                "wholeWords" => $wholeWords,
+                "dryRun" => $dryRun,
+                "searchEntries" => $searchEntries,
+                "searchGlobals" => $searchGlobals,
+                "searchMatrix" => $searchMatrix,
+                "searchCategories" => $searchCategories,
+                "sections" => is_array($sections) ? $sections : [],
+                "fields" => is_array($fields) ? $fields : [],
+                "entryTypes" => is_array($entryTypes) ? $entryTypes : [],
+                "siteIds" => $siteIds,
+            ],
+        ];
+    }
+
+    private function searchOptions(array $p): array
+    {
+        return [
+            "searchEntries" => $p["searchEntries"],
+            "searchGlobals" => $p["searchGlobals"],
+            "searchMatrix" => $p["searchMatrix"],
+            "searchCategories" => $p["searchCategories"],
+            "wholeWords" => $p["wholeWords"],
+            "sections" => $p["sections"],
+            "fields" => $p["fields"],
+            "entryTypes" => $p["entryTypes"],
+            "siteIds" => $p["siteIds"],
+        ];
+    }
+
+    private function logScope(array $p): array
+    {
+        return [
+            "siteId" => $p["searchSiteId"],
+            "allSites" => $p["allSites"],
+            "siteIds" => $p["siteIds"],
+            "searchEntries" => $p["searchEntries"],
+            "searchGlobals" => $p["searchGlobals"],
+            "searchMatrix" => $p["searchMatrix"],
+            "searchCategories" => $p["searchCategories"],
+            "sections" => $p["sections"],
+            "fields" => $p["fields"],
+            "entryTypes" => $p["entryTypes"],
+        ];
     }
 
     private function parseBoolean(mixed $value): bool
@@ -228,50 +458,6 @@ class SearchController extends Controller
             return filter_var($value, FILTER_VALIDATE_BOOLEAN);
         }
         return (bool) $value;
-    }
-
-    private function groupResultsBySite(array $results): array
-    {
-        $grouped = [];
-
-        foreach ($results as $result) {
-            $siteHandle = $result->siteHandle;
-
-            if (!isset($grouped[$siteHandle])) {
-                $site = Craft::$app->getSites()->getSiteByHandle($siteHandle);
-                $grouped[$siteHandle] = [
-                    "siteName" => $site ? $site->name : $siteHandle,
-                    "siteId" => $result->siteId,
-                    "results" => [],
-                ];
-            }
-
-            $grouped[$siteHandle]["results"][] = [
-                "uniqueKey" => $result->getUniqueKey(),
-                "elementType" => $result->elementType,
-                "elementId" => $result->elementId,
-                "elementTitle" => $result->elementTitle,
-                "sectionName" => $result->sectionName,
-                "sectionHandle" => $result->sectionHandle,
-                "fieldName" => $result->fieldName,
-                "fieldHandle" => $result->fieldHandle,
-                "matchContext" => $result->matchContext,
-                "fieldValue" => $result->fieldValue,
-                "matchStart" => $result->matchStart,
-                "matchEnd" => $result->matchEnd,
-                "isRichText" => $result->isRichText,
-                "cpEditUrl" => $result->getCpEditUrl(),
-                "parentId" => $result->parentId,
-                "parentTitle" => $result->parentTitle,
-                "blockTypeHandle" => $result->blockTypeHandle,
-                "siteId" => $result->siteId,
-                "siteHandle" => $result->siteHandle,
-                "readOnly" => $result->readOnly,
-                "readOnlyReason" => $result->readOnlyReason,
-            ];
-        }
-
-        return $grouped;
     }
 
     private function buildJsConfig(): array
@@ -294,6 +480,15 @@ class SearchController extends Controller
 
             "apiUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/search"
+            ),
+            "searchStartUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/search/search-start"
+            ),
+            "searchStatusUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/search/search-status"
+            ),
+            "searchCancelUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/search/search-cancel"
             ),
             "replaceUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/replace/execute"
@@ -441,6 +636,9 @@ class SearchController extends Controller
             "Cancel",
             "Confirm",
             "Searching...",
+            "Scanning {scanned} of {total} entries ({pct}%)…",
+            "Starting search…",
+            "Cancel search",
             "Replacing...",
             "Loading...",
             "entries selected",

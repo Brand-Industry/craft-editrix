@@ -68,9 +68,12 @@ class LogService extends Component
         array $scope,
         bool $useRegex = false,
         bool $caseSensitive = true,
-        bool $wholeWords = false
+        bool $wholeWords = false,
+        ?int $userId = null
     ): ?int {
-        $userId = Craft::$app->getUser()->getId();
+        // A background SearchJob has no web user session to read - it
+        // passes the id it captured when the search was started instead.
+        $userId ??= Craft::$app->getUser()->getId();
 
         if (!$userId) {
             return null;
