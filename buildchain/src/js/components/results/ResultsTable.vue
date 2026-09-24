@@ -21,16 +21,18 @@
           {{ allSelected ? t('Deselect All') : t('Select All') }}
         </button>
 
-        <button
-          v-if="actionMode === 'search' && canExport"
-          class="editrix-btn editrix-btn--primary editrix-btn--sm"
-          :disabled="totalResults === 0 || !hasFeature('export.csv')"
-          @click="exportCsv"
-        >
-          {{ t('Export CSV') }}
-          <span v-if="selectedCount > 0">({{ selectedCount }})</span>
-        </button>
-        <span v-if="actionMode === 'search' && canExport && !hasFeature('export.csv')" class="editrix-badge editrix-badge--info">Pro</span>
+        <template v-if="actionMode === 'search'">
+          <button
+            v-if="canExport"
+            class="editrix-btn editrix-btn--primary editrix-btn--sm"
+            :disabled="totalResults === 0 || !hasFeature('export.csv')"
+            @click="exportCsv"
+          >
+            {{ t('Export CSV') }}
+            <span v-if="selectedCount > 0">({{ selectedCount }})</span>
+          </button>
+          <span v-if="canExport && !hasFeature('export.csv')" class="editrix-badge editrix-badge--info">Pro</span>
+        </template>
 
         <button
           v-else
