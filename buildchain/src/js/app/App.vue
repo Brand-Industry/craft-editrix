@@ -197,7 +197,30 @@
             @search="handleSearch"
           />
 
-          <LoadingSpinner v-if="loading" :text="t('Searching...')" />
+          <div v-if="loading" class="editrix-search-progress">
+            <div class="editrix-search-progress__bar">
+              <div
+                class="editrix-search-progress__fill"
+                :style="{ width: `${Math.round(progress * 100)}%` }"
+              ></div>
+            </div>
+            <p class="editrix-search-progress__label">
+              {{ totalCount > 0
+                ? t('Scanning {scanned} of {total} entries ({pct}%)…', {
+                    scanned: scannedCount.toLocaleString(),
+                    total: totalCount.toLocaleString(),
+                    pct: Math.round(progress * 100),
+                  })
+                : t('Starting search…') }}
+            </p>
+            <button
+              type="button"
+              class="editrix-btn editrix-btn--secondary editrix-btn--sm"
+              @click="cancelSearch"
+            >
+              {{ t('Cancel search') }}
+            </button>
+          </div>
 
           <div v-else-if="error" class="editrix-form__warning" style="margin-top: 16px;">
             ⚠️ {{ error }}
@@ -446,7 +469,11 @@ const {
   selectedCount,
   hasSelected,
   allSelected,
+  scannedCount,
+  totalCount,
+  progress,
   search,
+  cancelSearch,
   toggleResult,
   isSelected,
   selectAll,
@@ -463,7 +490,15 @@ const previewResult = ref(null);
 const detailResult = ref(null);
 
 const setSearchMode = (mode) => {
+  if (mode === searchMode.value) return;
+
   searchMode.value = mode;
+  // Segmented's section/field/entry-type scope doesn't carry meaning back
+  // in General, and either way the previous mode's results are no longer
+  // an accurate answer to "what does this scope find" - keep the query
+  // text (the user is likely re-running the same search, just re-scoped),
+  // but the results themselves need a fresh search to mean anything.
+  reset();
 
   if (mode === 'general') {
     searchParams.sections = [];

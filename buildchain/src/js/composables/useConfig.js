@@ -7,6 +7,9 @@ export function useConfig() {
   const sites = computed(() => config.value.sites || []);
   const currentSiteId = computed(() => config.value.currentSiteId || 1);
   const apiUrl = computed(() => config.value.apiUrl || '');
+  const searchStartUrl = computed(() => config.value.searchStartUrl || '');
+  const searchStatusUrl = computed(() => config.value.searchStatusUrl || '');
+  const searchCancelUrl = computed(() => config.value.searchCancelUrl || '');
   const replaceUrl = computed(() => config.value.replaceUrl || '');
   const previewUrl = computed(() => config.value.previewUrl || '');
   const cpUrl = computed(() => config.value.cpUrl || '');
@@ -65,6 +68,9 @@ export function useConfig() {
     sites,
     currentSiteId,
     apiUrl,
+    searchStartUrl,
+    searchStatusUrl,
+    searchCancelUrl,
     replaceUrl,
     previewUrl,
     cpUrl,

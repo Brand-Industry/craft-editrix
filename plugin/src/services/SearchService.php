@@ -10,6 +10,7 @@ use craft\elements\GlobalSet;
 use craft\elements\Category;
 use craft\fields\Matrix;
 use craft\fields\Tags;
+use craft\helpers\Db;
 use brandindustry\editrix\helpers\HtmlText;
 use brandindustry\editrix\models\SearchResult;
 use brandindustry\editrix\Editrix;
@@ -21,7 +22,9 @@ class SearchService extends Component
         ?int $siteId = null,
         bool $useRegex = false,
         bool $caseSensitive = true,
-        array $options = []
+        array $options = [],
+        ?callable $onProgress = null,
+        ?callable $isCancelled = null
     ): array {
         $results = [];
         $settings = Editrix::$plugin->getSettings();
@@ -41,6 +44,10 @@ class SearchService extends Component
         $sites = $this->getSitesToSearch($siteId, $options["siteIds"] ?? []);
 
         foreach ($sites as $site) {
+            if ($isCancelled && $isCancelled()) {
+                break;
+            }
+
             if ($searchEntries) {
                 $results = array_merge(
                     $results,
@@ -53,7 +60,9 @@ class SearchService extends Component
                         $wholeWords,
                         $sectionFilter,
                         $fieldFilter,
-                        $entryTypeFilter
+                        $entryTypeFilter,
+                        $onProgress,
+                        $isCancelled
                     )
                 );
             }
@@ -95,6 +104,56 @@ class SearchService extends Component
         return $results;
     }
 
+    /**
+     * Groups a flat list of SearchResult objects by site, in the exact
+     * shape the frontend expects - shared by the synchronous search
+     * endpoint and SearchJob's background results, so both produce
+     * identical output for the same query.
+     */
+    public function groupResultsBySite(array $results): array
+    {
+        $grouped = [];
+
+        foreach ($results as $result) {
+            $siteHandle = $result->siteHandle;
+
+            if (!isset($grouped[$siteHandle])) {
+                $site = Craft::$app->getSites()->getSiteByHandle($siteHandle);
+                $grouped[$siteHandle] = [
+                    "siteName" => $site ? $site->name : $siteHandle,
+                    "siteId" => $result->siteId,
+                    "results" => [],
+                ];
+            }
+
+            $grouped[$siteHandle]["results"][] = [
+                "uniqueKey" => $result->getUniqueKey(),
+                "elementType" => $result->elementType,
+                "elementId" => $result->elementId,
+                "elementTitle" => $result->elementTitle,
+                "sectionName" => $result->sectionName,
+                "sectionHandle" => $result->sectionHandle,
+                "fieldName" => $result->fieldName,
+                "fieldHandle" => $result->fieldHandle,
+                "matchContext" => $result->matchContext,
+                "fieldValue" => $result->fieldValue,
+                "matchStart" => $result->matchStart,
+                "matchEnd" => $result->matchEnd,
+                "isRichText" => $result->isRichText,
+                "cpEditUrl" => $result->getCpEditUrl(),
+                "parentId" => $result->parentId,
+                "parentTitle" => $result->parentTitle,
+                "blockTypeHandle" => $result->blockTypeHandle,
+                "siteId" => $result->siteId,
+                "siteHandle" => $result->siteHandle,
+                "readOnly" => $result->readOnly,
+                "readOnlyReason" => $result->readOnlyReason,
+            ];
+        }
+
+        return $grouped;
+    }
+
     private function getSitesToSearch(
         ?int $siteId,
         array $siteIds = []
@@ -124,7 +183,9 @@ class SearchService extends Component
         bool $wholeWords,
         array $sectionFilter,
         array $fieldFilter,
-        array $entryTypeFilter
+        array $entryTypeFilter,
+        ?callable $onProgress = null,
+        ?callable $isCancelled = null
     ): array {
         $results = [];
         $site = Craft::$app->getSites()->getSiteById($siteId);
@@ -143,9 +204,71 @@ class SearchService extends Component
             $entryQuery->type($entryTypeFilter);
         }
 
-        // Batch instead of ->all() so we never hold every entry (and every
-        // custom field value) on the site in memory at the same time.
-        foreach ($entryQuery->each() as $entry) {
+        $total = $onProgress ? (clone $entryQuery)->count() : 0;
+        $scanned = 0;
+
+        // Batched via Db::each() - the same batching helper Craft's own
+        // core uses for large-scale element processing (the engine behind
+        // the `resave/*` console commands) - so we never hold every entry
+        // (and every custom field value) on the site in memory at once,
+        // and a 200k+ entry site doesn't have to finish in one PHP request.
+        foreach (Db::each($entryQuery, 100) as $entry) {
+            $scanned++;
+
+            if ($scanned % 250 === 0) {
+                if ($onProgress) {
+                    $onProgress($scanned, $total);
+                }
+                if ($isCancelled && $isCancelled()) {
+                    break;
+                }
+            }
+
+            try {
+                $this->searchOneEntry(
+                    $entry,
+                    $query,
+                    $siteId,
+                    $site,
+                    $useRegex,
+                    $caseSensitive,
+                    $searchMatrix,
+                    $wholeWords,
+                    $fieldFilter,
+                    $results
+                );
+            } catch (\Throwable $e) {
+                // One broken/orphaned entry (e.g. a nested Craft 5 entry
+                // whose owner was deleted, tripping up another plugin's own
+                // element-population listener) must not abort a search that
+                // could otherwise cover hundreds of thousands of entries.
+                Craft::error(
+                    "Editrix: skipped entry #{$entry->id} during search - " .
+                        $e->getMessage(),
+                    __METHOD__
+                );
+            }
+        }
+
+        if ($onProgress) {
+            $onProgress($scanned, $total);
+        }
+
+        return $results;
+    }
+
+    private function searchOneEntry(
+        Entry $entry,
+        string $query,
+        int $siteId,
+        $site,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $searchMatrix,
+        bool $wholeWords,
+        array $fieldFilter,
+        array &$results
+    ): void {
             $section = $entry->getSection();
 
             // On Craft 5, nested entries (e.g. Matrix blocks, which are now
@@ -153,13 +276,13 @@ class SearchService extends Component
             // reached separately via searchInMatrixField() through their
             // owner, so skip them here to avoid duplicate/orphaned results.
             if (!$section) {
-                continue;
+                return;
             }
 
             $fieldLayout = $entry->getFieldLayout();
 
             if (!$fieldLayout) {
-                continue;
+                return;
             }
 
             if (
@@ -299,9 +422,6 @@ class SearchService extends Component
                     $results = array_merge($results, $tagResults);
                 }
             }
-        }
-
-        return $results;
     }
 
     /**

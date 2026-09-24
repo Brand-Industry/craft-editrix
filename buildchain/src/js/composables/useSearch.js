@@ -3,8 +3,15 @@ import { useApi } from './useApi';
 import { useConfig } from './useConfig';
 
 export function useSearch(actionMode) {
-  const { post } = useApi();
-  const { apiUrl, replaceUrl, previewUrl, hasFeature } = useConfig();
+  const { post, get } = useApi();
+  const {
+    searchStartUrl,
+    searchStatusUrl,
+    searchCancelUrl,
+    replaceUrl,
+    previewUrl,
+    hasFeature,
+  } = useConfig();
 
   // Search state
   const loading = ref(false);
@@ -13,6 +20,17 @@ export function useSearch(actionMode) {
   const totalResults = ref(0);
   const selectedResults = ref([]);
   const hasSearched = ref(false);
+
+  // Background-search progress - a search runs as a queued job (see
+  // SearchJob/actionSearchStart) instead of inside one HTTP request, so a
+  // large site doesn't risk timing out or starving other requests of
+  // PHP-FPM workers. These track that job while search() polls for it.
+  const scannedCount = ref(0);
+  const totalCount = ref(0);
+  const progress = computed(() =>
+    totalCount.value > 0 ? scannedCount.value / totalCount.value : 0
+  );
+  const currentSearchId = ref(null);
 
   // Search params
   const searchParams = reactive({
@@ -50,49 +68,131 @@ export function useSearch(actionMode) {
     return selectedCount.value === selectableResults.value.length;
   });
 
-  // Perform search
+  // Perform search - starts a background job and polls for progress/
+  // results rather than waiting on a single (potentially very long)
+  // request, so a large site can't time out or crash mid-search.
   const search = async () => {
     loading.value = true;
     error.value = null;
     hasSearched.value = true;
     selectedResults.value = [];
+    scannedCount.value = 0;
+    totalCount.value = 0;
+
+    const payload = {
+      query: searchParams.query,
+      siteId: searchParams.siteId,
+      allSites: searchParams.allSites,
+      siteIds: searchParams.siteIds,
+      useRegex: searchParams.useRegex,
+      caseInsensitive: searchParams.caseInsensitive,
+      wholeWords: searchParams.wholeWords,
+      dryRun: searchParams.dryRun,
+      searchEntries: searchParams.searchEntries,
+      searchGlobals: searchParams.searchGlobals,
+      searchMatrix: searchParams.searchMatrix,
+      searchCategories: searchParams.searchCategories,
+      sections: searchParams.sections,
+      fields: searchParams.fields,
+      entryTypes: searchParams.entryTypes,
+    };
 
     try {
-      const data = await post(apiUrl.value, {
-        query: searchParams.query,
-        siteId: searchParams.siteId,
-        allSites: searchParams.allSites,
-        siteIds: searchParams.siteIds,
-        useRegex: searchParams.useRegex,
-        caseInsensitive: searchParams.caseInsensitive,
-        wholeWords: searchParams.wholeWords,
-        dryRun: searchParams.dryRun,
-        searchEntries: searchParams.searchEntries,
-        searchGlobals: searchParams.searchGlobals,
-        searchMatrix: searchParams.searchMatrix,
-        searchCategories: searchParams.searchCategories,
-        sections: searchParams.sections,
-        fields: searchParams.fields,
-        entryTypes: searchParams.entryTypes,
-      });
+      const startData = await post(searchStartUrl.value, payload);
 
-      if (data.success) {
-        results.value = data.groupedResults || {};
-        totalResults.value = data.totalResults || 0;
-      } else {
-        error.value = data.error || 'Search failed';
+      if (!startData.success) {
+        error.value = startData.error || 'Search failed';
         results.value = {};
         totalResults.value = 0;
+        loading.value = false;
+        return startData;
       }
 
-      return data;
+      currentSearchId.value = startData.searchId;
+      return await pollSearch(startData.searchId);
     } catch (err) {
       error.value = err.message;
       results.value = {};
       totalResults.value = 0;
-      throw err;
-    } finally {
       loading.value = false;
+      throw err;
+    }
+  };
+
+  const pollSearch = searchId => {
+    return new Promise((resolve, reject) => {
+      const tick = async () => {
+        // A cancel (or a newer search started since) may have moved on
+        // from this poll loop - don't let a stale response land.
+        if (currentSearchId.value !== searchId) {
+          resolve(null);
+          return;
+        }
+
+        try {
+          const data = await get(searchStatusUrl.value, { id: searchId });
+
+          if (currentSearchId.value !== searchId) {
+            resolve(null);
+            return;
+          }
+
+          if (!data.success) {
+            error.value = data.error || 'Search failed';
+            results.value = {};
+            totalResults.value = 0;
+            loading.value = false;
+            currentSearchId.value = null;
+            resolve(data);
+            return;
+          }
+
+          scannedCount.value = data.scannedCount || 0;
+          totalCount.value = data.totalCount || 0;
+
+          if (data.status === 'completed' || data.status === 'cancelled') {
+            results.value = data.groupedResults || {};
+            totalResults.value = data.totalResults || 0;
+            loading.value = false;
+            currentSearchId.value = null;
+            resolve(data);
+            return;
+          }
+
+          if (data.status === 'error') {
+            error.value = data.error || 'Search failed';
+            results.value = {};
+            totalResults.value = 0;
+            loading.value = false;
+            currentSearchId.value = null;
+            resolve(data);
+            return;
+          }
+
+          setTimeout(tick, 1500);
+        } catch (err) {
+          error.value = err.message;
+          loading.value = false;
+          currentSearchId.value = null;
+          reject(err);
+        }
+      };
+
+      tick();
+    });
+  };
+
+  // Best-effort - the running job checks this flag on its own cadence
+  // (every ~250 entries), so cancellation isn't instant, but the search
+  // stops consuming resources shortly after rather than running to
+  // completion regardless. The poll loop above picks up the resulting
+  // "cancelled" status on its own once the job notices.
+  const cancelSearch = async () => {
+    if (!currentSearchId.value) return;
+    try {
+      await post(searchCancelUrl.value, { id: currentSearchId.value });
+    } catch (err) {
+      // Ignored - polling continues regardless.
     }
   };
 
@@ -201,6 +301,11 @@ export function useSearch(actionMode) {
     selectedResults.value = [];
     hasSearched.value = false;
     error.value = null;
+    scannedCount.value = 0;
+    totalCount.value = 0;
+    // Lets any in-flight poll loop notice it's stale and stop on its next
+    // tick instead of overwriting this reset with a late response.
+    currentSearchId.value = null;
   };
 
   // Reset form
@@ -226,15 +331,20 @@ export function useSearch(actionMode) {
     selectedResults,
     hasSearched,
     searchParams,
+    scannedCount,
+    totalCount,
+    currentSearchId,
 
     // Computed
     hasResults,
     selectedCount,
     hasSelected,
     allSelected,
+    progress,
 
     // Methods
     search,
+    cancelSearch,
     getAllResults,
     toggleResult,
     isSelected,
