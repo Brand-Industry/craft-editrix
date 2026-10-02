@@ -2,6 +2,20 @@
 
 All notable changes to Editrix will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Searches now run as background jobs on Craft's queue, with a progress bar and a "Cancel search" button, so large sites no longer time out or tie up PHP workers
+- A warning appears when a search is still waiting to start after about 15 seconds, since Craft's queue may not be running (see "Searches and the Craft queue" in the README)
+- Searches stop at 5,000 matches and show a notice asking the user to narrow the search, so a broad query can't exhaust memory on a large site
+
+### Changed
+- Switching between General and Segmented Search now clears the previous results
+
+### Fixed
+- "Replace Selected" appeared in Search mode, where nothing can be replaced
+- A single entry that fails to load (for example, a template error from another plugin) no longer aborts the whole search; it is logged and skipped
+
 ## [2.0.0-beta.4] - 2026-09-22
 
 ### Added

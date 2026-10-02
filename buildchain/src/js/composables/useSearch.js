@@ -2,6 +2,11 @@ import { ref, computed, reactive } from 'vue';
 import { useApi } from './useApi';
 import { useConfig } from './useConfig';
 
+// How long a search may sit in "queued" before we tell the user the queue
+// probably isn't running.
+export const QUEUE_STALL_MS = 15000;
+export const POLL_INTERVAL_MS = 1500;
+
 export function useSearch(actionMode) {
   const { post, get } = useApi();
   const {
@@ -32,6 +37,7 @@ export function useSearch(actionMode) {
     totalCount.value > 0 ? scannedCount.value / totalCount.value : 0
   );
   const currentSearchId = ref(null);
+  const queueStalled = ref(false);
 
   // Search params
   const searchParams = reactive({
@@ -80,6 +86,7 @@ export function useSearch(actionMode) {
     scannedCount.value = 0;
     totalCount.value = 0;
     truncated.value = false;
+    queueStalled.value = false;
 
     const payload = {
       query: searchParams.query,
@@ -122,6 +129,8 @@ export function useSearch(actionMode) {
   };
 
   const pollSearch = searchId => {
+    const startedAt = Date.now();
+
     return new Promise((resolve, reject) => {
       const tick = async () => {
         // A cancel (or a newer search started since) may have moved on
@@ -151,11 +160,15 @@ export function useSearch(actionMode) {
 
           scannedCount.value = data.scannedCount || 0;
           totalCount.value = data.totalCount || 0;
+          queueStalled.value =
+            data.status === 'queued' &&
+            Date.now() - startedAt >= QUEUE_STALL_MS;
 
           if (data.status === 'completed' || data.status === 'cancelled') {
             results.value = data.groupedResults || {};
             totalResults.value = data.totalResults || 0;
             truncated.value = data.truncated || false;
+            queueStalled.value = false;
             loading.value = false;
             currentSearchId.value = null;
             resolve(data);
@@ -172,7 +185,7 @@ export function useSearch(actionMode) {
             return;
           }
 
-          setTimeout(tick, 1500);
+          setTimeout(tick, POLL_INTERVAL_MS);
         } catch (err) {
           error.value = err.message;
           loading.value = false;
@@ -307,6 +320,7 @@ export function useSearch(actionMode) {
     error.value = null;
     scannedCount.value = 0;
     totalCount.value = 0;
+    queueStalled.value = false;
     // Lets any in-flight poll loop notice it's stale and stop on its next
     // tick instead of overwriting this reset with a late response.
     currentSearchId.value = null;
@@ -339,6 +353,7 @@ export function useSearch(actionMode) {
     scannedCount,
     totalCount,
     currentSearchId,
+    queueStalled,
 
     // Computed
     hasResults,

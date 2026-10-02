@@ -32,6 +32,8 @@ class SearchJob extends BaseJob
     public function execute($queue): void
     {
         try {
+            $this->markRunning();
+
             $meta = [];
             $results = Editrix::$plugin->search->search(
                 $this->query,
@@ -92,6 +94,27 @@ class SearchJob extends BaseJob
         return Craft::t("editrix", "Searching for \"{query}\"", [
             "query" => $this->query,
         ]);
+    }
+
+    /**
+     * The row starts as "queued" so the UI can tell a search that is
+     * waiting for a queue runner from one that is actually scanning.
+     * A search cancelled while still queued stays cancelled.
+     */
+    private function markRunning(): void
+    {
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->update(
+                SearchSessions::TABLE_SEARCHES,
+                [
+                    "status" => "running",
+                    "dateUpdated" => Db::prepareDateForDb(new \DateTime()),
+                ],
+                ["searchId" => $this->searchId, "status" => "queued"]
+            )
+            ->execute();
     }
 
     private function isCancelled(): bool

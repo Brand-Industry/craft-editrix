@@ -142,7 +142,7 @@ class SearchController extends Controller
             ->insert(SearchSessions::TABLE_SEARCHES, [
                 "searchId" => $searchId,
                 "userId" => Craft::$app->getUser()->getId(),
-                "status" => "running",
+                "status" => "queued",
                 "dateCreated" => $now,
                 "dateUpdated" => $now,
                 "uid" => StringHelper::UUID(),
@@ -262,7 +262,7 @@ class SearchController extends Controller
                 [
                     "searchId" => $searchId,
                     "userId" => $userId,
-                    "status" => "running",
+                    "status" => ["queued", "running"],
                 ]
             )
             ->execute();
@@ -645,6 +645,7 @@ class SearchController extends Controller
             "Scanning {scanned} of {total} entries ({pct}%)…",
             "Starting search…",
             "Cancel search",
+            "This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.",
             "Showing the first {count} matches. Narrow your search for more precise results.",
             "Replacing...",
             "Loading...",

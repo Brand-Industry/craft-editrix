@@ -60,6 +60,7 @@ return [
     'Scanning {scanned} of {total} entries ({pct}%)…' => 'Scanning {scanned} of {total} entries ({pct}%)…',
     'Starting search…' => 'Starting search…',
     'Cancel search' => 'Cancel search',
+    "This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README." => "This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.",
     'Showing the first {count} matches. Narrow your search for more precise results.' => 'Showing the first {count} matches. Narrow your search for more precise results.',
     'Replacing...' => 'Replacing...',
     'Loading...' => 'Loading...',
