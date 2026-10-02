@@ -19,7 +19,7 @@ vi.mock('../src/js/composables/useConfig', () => ({
   }),
 }));
 
-const { useSearch, QUEUE_STALL_MS, POLL_INTERVAL_MS } = await import(
+const { useSearch, QUEUE_STALL_MS, POLL_INTERVAL_MS, JOB_IDLE_SECONDS } = await import(
   '../src/js/composables/useSearch'
 );
 
@@ -233,5 +233,63 @@ describe('useSearch cancel and stale polls', () => {
     await tickPoll();
 
     expect(s.totalResults.value).toBe(0);
+  });
+});
+
+describe('useSearch stalled job warning', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    post.mockReset();
+    get.mockReset();
+    post.mockResolvedValue({ success: true, searchId: 'abc' });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('flags a running job that has stopped reporting progress', async () => {
+    get.mockResolvedValue(
+      status({ status: 'running', totalCount: 100, idleSeconds: JOB_IDLE_SECONDS })
+    );
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(s.jobStalled.value).toBe(true);
+  });
+
+  it('stays quiet while progress keeps arriving', async () => {
+    get.mockResolvedValue(
+      status({ status: 'running', totalCount: 100, idleSeconds: JOB_IDLE_SECONDS - 1 })
+    );
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(s.jobStalled.value).toBe(false);
+  });
+
+  it('does not treat a queued search as a stalled job', async () => {
+    get.mockResolvedValue(status({ status: 'queued', idleSeconds: 9999 }));
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(s.jobStalled.value).toBe(false);
+  });
+
+  it('clears when the job picks up again', async () => {
+    get.mockResolvedValue(
+      status({ status: 'running', totalCount: 100, idleSeconds: JOB_IDLE_SECONDS })
+    );
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.jobStalled.value).toBe(true);
+
+    get.mockResolvedValue(status({ status: 'running', totalCount: 100, idleSeconds: 1 }));
+    await tickPoll();
+    expect(s.jobStalled.value).toBe(false);
   });
 });

@@ -5,6 +5,7 @@ namespace brandindustry\editrix\controllers;
 use Craft;
 use craft\db\Query;
 use craft\helpers\Db;
+use craft\helpers\DateTimeHelper;
 use craft\helpers\Json;
 use craft\helpers\StringHelper;
 use craft\web\Controller;
@@ -200,6 +201,7 @@ class SearchController extends Controller
                 "totalCount",
                 "resultsJson",
                 "errorMessage",
+                "dateUpdated",
             ])
             ->from(SearchSessions::TABLE_SEARCHES)
             ->where(["searchId" => $searchId, "userId" => $userId])
@@ -217,6 +219,13 @@ class SearchController extends Controller
             "status" => $row["status"],
             "scannedCount" => (int) $row["scannedCount"],
             "totalCount" => (int) $row["totalCount"],
+            // A running job writes progress every few hundred entries. If
+            // that goes quiet, the worker was probably killed (out of
+            // memory, restarted) and the row will never be finalized.
+            "idleSeconds" => max(
+                0,
+                time() - DateTimeHelper::toDateTime($row["dateUpdated"])->getTimestamp()
+            ),
         ];
 
         if ($row["status"] === "error") {
@@ -646,6 +655,7 @@ class SearchController extends Controller
             "Starting search…",
             "Cancel search",
             "This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.",
+            "This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.",
             "Showing the first {count} matches. Narrow your search for more precise results.",
             "Replacing...",
             "Loading...",

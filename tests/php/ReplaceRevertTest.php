@@ -1,0 +1,134 @@
+<?php
+
+namespace brandindustry\editrix\tests;
+
+use Craft;
+use craft\elements\Entry;
+use brandindustry\editrix\Editrix;
+
+/**
+ * Search, replace and revert on a real entry title. The original title is
+ * restored in tearDown even if an assertion fails, but this does write to
+ * the host project's database, so keep it to local copies.
+ */
+class ReplaceRevertTest extends EditrixTestCase
+{
+    private ?int $entryId = null;
+    private ?string $originalTitle = null;
+
+    protected function tearDown(): void
+    {
+        if ($this->entryId !== null) {
+            $entry = Entry::find()->id($this->entryId)->siteId($this->siteId())->status(null)->one();
+            if ($entry && $entry->title !== $this->originalTitle) {
+                $entry->title = $this->originalTitle;
+                Craft::$app->getElements()->saveElement($entry, false);
+            }
+        }
+        parent::tearDown();
+    }
+
+    /**
+     * Finds an entry whose title has a word we can target, in a small
+     * section, and returns [entry, word].
+     */
+    private function pickEntry(): array
+    {
+        $section = $this->smallestSection(1);
+        if (!$section) {
+            $this->markTestSkipped('The site has no entries.');
+        }
+
+        $entries = Entry::find()
+            ->siteId($this->siteId())
+            ->section($section[0])
+            ->status(null)
+            ->drafts(false)
+            ->revisions(false)
+            ->limit(50)
+            ->all();
+
+        foreach ($entries as $entry) {
+            if (preg_match('/\b(\p{L}{5,})\b/u', (string) $entry->title, $m)) {
+                $this->entryId = $entry->id;
+                $this->originalTitle = (string) $entry->title;
+                return [$entry, $m[1], $section[0]];
+            }
+        }
+
+        $this->markTestSkipped('No entry in the smallest section has a title word of 5+ letters.');
+    }
+
+    private function titleResult(string $word, int $entryId, string $sectionHandle): array
+    {
+        $results = Editrix::$plugin->search->search(
+            $word,
+            $this->siteId(),
+            false,
+            true,
+            $this->sectionOptions($sectionHandle, ['fields' => ['title']])
+        );
+
+        $grouped = Editrix::$plugin->search->groupResultsBySite($results);
+        foreach ($grouped as $site) {
+            foreach ($site['results'] as $result) {
+                if ($result['elementId'] === $entryId && $result['fieldHandle'] === 'title') {
+                    return $result;
+                }
+            }
+        }
+
+        $this->fail("Searching for \"{$word}\" did not return the title of entry {$entryId}.");
+    }
+
+    private function currentTitle(): string
+    {
+        return (string) Entry::find()->id($this->entryId)->siteId($this->siteId())->status(null)->one()->title;
+    }
+
+    public function testReplaceWritesTheNewTitleAndRevertRestoresTheOriginal(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+        $replacement = 'EditrixQA' . random_int(1000, 9999);
+
+        $result = $this->titleResult($word, $entry->id, $section);
+        $replacements = Editrix::$plugin->replace->replace([$result], $word, $replacement, false, true, false);
+
+        $this->assertCount(1, $replacements);
+        $this->assertSame(str_replace($word, $replacement, $this->originalTitle), $this->currentTitle());
+
+        $validation = Editrix::$plugin->replace->validateRevert($replacements);
+        $this->assertSame('safe', $validation[0]['status']);
+
+        $this->assertTrue(Editrix::$plugin->replace->revert($replacements[0]));
+        $this->assertSame($this->originalTitle, $this->currentTitle());
+    }
+
+    public function testRevertIsFlaggedWhenTheContentChangedAfterTheReplace(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+        $replacement = 'EditrixQA' . random_int(1000, 9999);
+
+        $result = $this->titleResult($word, $entry->id, $section);
+        $replacements = Editrix::$plugin->replace->replace([$result], $word, $replacement, false, true, false);
+        $this->assertCount(1, $replacements);
+
+        $edited = Entry::find()->id($entry->id)->siteId($this->siteId())->status(null)->one();
+        $edited->title = $replacement . ' edited by someone else';
+        Craft::$app->getElements()->saveElement($edited, false);
+
+        $validation = Editrix::$plugin->replace->validateRevert($replacements);
+        $this->assertSame('modified', $validation[0]['status']);
+    }
+
+    public function testReplacingWithTheSameTextChangesNothing(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+
+        $result = $this->titleResult($word, $entry->id, $section);
+        $replacements = Editrix::$plugin->replace->replace([$result], $word, $word, false, true, false);
+
+        $this->assertSame([], $replacements);
+        $this->assertSame($this->originalTitle, $this->currentTitle());
+    }
+}
