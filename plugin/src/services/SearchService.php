@@ -17,6 +17,16 @@ use brandindustry\editrix\Editrix;
 
 class SearchService extends Component
 {
+    /**
+     * Hard ceiling on accumulated matches for a single search. Results are
+     * built up as one in-memory array and serialized into one JSON blob at
+     * the end (see SearchJob) - on a large site a broad query can produce
+     * hundreds of thousands of matches, which can exhaust a queue worker's
+     * memory long before the UI could ever usefully show them all. Past
+     * this point we stop scanning and flag the search as truncated.
+     */
+    public const MAX_RESULTS = 5000;
+
     public function search(
         string $query,
         ?int $siteId = null,
@@ -24,9 +34,11 @@ class SearchService extends Component
         bool $caseSensitive = true,
         array $options = [],
         ?callable $onProgress = null,
-        ?callable $isCancelled = null
+        ?callable $isCancelled = null,
+        array &$meta = []
     ): array {
         $results = [];
+        $truncated = false;
         $settings = Editrix::$plugin->getSettings();
 
         // Get search options
@@ -65,9 +77,13 @@ class SearchService extends Component
                         $isCancelled
                     )
                 );
+
+                if (count($results) >= self::MAX_RESULTS) {
+                    $truncated = true;
+                }
             }
 
-            if ($searchGlobals) {
+            if (!$truncated && $searchGlobals) {
                 $results = array_merge(
                     $results,
                     $this->searchInGlobals(
@@ -79,9 +95,14 @@ class SearchService extends Component
                         $fieldFilter
                     )
                 );
+
+                if (count($results) >= self::MAX_RESULTS) {
+                    $truncated = true;
+                }
             }
 
             if (
+                !$truncated &&
                 $searchCategories &&
                 Editrix::$plugin->hasFeature(
                     LicenseService::FEATURE_SEARCH_CATEGORIES
@@ -98,8 +119,23 @@ class SearchService extends Component
                         $fieldFilter
                     )
                 );
+
+                if (count($results) >= self::MAX_RESULTS) {
+                    $truncated = true;
+                }
+            }
+
+            if ($truncated) {
+                break;
             }
         }
+
+        if ($truncated) {
+            $results = array_slice($results, 0, self::MAX_RESULTS);
+        }
+
+        $meta["truncated"] = $truncated;
+        $meta["resultCount"] = count($results);
 
         return $results;
     }
@@ -247,6 +283,10 @@ class SearchService extends Component
                         $e->getMessage(),
                     __METHOD__
                 );
+            }
+
+            if (count($results) >= self::MAX_RESULTS) {
+                break;
             }
         }
 

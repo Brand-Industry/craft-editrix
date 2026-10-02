@@ -32,6 +32,7 @@ class SearchJob extends BaseJob
     public function execute($queue): void
     {
         try {
+            $meta = [];
             $results = Editrix::$plugin->search->search(
                 $this->query,
                 $this->siteId,
@@ -46,7 +47,8 @@ class SearchJob extends BaseJob
                 },
                 function (): bool {
                     return $this->isCancelled();
-                }
+                },
+                $meta
             );
 
             $grouped = Editrix::$plugin->search->groupResultsBySite($results);
@@ -72,6 +74,7 @@ class SearchJob extends BaseJob
                 Json::encode([
                     "totalResults" => count($results),
                     "groupedResults" => $grouped,
+                    "truncated" => $meta["truncated"] ?? false,
                 ])
             );
         } catch (\Throwable $e) {
