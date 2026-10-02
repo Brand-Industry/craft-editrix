@@ -6,6 +6,9 @@ import { useConfig } from './useConfig';
 // probably isn't running.
 export const QUEUE_STALL_MS = 15000;
 export const POLL_INTERVAL_MS = 1500;
+// A running job reports progress every few hundred entries. This long
+// without a report means the worker most likely died.
+export const JOB_IDLE_SECONDS = 120;
 
 export function useSearch(actionMode) {
   const { post, get } = useApi();
@@ -38,6 +41,7 @@ export function useSearch(actionMode) {
   );
   const currentSearchId = ref(null);
   const queueStalled = ref(false);
+  const jobStalled = ref(false);
 
   // Search params
   const searchParams = reactive({
@@ -87,6 +91,7 @@ export function useSearch(actionMode) {
     totalCount.value = 0;
     truncated.value = false;
     queueStalled.value = false;
+    jobStalled.value = false;
 
     const payload = {
       query: searchParams.query,
@@ -163,12 +168,16 @@ export function useSearch(actionMode) {
           queueStalled.value =
             data.status === 'queued' &&
             Date.now() - startedAt >= QUEUE_STALL_MS;
+          jobStalled.value =
+            data.status === 'running' &&
+            (data.idleSeconds || 0) >= JOB_IDLE_SECONDS;
 
           if (data.status === 'completed' || data.status === 'cancelled') {
             results.value = data.groupedResults || {};
             totalResults.value = data.totalResults || 0;
             truncated.value = data.truncated || false;
             queueStalled.value = false;
+            jobStalled.value = false;
             loading.value = false;
             currentSearchId.value = null;
             resolve(data);
@@ -321,6 +330,7 @@ export function useSearch(actionMode) {
     scannedCount.value = 0;
     totalCount.value = 0;
     queueStalled.value = false;
+    jobStalled.value = false;
     // Lets any in-flight poll loop notice it's stale and stop on its next
     // tick instead of overwriting this reset with a late response.
     currentSearchId.value = null;
@@ -354,6 +364,7 @@ export function useSearch(actionMode) {
     totalCount,
     currentSearchId,
     queueStalled,
+    jobStalled,
 
     // Computed
     hasResults,

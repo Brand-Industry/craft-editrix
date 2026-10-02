@@ -7,6 +7,7 @@ All notable changes to Editrix will be documented in this file.
 ### Added
 - Searches now run as background jobs on Craft's queue, with a progress bar and a "Cancel search" button, so large sites no longer time out or tie up PHP workers
 - A warning appears when a search is still waiting to start after about 15 seconds, since Craft's queue may not be running (see "Searches and the Craft queue" in the README)
+- A warning appears when a running search stops reporting progress for two minutes, which usually means the server killed the worker; the search can be cancelled from the same screen
 - Searches stop at 5,000 matches and show a notice asking the user to narrow the search, so a broad query can't exhaust memory on a large site
 
 ### Changed

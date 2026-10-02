@@ -213,6 +213,9 @@
                   })
                 : t('Starting search…') }}
             </p>
+            <p v-if="jobStalled" class="editrix-form__warning">
+              ⚠️ {{ t("This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.") }}
+            </p>
             <p v-if="queueStalled" class="editrix-form__warning">
               ⚠️ {{ t("This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.") }}
             </p>
@@ -484,6 +487,7 @@ const {
   totalCount,
   progress,
   queueStalled,
+  jobStalled,
   search,
   cancelSearch,
   toggleResult,
