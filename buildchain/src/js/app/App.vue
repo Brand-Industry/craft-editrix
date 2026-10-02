@@ -213,6 +213,9 @@
                   })
                 : t('Starting search…') }}
             </p>
+            <p v-if="queueStalled" class="editrix-form__warning">
+              ⚠️ {{ t("This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.") }}
+            </p>
             <button
               type="button"
               class="editrix-btn editrix-btn--secondary editrix-btn--sm"
@@ -480,6 +483,7 @@ const {
   scannedCount,
   totalCount,
   progress,
+  queueStalled,
   search,
   cancelSearch,
   toggleResult,

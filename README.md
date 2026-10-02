@@ -41,6 +41,23 @@ Editrix is an advanced search & replace plugin that lets you find and update con
 - Craft CMS 4.0+
 - PHP 8.0.2+
 
+## Searches and the Craft queue
+
+Editrix runs each search as a background job on Craft's queue, so a large site can't time out a web request or tie up PHP workers. The search only starts once Craft runs that job.
+
+- **Default setup.** Craft runs queued jobs from control panel requests (`runQueueAutomatically`, on by default). That is enough for small sites, but the job runs inside a web request and is subject to its time limits.
+- **Production and large sites.** Run a real queue worker. Set `runQueueAutomatically` to `false` in `config/general.php`, then either keep `php craft queue/listen` running under a process manager such as Supervisor, or call `php craft queue/run` from cron every minute:
+
+  ```
+  * * * * * cd /path/to/project && php craft queue/run
+  ```
+
+- **Craft Cloud.** The platform runs the queue for you, so there is nothing to set up.
+
+If a search is still waiting after about 15 seconds, Editrix shows a warning that the queue may not be running. You can cancel it from the same screen.
+
+Searches stop at 5,000 matches and say so in the results. Narrow the search (a section, an entry type, specific fields) to see the rest.
+
 ## Installation
 
 ## Usage

@@ -39,6 +39,7 @@ class SearchService extends Component
     ): array {
         $results = [];
         $truncated = false;
+        $maxResults = (int) ($options["maxResults"] ?? self::MAX_RESULTS);
         $settings = Editrix::$plugin->getSettings();
 
         // Get search options
@@ -74,11 +75,12 @@ class SearchService extends Component
                         $fieldFilter,
                         $entryTypeFilter,
                         $onProgress,
-                        $isCancelled
+                        $isCancelled,
+                        $maxResults
                     )
                 );
 
-                if (count($results) >= self::MAX_RESULTS) {
+                if (count($results) >= $maxResults) {
                     $truncated = true;
                 }
             }
@@ -96,7 +98,7 @@ class SearchService extends Component
                     )
                 );
 
-                if (count($results) >= self::MAX_RESULTS) {
+                if (count($results) >= $maxResults) {
                     $truncated = true;
                 }
             }
@@ -120,7 +122,7 @@ class SearchService extends Component
                     )
                 );
 
-                if (count($results) >= self::MAX_RESULTS) {
+                if (count($results) >= $maxResults) {
                     $truncated = true;
                 }
             }
@@ -131,7 +133,7 @@ class SearchService extends Component
         }
 
         if ($truncated) {
-            $results = array_slice($results, 0, self::MAX_RESULTS);
+            $results = array_slice($results, 0, $maxResults);
         }
 
         $meta["truncated"] = $truncated;
@@ -221,7 +223,8 @@ class SearchService extends Component
         array $fieldFilter,
         array $entryTypeFilter,
         ?callable $onProgress = null,
-        ?callable $isCancelled = null
+        ?callable $isCancelled = null,
+        int $maxResults = self::MAX_RESULTS
     ): array {
         $results = [];
         $site = Craft::$app->getSites()->getSiteById($siteId);
@@ -285,7 +288,7 @@ class SearchService extends Component
                 );
             }
 
-            if (count($results) >= self::MAX_RESULTS) {
+            if (count($results) >= $maxResults) {
                 break;
             }
         }
@@ -297,7 +300,7 @@ class SearchService extends Component
         return $results;
     }
 
-    private function searchOneEntry(
+    protected function searchOneEntry(
         Entry $entry,
         string $query,
         int $siteId,
