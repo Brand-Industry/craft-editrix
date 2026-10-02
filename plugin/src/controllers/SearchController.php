@@ -57,12 +57,16 @@ class SearchController extends Controller
         $p = $parsed["params"];
 
         try {
+            $meta = [];
             $results = Editrix::$plugin->search->search(
                 $p["query"],
                 $p["searchSiteId"],
                 $p["useRegex"],
                 !$p["caseInsensitive"],
-                $this->searchOptions($p)
+                $this->searchOptions($p),
+                null,
+                null,
+                $meta
             );
 
             $groupedResults = Editrix::$plugin->search->groupResultsBySite(
@@ -88,6 +92,7 @@ class SearchController extends Controller
                 "totalResults" => count($results),
                 "groupedResults" => $groupedResults,
                 "dryRun" => $p["dryRun"],
+                "truncated" => $meta["truncated"] ?? false,
             ]);
         } catch (\Throwable $e) {
             Craft::error(
@@ -224,6 +229,7 @@ class SearchController extends Controller
                 : ["totalResults" => 0, "groupedResults" => []];
             $response["totalResults"] = $decoded["totalResults"];
             $response["groupedResults"] = $decoded["groupedResults"];
+            $response["truncated"] = $decoded["truncated"] ?? false;
         }
 
         return $this->asJson($response);
@@ -639,6 +645,7 @@ class SearchController extends Controller
             "Scanning {scanned} of {total} entries ({pct}%)…",
             "Starting search…",
             "Cancel search",
+            "Showing the first {count} matches. Narrow your search for more precise results.",
             "Replacing...",
             "Loading...",
             "entries selected",

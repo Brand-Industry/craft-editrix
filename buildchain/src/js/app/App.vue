@@ -226,8 +226,14 @@
             ⚠️ {{ error }}
           </div>
 
+          <template v-else-if="hasSearched">
+          <div v-if="truncated" class="editrix-form__warning" style="margin-top: 16px;">
+            ⚠️ {{ t('Showing the first {count} matches. Narrow your search for more precise results.', {
+              count: totalResults.toLocaleString(),
+            }) }}
+          </div>
+
           <ResultsTable
-            v-else-if="hasSearched"
             :results="visibleResults"
             :total-results="visibleTotalResults"
             :selected-count="selectedCount"
@@ -240,9 +246,10 @@
             @view="openView"
             @replace="showReplaceConfirm = true"
           />
+          </template>
 
           <EmptyState v-else />
-          </template>
+        </template>
         </template>
       </main>
     </div>
@@ -462,6 +469,7 @@ const {
   error,
   results,
   totalResults,
+  truncated,
   selectedResults,
   hasSearched,
   searchParams,

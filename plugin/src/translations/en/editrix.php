@@ -60,6 +60,7 @@ return [
     'Scanning {scanned} of {total} entries ({pct}%)…' => 'Scanning {scanned} of {total} entries ({pct}%)…',
     'Starting search…' => 'Starting search…',
     'Cancel search' => 'Cancel search',
+    'Showing the first {count} matches. Narrow your search for more precise results.' => 'Showing the first {count} matches. Narrow your search for more precise results.',
     'Replacing...' => 'Replacing...',
     'Loading...' => 'Loading...',
     'Cancel' => 'Cancel',

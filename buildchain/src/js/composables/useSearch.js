@@ -18,6 +18,7 @@ export function useSearch(actionMode) {
   const error = ref(null);
   const results = ref({});
   const totalResults = ref(0);
+  const truncated = ref(false);
   const selectedResults = ref([]);
   const hasSearched = ref(false);
 
@@ -78,6 +79,7 @@ export function useSearch(actionMode) {
     selectedResults.value = [];
     scannedCount.value = 0;
     totalCount.value = 0;
+    truncated.value = false;
 
     const payload = {
       query: searchParams.query,
@@ -153,6 +155,7 @@ export function useSearch(actionMode) {
           if (data.status === 'completed' || data.status === 'cancelled') {
             results.value = data.groupedResults || {};
             totalResults.value = data.totalResults || 0;
+            truncated.value = data.truncated || false;
             loading.value = false;
             currentSearchId.value = null;
             resolve(data);
@@ -298,6 +301,7 @@ export function useSearch(actionMode) {
   const reset = () => {
     results.value = {};
     totalResults.value = 0;
+    truncated.value = false;
     selectedResults.value = [];
     hasSearched.value = false;
     error.value = null;
@@ -328,6 +332,7 @@ export function useSearch(actionMode) {
     error,
     results,
     totalResults,
+    truncated,
     selectedResults,
     hasSearched,
     searchParams,
