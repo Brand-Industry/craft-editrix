@@ -234,9 +234,14 @@
 
           <template v-else-if="hasSearched">
           <div v-if="truncated" class="editrix-form__warning" style="margin-top: 16px;">
-            ⚠️ {{ t('Showing the first {count} matches. Narrow your search for more precise results.', {
-              count: totalResults.toLocaleString(),
-            }) }}
+            <template v-if="stopReason === 'memory'">
+              ⚠️ {{ t('Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.') }}
+            </template>
+            <template v-else>
+              ⚠️ {{ t('Showing the first {count} matches. Narrow your search for more precise results.', {
+                count: totalResults.toLocaleString(),
+              }) }}
+            </template>
           </div>
 
           <ResultsTable
@@ -476,6 +481,7 @@ const {
   results,
   totalResults,
   truncated,
+  stopReason,
   selectedResults,
   hasSearched,
   searchParams,

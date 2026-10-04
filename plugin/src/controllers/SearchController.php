@@ -94,6 +94,7 @@ class SearchController extends Controller
                 "groupedResults" => $groupedResults,
                 "dryRun" => $p["dryRun"],
                 "truncated" => $meta["truncated"] ?? false,
+                "stopReason" => $meta["stopReason"] ?? null,
             ]);
         } catch (\Throwable $e) {
             Craft::error(
@@ -239,6 +240,7 @@ class SearchController extends Controller
             $response["totalResults"] = $decoded["totalResults"];
             $response["groupedResults"] = $decoded["groupedResults"];
             $response["truncated"] = $decoded["truncated"] ?? false;
+            $response["stopReason"] = $decoded["stopReason"] ?? null;
         }
 
         return $this->asJson($response);
@@ -657,6 +659,7 @@ class SearchController extends Controller
             "This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.",
             "This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.",
             "Showing the first {count} matches. Narrow your search for more precise results.",
+            "Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.",
             "Replacing...",
             "Loading...",
             "entries selected",

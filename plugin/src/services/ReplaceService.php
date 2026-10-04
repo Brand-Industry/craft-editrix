@@ -9,6 +9,7 @@ use craft\elements\GlobalSet;
 use craft\elements\Category;
 use craft\elements\MatrixBlock;
 use benf\neo\elements\Block as NeoBlock;
+use brandindustry\editrix\helpers\FieldValue;
 use brandindustry\editrix\helpers\HtmlText;
 use brandindustry\editrix\models\SearchResult;
 use brandindustry\editrix\Editrix;
@@ -434,7 +435,10 @@ class ReplaceService extends Component
                 ->id($result["elementId"])
                 ->siteId($result["siteId"])
                 ->one(),
-            "matrixBlock" => MatrixBlock::find()
+            // Craft 5 has no MatrixBlock class: Matrix blocks are Entries.
+            "matrixBlock" => (class_exists(MatrixBlock::class)
+                ? MatrixBlock::find()
+                : Entry::find())
                 ->id($result["elementId"])
                 ->siteId($result["siteId"])
                 ->status(null)
@@ -492,13 +496,15 @@ class ReplaceService extends Component
                 continue;
             }
 
-            $currentValue = (string) $this->getElementValue(
-                $element,
-                $replacement["fieldHandle"]
+            $currentValue = FieldValue::toString(
+                $this->getElementValue($element, $replacement["fieldHandle"])
             );
             $expectedValue = (string) ($replacement["newValue"] ?? "");
 
-            if ($currentValue === $expectedValue) {
+            if (
+                FieldValue::withoutRefFallbacks($currentValue) ===
+                FieldValue::withoutRefFallbacks($expectedValue)
+            ) {
                 $results[] = [
                     "index" => $i,
                     "status" => "safe",

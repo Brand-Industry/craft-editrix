@@ -75,6 +75,23 @@ describe('useSearch background polling', () => {
     expect(s.getAllResults()).toEqual([{ uniqueKey: 'a' }]);
   });
 
+  it('exposes why a search stopped early', async () => {
+    get.mockResolvedValueOnce(
+      status({ status: 'completed', totalResults: 12, truncated: true, stopReason: 'memory', groupedResults: {} })
+    );
+    const s = useSearch();
+    const done = s.search();
+    await tickPoll();
+    await done;
+    expect(s.stopReason.value).toBe('memory');
+
+    get.mockResolvedValueOnce(status({ status: 'completed', totalResults: 1, groupedResults: {} }));
+    const next = s.search();
+    await tickPoll();
+    await next;
+    expect(s.stopReason.value).toBe(null);
+  });
+
   it('clears the truncated flag when a new search starts', async () => {
     get.mockResolvedValueOnce(
       status({ status: 'completed', totalResults: 1, truncated: true, groupedResults: {} })

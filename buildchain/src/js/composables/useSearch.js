@@ -27,6 +27,7 @@ export function useSearch(actionMode) {
   const results = ref({});
   const totalResults = ref(0);
   const truncated = ref(false);
+  const stopReason = ref(null);
   const selectedResults = ref([]);
   const hasSearched = ref(false);
 
@@ -90,6 +91,7 @@ export function useSearch(actionMode) {
     scannedCount.value = 0;
     totalCount.value = 0;
     truncated.value = false;
+    stopReason.value = null;
     queueStalled.value = false;
     jobStalled.value = false;
 
@@ -176,6 +178,7 @@ export function useSearch(actionMode) {
             results.value = data.groupedResults || {};
             totalResults.value = data.totalResults || 0;
             truncated.value = data.truncated || false;
+            stopReason.value = data.stopReason || null;
             queueStalled.value = false;
             jobStalled.value = false;
             loading.value = false;
@@ -324,6 +327,7 @@ export function useSearch(actionMode) {
     results.value = {};
     totalResults.value = 0;
     truncated.value = false;
+    stopReason.value = null;
     selectedResults.value = [];
     hasSearched.value = false;
     error.value = null;
@@ -357,6 +361,7 @@ export function useSearch(actionMode) {
     results,
     totalResults,
     truncated,
+    stopReason,
     selectedResults,
     hasSearched,
     searchParams,

@@ -77,6 +77,7 @@ class SearchJob extends BaseJob
                     "totalResults" => count($results),
                     "groupedResults" => $grouped,
                     "truncated" => $meta["truncated"] ?? false,
+                    "stopReason" => $meta["stopReason"] ?? null,
                 ])
             );
         } catch (\Throwable $e) {
