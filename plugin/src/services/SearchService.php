@@ -10,7 +10,7 @@ use craft\elements\GlobalSet;
 use craft\elements\Category;
 use craft\fields\Matrix;
 use craft\fields\Tags;
-use craft\helpers\Db;
+use brandindustry\editrix\helpers\FieldValue;
 use brandindustry\editrix\helpers\HtmlText;
 use brandindustry\editrix\models\SearchResult;
 use brandindustry\editrix\Editrix;
@@ -27,6 +27,15 @@ class SearchService extends Component
      */
     public const MAX_RESULTS = 5000;
 
+    /**
+     * Share of PHP's memory_limit a scan may use before it stops and
+     * returns what it has, instead of being killed with nothing to show.
+     */
+    private const MEMORY_STOP_RATIO = 0.8;
+
+    /** Why the last search ended before covering everything, if it did. */
+    private ?string $stopReason = null;
+
     public function search(
         string $query,
         ?int $siteId = null,
@@ -39,6 +48,7 @@ class SearchService extends Component
     ): array {
         $results = [];
         $truncated = false;
+        $this->stopReason = null;
         $maxResults = (int) ($options["maxResults"] ?? self::MAX_RESULTS);
         $settings = Editrix::$plugin->getSettings();
 
@@ -82,6 +92,9 @@ class SearchService extends Component
 
                 if (count($results) >= $maxResults) {
                     $truncated = true;
+                    $this->stopReason ??= "results";
+                } elseif ($this->stopReason !== null) {
+                    $truncated = true;
                 }
             }
 
@@ -100,6 +113,7 @@ class SearchService extends Component
 
                 if (count($results) >= $maxResults) {
                     $truncated = true;
+                    $this->stopReason ??= "results";
                 }
             }
 
@@ -124,6 +138,7 @@ class SearchService extends Component
 
                 if (count($results) >= $maxResults) {
                     $truncated = true;
+                    $this->stopReason ??= "results";
                 }
             }
 
@@ -137,6 +152,7 @@ class SearchService extends Component
         }
 
         $meta["truncated"] = $truncated;
+        $meta["stopReason"] = $truncated ? $this->stopReason ?? "results" : null;
         $meta["resultCount"] = count($results);
 
         return $results;
@@ -246,12 +262,7 @@ class SearchService extends Component
         $total = $onProgress ? (clone $entryQuery)->count() : 0;
         $scanned = 0;
 
-        // Batched via Db::each() - the same batching helper Craft's own
-        // core uses for large-scale element processing (the engine behind
-        // the `resave/*` console commands) - so we never hold every entry
-        // (and every custom field value) on the site in memory at once,
-        // and a 200k+ entry site doesn't have to finish in one PHP request.
-        foreach (Db::each($entryQuery, 100) as $entry) {
+        foreach ($this->eachEntry($entryQuery) as $entry) {
             $scanned++;
 
             if ($scanned % 250 === 0) {
@@ -259,6 +270,10 @@ class SearchService extends Component
                     $onProgress($scanned, $total);
                 }
                 if ($isCancelled && $isCancelled()) {
+                    break;
+                }
+                if ($this->memoryLow()) {
+                    $this->stopReason = "memory";
                     break;
                 }
             }
@@ -298,6 +313,97 @@ class SearchService extends Component
         }
 
         return $results;
+    }
+
+    /**
+     * Walks the query in batches of 100, newest id first, without ever
+     * holding more than one batch. Paging is by id ("before the last one
+     * seen") rather than by offset, so it stays cheap deep into a table of
+     * hundreds of thousands of rows. If populating a batch throws (a bad
+     * row, or another plugin's populate listener), the batch is retried one
+     * entry at a time so only the entries that actually fail are skipped.
+     */
+    protected function eachEntry($entryQuery): \Generator
+    {
+        $lastId = null;
+
+        while (true) {
+            $page = (clone $entryQuery)
+                ->orderBy("elements.id DESC")
+                ->limit(100);
+
+            if ($lastId !== null) {
+                $page->andWhere(["<", "elements.id", $lastId]);
+            }
+
+            try {
+                $batch = $page->all();
+                $ids = array_map(fn($e) => $e->id, $batch);
+            } catch (\Throwable $e) {
+                Craft::error(
+                    "Editrix: could not load a batch of entries, retrying one by one - " .
+                        $e->getMessage(),
+                    __METHOD__
+                );
+                $ids = (clone $page)->ids();
+                $batch = [];
+
+                foreach ($ids as $id) {
+                    try {
+                        $one = (clone $entryQuery)->id($id)->one();
+                        if ($one) {
+                            $batch[] = $one;
+                        }
+                    } catch (\Throwable $inner) {
+                        Craft::error(
+                            "Editrix: skipped entry #{$id} - " . $inner->getMessage(),
+                            __METHOD__
+                        );
+                    }
+                }
+            }
+
+            if (empty($ids)) {
+                return;
+            }
+
+            foreach ($batch as $entry) {
+                yield $entry;
+            }
+
+            $lastId = min($ids);
+            unset($batch, $page);
+        }
+    }
+
+    /**
+     * True when this process has used most of its memory_limit. Overridable
+     * so tests can trip it without allocating gigabytes.
+     */
+    protected function memoryLow(): bool
+    {
+        $limit = $this->memoryLimitBytes();
+
+        return $limit > 0 &&
+            memory_get_usage(true) > $limit * self::MEMORY_STOP_RATIO;
+    }
+
+    private function memoryLimitBytes(): int
+    {
+        $raw = trim((string) ini_get("memory_limit"));
+
+        if ($raw === "" || $raw === "-1") {
+            return 0;
+        }
+
+        $bytes = (int) $raw;
+
+        return match (strtolower(substr($raw, -1))) {
+            "g" => $bytes * 1024 ** 3,
+            "m" => $bytes * 1024 ** 2,
+            "k" => $bytes * 1024,
+            default => $bytes,
+        };
     }
 
     protected function searchOneEntry(
@@ -398,7 +504,7 @@ class SearchService extends Component
                         $result->siteId = $siteId;
                         $result->siteHandle = $site->handle;
                         $result->matchContext = $match["context"];
-                        $result->fieldValue = (string) $value;
+                        $result->fieldValue = FieldValue::toString($value);
                         $result->matchStart = $match["start"];
                         $result->matchEnd = $match["end"];
                         $result->isRichText = $isRich;
@@ -425,6 +531,29 @@ class SearchService extends Component
                         $fieldFilter
                     );
                     $results = array_merge($results, $matrixResults);
+                }
+
+                if ($searchMatrix && $this->isCkeditorField($field)) {
+                    $nested = $this->ckeditorNestedEntries($entry, $field);
+
+                    if ($nested) {
+                        $results = array_merge(
+                            $results,
+                            $this->searchInMatrixField(
+                                $entry,
+                                $field,
+                                $query,
+                                $siteId,
+                                $site->handle,
+                                $section,
+                                $useRegex,
+                                $caseSensitive,
+                                $wholeWords,
+                                $fieldFilter,
+                                $nested
+                            )
+                        );
+                    }
                 }
 
                 if (
@@ -524,7 +653,7 @@ class SearchService extends Component
 
     private function searchInMatrixField(
         Entry $entry,
-        Matrix $matrixField,
+        FieldInterface $matrixField,
         string $query,
         int $siteId,
         string $siteHandle,
@@ -532,16 +661,19 @@ class SearchService extends Component
         bool $useRegex,
         bool $caseSensitive,
         bool $wholeWords,
-        array $fieldFilter
+        array $fieldFilter,
+        ?iterable $blocks = null
     ): array {
         $results = [];
 
-        $matrixQuery = $entry->getFieldValue($matrixField->handle);
-        if (!$matrixQuery) {
-            return $results;
-        }
+        if ($blocks === null) {
+            $matrixQuery = $entry->getFieldValue($matrixField->handle);
+            if (!$matrixQuery) {
+                return $results;
+            }
 
-        $blocks = $matrixQuery->all();
+            $blocks = $matrixQuery->all();
+        }
 
         foreach ($blocks as $block) {
             $blockType = $block->getType();
@@ -592,7 +724,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $siteHandle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = (string) $value;
+                    $result->fieldValue = FieldValue::toString($value);
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->parentId = $entry->id;
@@ -606,6 +738,34 @@ class SearchService extends Component
         }
 
         return $results;
+    }
+
+    private function isCkeditorField(FieldInterface $field): bool
+    {
+        return class_exists(\craft\ckeditor\Field::class) &&
+            $field instanceof \craft\ckeditor\Field;
+    }
+
+    /**
+     * Entries embedded in a CKEditor field are stored as their own elements;
+     * the field itself only keeps a <craft-entry> marker for each. They are
+     * searched like Matrix blocks, so text inside them is found and saved on
+     * the embedded entry rather than flattened into the parent's HTML.
+     * Returns null when the field embeds none, which is the usual case.
+     */
+    private function ckeditorNestedEntries(Entry $entry, FieldInterface $field): ?array
+    {
+        $value = $entry->getFieldValue($field->handle);
+
+        if (
+            !is_object($value) ||
+            !method_exists($value, "getEntries") ||
+            !str_contains(FieldValue::toString($value), "<craft-entry")
+        ) {
+            return null;
+        }
+
+        return $value->getEntries()->status(null)->all() ?: null;
     }
 
     /**
@@ -694,7 +854,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $siteHandle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = (string) $value;
+                    $result->fieldValue = FieldValue::toString($value);
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->parentId = $entry->id;
@@ -772,7 +932,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $site->handle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = (string) $value;
+                    $result->fieldValue = FieldValue::toString($value);
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->isRichText = $isRich;
@@ -878,7 +1038,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $site->handle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = (string) $value;
+                    $result->fieldValue = FieldValue::toString($value);
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->isRichText = $isRich;
@@ -979,8 +1139,8 @@ class SearchService extends Component
         bool $caseSensitive,
         bool $wholeWords
     ): array {
-        if ($value instanceof \Stringable) {
-            $value = (string) $value;
+        if (is_object($value)) {
+            $value = FieldValue::toString($value);
         }
 
         if (!is_string($value) || $value === "" || $query === "") {
@@ -1062,8 +1222,8 @@ class SearchService extends Component
     ): array {
         // Rich text fields (Redactor, CKEditor, Matrix/relation values, etc.)
         // return a FieldData/Markup wrapper object, not a plain string.
-        if ($value instanceof \Stringable) {
-            $value = (string) $value;
+        if (is_object($value)) {
+            $value = FieldValue::toString($value);
         }
 
         if (!is_string($value) || $value === "" || $query === "") {

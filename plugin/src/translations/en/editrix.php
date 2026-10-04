@@ -63,6 +63,7 @@ return [
     "This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README." => "This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.",
     "This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search." => "This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.",
     'Showing the first {count} matches. Narrow your search for more precise results.' => 'Showing the first {count} matches. Narrow your search for more precise results.',
+    'Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.' => 'Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.',
     'Replacing...' => 'Replacing...',
     'Loading...' => 'Loading...',
     'Cancel' => 'Cancel',
