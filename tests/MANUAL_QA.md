@@ -20,7 +20,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] **Standard**: Matrix, Categories, selector de varios sitios, filtros de alcance (Segmented) y exportar CSV/JSON no están disponibles (ocultos o desactivados, y nunca devuelven resultados de todos modos). La insignia del título dice Standard.
 - [ ] **Pro**: aparecen todos esos elementos y la insignia dice Pro.
 - [ ] Cambiar de Standard a Pro (y de vuelta) sin recargar manualmente no deja la pantalla en un estado raro. Recarga y confirma.
-- [ ] Compara la tabla de ediciones del README con lo que ves. **Hoy no coinciden** (ver sección 13).
+- [ ] La tabla de ediciones del README coincide con lo que ves en cada edición.
 
 ## 2. Pantalla de inicio
 
@@ -160,7 +160,6 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 
 ## 13. Pendientes y diferencias conocidas
 
-- **README vs. código**: la tabla de ediciones del README marca como disponibles en Standard cosas que el código reserva a Pro (Matrix, Categories, multi-sitio, filtros de alcance, exportar). Decidir cuál es la intención antes de publicar en la tienda.
 - **Tope de 5,000 resultados**: es un valor por defecto, cámbialo en `SearchService::MAX_RESULTS` si hace falta.
 - **Cola en producción**: confirmar con quien administra el servidor de Frommers que corre un worker o cron (o Craft Cloud).
 - **Frommers**: el error de Twig en `articleBookstore.twig` (línea 8, `is defined` en vez de comprobar null) es de su template. El plugin ya lo omite, pero conviene que lo corrijan.

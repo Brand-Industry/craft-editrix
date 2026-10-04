@@ -16,21 +16,21 @@ Editrix is an advanced search & replace plugin that lets you find and update con
 
 ## Editions
 
-| Feature                  |    Standard     |    Pro     |
+| Feature                  | Standard (free) |    Pro     |
 | ------------------------ | :-------------: | :--------: |
 | Search Entries & Globals |       ✅        |     ✅     |
 | Basic Replace            |       ✅        |     ✅     |
 | Case Insensitive         |       ✅        |     ✅     |
-| Logs & Revert            |     30 days     |  90 days   |
-| Matrix Fields            |       ✅        |     ✅     |
-| Categories               |       ✅        |     ✅     |
 | Regex Support            |       ✅        |     ✅     |
 | Whole Words              |       ✅        |     ✅     |
-| Multi-Site               |       ✅        |     ✅     |
-| Scope Filters            | Sections, Sites |    Full    |
-| Diff Preview             |      Text       |   Visual   |
 | Dry Run Mode             |       ✅        |     ✅     |
-| Export Logs              |       CSV       | CSV + JSON |
+| Logs & Revert            |     30 days     |  90 days   |
+| Diff Preview             |      Text       |   Visual   |
+| Matrix Fields            |        -        |     ✅     |
+| Categories & Tags        |        -        |     ✅     |
+| Multi-Site               |        -        |     ✅     |
+| Scope Filters            |        -        |    Full    |
+| Export Logs              |        -        | CSV + JSON |
 | Presets                  |        5        | Unlimited  |
 | Protected Fields         |        -        |     ✅     |
 | CLI Commands             |        -        |     ✅     |
