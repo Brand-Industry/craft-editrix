@@ -4,6 +4,9 @@
       <h2 class="editrix-results__title">
         {{ t('Results') }}
         <span class="editrix-results__count">{{ totalResults }}</span>
+        <span v-if="occurrenceCount > totalResults" class="editrix-results__matches-total">
+          {{ t('{count} matches', { count: occurrenceCount.toLocaleString() }) }}
+        </span>
 
         <label v-if="totalResults > 0" class="editrix-results__page-size">
           {{ t('Show') }}
@@ -107,10 +110,24 @@
             <td class="editrix-results__field">
               {{ row.result.fieldName }}
               <span class="editrix-badge editrix-badge--neutral">{{ elementTypeLabel(row.result.elementType) }}</span>
+              <span v-if="(row.result.matchCount || 1) > 1" class="editrix-badge editrix-badge--info">{{ t('{count} matches', { count: row.result.matchCount }) }}</span>
               <span v-if="rowState(row.result) === 'replaced'" class="editrix-badge editrix-badge--success">{{ t('Replaced') }}</span>
               <span v-else-if="rowState(row.result) === 'stale'" class="editrix-badge editrix-badge--warning" :title="t('Its content changed after the search. Search again to see the current text.')">{{ t('Changed since search') }}</span>
             </td>
-            <td class="editrix-results__preview" v-html="formatPreview(row.result.matchContext)"></td>
+            <td class="editrix-results__preview">
+              <span v-html="formatPreview(row.result.matchContext)"></span>
+              <button
+                v-if="(row.result.matchCount || 1) > 1"
+                type="button"
+                class="editrix-results__expand"
+                :aria-expanded="isExpanded(row.result)"
+                @click.stop="toggleExpanded(row.result)"
+              >
+                {{ isExpanded(row.result)
+                  ? t('Hide matches')
+                  : t('Show all {count} matches', { count: row.result.matchCount }) }}
+              </button>
+            </td>
             <td>
               <button
                 class="editrix-btn editrix-btn--ghost editrix-btn--sm"
@@ -118,6 +135,18 @@
               >
                 {{ t('View') }}
               </button>
+            </td>
+          </tr>
+
+          <tr v-if="isExpanded(row.result)" class="editrix-results__matches-row">
+            <td></td>
+            <td colspan="4">
+              <ol class="editrix-results__matches">
+                <li v-for="(m, i) in row.result.matches" :key="i" v-html="formatPreview(m.context)"></li>
+              </ol>
+              <p v-if="row.result.matchCount > row.result.matches.length" class="editrix-results__matches-more">
+                {{ t('and {count} more', { count: row.result.matchCount - row.result.matches.length }) }}
+              </p>
             </td>
           </tr>
         </template>
@@ -129,7 +158,7 @@
         <span v-if="selectedCount > 0">
           <strong>{{ selectedCount }}</strong> {{ t('entries selected') }}
         </span>
-        <span>{{ t('Total occurrences:') }} <strong>{{ totalResults }}</strong></span>
+        <span>{{ t('Total occurrences:') }} <strong>{{ occurrenceCount }}</strong></span>
       </div>
 
       <div class="editrix-results__pagination">
@@ -198,6 +227,20 @@ const flatRows = computed(() => {
   return rows;
 });
 
+// A row is a field; it can match several times. Which rows show their
+// individual matches is purely a view concern.
+const expanded = ref(new Set());
+const isExpanded = result => expanded.value.has(result.uniqueKey);
+const toggleExpanded = result => {
+  const next = new Set(expanded.value);
+  if (!next.delete(result.uniqueKey)) next.add(result.uniqueKey);
+  expanded.value = next;
+};
+
+const occurrenceCount = computed(() =>
+  flatRows.value.reduce((sum, row) => sum + (row.result.matchCount || 1), 0)
+);
+
 const showSiteHeaders = computed(() => Object.keys(props.results).length > 1);
 
 const totalPages = computed(() =>
@@ -254,15 +297,19 @@ const exportCsv = () => {
     siteData.results.forEach(result => {
       if (!exportAll && !props.isSelected(result)) return;
 
-      rows.push([
-        siteData.siteName,
-        elementTypeLabel(result.elementType),
-        result.elementTitle,
-        result.sectionName,
-        result.fieldName,
-        result.matchContext.replace(/\[\[\/?MATCH\]\]/g, ''),
-        result.cpEditUrl || '',
-      ]);
+      // One line per occurrence, so the file counts what the search found.
+      // Only the first contexts of a field with very many are kept.
+      (result.matches?.length ? result.matches.map(m => m.context) : [result.matchContext]).forEach(context => {
+        rows.push([
+          siteData.siteName,
+          elementTypeLabel(result.elementType),
+          result.elementTitle,
+          result.sectionName,
+          result.fieldName,
+          context.replace(/\[\[\/?MATCH\]\]/g, ''),
+          result.cpEditUrl || '',
+        ]);
+      });
     });
   });
 

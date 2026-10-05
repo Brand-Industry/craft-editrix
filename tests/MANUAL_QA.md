@@ -83,6 +83,9 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] Al terminar una búsqueda, sal del plugin y vuelve: en **Recent searches** aparece con su número de resultados. **Open** muestra los mismos resultados sin buscar de nuevo y restaura el formulario (texto, secciones, opciones).
 - [ ] Una búsqueda terminada abierta desde **Recent searches** se puede usar en Search & Replace (la selección y el preview funcionan).
 - [ ] Un segundo usuario no ve las búsquedas del primero.
+- [ ] **Una fila por campo**: una palabra que aparece varias veces en el mismo campo de una entrada sale en **una sola fila** con la etiqueta "N matches". "Show all N matches" despliega cada aparición con la palabra resaltada, y la vista previa se ve completa (la palabra resaltada no queda cortada). El encabezado muestra el número de filas y, al lado, el total de coincidencias.
+- [ ] Al seleccionar esa fila y reemplazar, cambian **todas** las apariciones del campo; el mensaje dice cuántas apariciones se cambiaron. En **View**, todas las apariciones salen resaltadas.
+- [ ] Export CSV genera una línea por aparición.
 - [ ] Con una búsqueda muy amplia en un sitio grande (ej. una vocal en un sitio de miles de entradas) el resultado se corta en **5,000** y aparece el aviso amarillo "Showing the first 5,000 matches…". Con una búsqueda estrecha, ese aviso no aparece.
 - [ ] **Cola apagada**: pon `runQueueAutomatically => false` en `config/general.php`, sin worker, y busca. A los ~15 segundos aparece el aviso de que la cola de Craft quizá no está corriendo. Cancelar funciona.
 - [ ] Con la cola apagada, arranca el worker (`php craft queue/run`): la búsqueda empieza sola y el aviso desaparece.

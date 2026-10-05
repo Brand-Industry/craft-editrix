@@ -100,6 +100,7 @@
 import { computed, inject, ref, watch } from 'vue';
 import { useConfig } from '../../composables/useConfig';
 import { elementTypeLabel } from '../../utils/elementType';
+import { highlightMatches } from '../../utils/highlight';
 
 const t = inject('t');
 const { cpUrl } = useConfig();
@@ -147,20 +148,12 @@ const highlightedContext = computed(() => {
   if (!r) return '';
 
   const value = r.fieldValue ?? '';
-  const hasRange =
-    Number.isInteger(r.matchStart) &&
-    Number.isInteger(r.matchEnd) &&
-    r.matchEnd > r.matchStart &&
-    r.matchEnd <= value.length;
 
-  if (!hasRange) {
-    return escapeHtml(value);
-  }
-
-  const before = escapeHtml(value.slice(0, r.matchStart));
-  const match = escapeHtml(value.slice(r.matchStart, r.matchEnd));
-  const after = escapeHtml(value.slice(r.matchEnd));
-
-  return `${before}<span class="match">${match}</span>${after}`;
+  // A row stands for a whole field, so every match in it is highlighted.
+  return highlightMatches(
+    value,
+    r.matches?.length ? r.matches : [{ start: r.matchStart, end: r.matchEnd }],
+    escapeHtml
+  );
 });
 </script>

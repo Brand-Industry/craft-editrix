@@ -258,7 +258,7 @@
               ⚠️ {{ t('Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.') }}
             </template>
             <template v-else>
-              ⚠️ {{ t('Showing the first {count} matches. Narrow your search for more precise results.', {
+              ⚠️ {{ t('Showing the first {count} results. Narrow your search for more precise results.', {
                 count: totalResults.toLocaleString(),
               }) }}
             </template>
@@ -791,7 +791,7 @@ const handleReplace = async (confirmationCode) => {
       // The rows are marked in place; searching again would rescan the
       // whole scope just to show what we already know.
       lastReplace.value = {
-        replaced: data.replacedCount || 0,
+        replaced: data.replacedMatches ?? data.replacedCount ?? 0,
         skipped: (data.skipped || []).length,
       };
     } else {
