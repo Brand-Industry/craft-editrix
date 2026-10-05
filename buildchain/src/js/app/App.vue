@@ -261,6 +261,13 @@
               ⚠️ {{ t('Showing the first {count} results. Narrow your search for more precise results.', {
                 count: totalResults.toLocaleString(),
               }) }}
+              <template v-if="upgradeLimit">
+                {{ t('Your edition shows up to {limit} results; Pro shows up to {proLimit}.', {
+                  limit: (resultLimit || totalResults).toLocaleString(),
+                  proLimit: upgradeLimit.toLocaleString(),
+                }) }}
+                <span class="editrix-badge editrix-badge--info">Pro</span>
+              </template>
             </template>
           </div>
 
@@ -289,7 +296,8 @@
             @toggle="toggleResult"
             @toggle-all="toggleSelectAll"
             @view="openView"
-            @replace="showReplaceConfirm = true"
+            :replace-limit="replaceRowLimit"
+            @replace="requestBulkReplace"
           />
           </template>
 
@@ -370,6 +378,7 @@ const {
   tagsSettingsUrl,
   canExport,
   canReplace,
+  replaceRowLimit,
 } = useConfig();
 const { get: apiGet } = useApi();
 
@@ -541,6 +550,8 @@ const {
   totalResults,
   truncated,
   stopReason,
+  resultLimit,
+  upgradeLimit,
   recentSearches,
   rowState,
   loadRecentSearches,
@@ -762,6 +773,21 @@ const handleRequestSingleReplace = ({ result, replaceWith }) => {
   singleReplaceValue.value = replaceWith;
   detailResult.value = null;
   previewResult.value = null;
+  showReplaceConfirm.value = true;
+};
+
+// One request can only change so many entries before the server may cut it
+// off (see maxRowsPerReplace); the server refuses more, this says so first.
+const requestBulkReplace = () => {
+  if (replaceRowLimit.value > 0 && selectedCount.value > replaceRowLimit.value) {
+    window.Craft?.cp?.displayError?.(
+      t('Select at most {limit} rows per replace; you selected {count}.', {
+        limit: replaceRowLimit.value.toLocaleString(),
+        count: selectedCount.value.toLocaleString(),
+      })
+    );
+    return;
+  }
   showReplaceConfirm.value = true;
 };
 

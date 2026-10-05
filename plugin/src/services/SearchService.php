@@ -28,7 +28,50 @@ class SearchService extends Component
      * memory long before the UI could ever usefully show them all. Past
      * this point we stop scanning and flag the search as truncated.
      */
-    public const MAX_RESULTS = 5000;
+    public const HARD_CEILING = 50000;
+
+    /**
+     * How many rows a search may return: the edition's limit, lowered by
+     * the optional setting, and never above the hard ceiling (the JSON for
+     * a search is stored in one database value and sent to the browser in
+     * one response).
+     */
+    public static function resultLimit(int $editionLimit, ?int $setting = null): int
+    {
+        $limit = $editionLimit > 0 ? $editionLimit : self::HARD_CEILING;
+
+        if ($setting !== null && $setting > 0) {
+            $limit = min($limit, $setting);
+        }
+
+        return min($limit, self::HARD_CEILING);
+    }
+
+    /** The limit that applies to this site right now. */
+    public function currentResultLimit(): int
+    {
+        return self::resultLimit(
+            Editrix::$plugin->license->getLimit("searchResultLimit"),
+            Editrix::$plugin->getSettings()->maxSearchResults
+        );
+    }
+
+    /**
+     * The limit Pro would give, if this site is not on Pro and that is
+     * higher; null otherwise. Used to say what upgrading would change.
+     */
+    public function upgradeResultLimit(): ?int
+    {
+        if (Editrix::$plugin->edition === Editrix::EDITION_PRO) {
+            return null;
+        }
+
+        $pro = self::resultLimit(
+            Editrix::$plugin->license->getLimitFor(Editrix::EDITION_PRO, "searchResultLimit")
+        );
+
+        return $pro > $this->currentResultLimit() ? $pro : null;
+    }
 
     /**
      * Share of PHP's memory_limit a scan may use before it stops and
@@ -63,7 +106,8 @@ class SearchService extends Component
         $truncated = false;
         $this->stopReason = null;
         $this->matchesBase = 0;
-        $maxResults = (int) ($options["maxResults"] ?? self::MAX_RESULTS);
+        $limit = $this->currentResultLimit();
+        $maxResults = min($limit, (int) ($options["maxResults"] ?? $limit));
         $settings = Editrix::$plugin->getSettings();
 
         // Get search options
@@ -168,6 +212,8 @@ class SearchService extends Component
 
         $meta["truncated"] = $truncated;
         $meta["stopReason"] = $truncated ? $this->stopReason ?? "results" : null;
+        $meta["resultLimit"] = $limit;
+        $meta["upgradeLimit"] = $truncated ? $this->upgradeResultLimit() : null;
         $meta["resultCount"] = $this->countRows($results);
         $meta["matchCount"] = count($results);
 
@@ -357,7 +403,7 @@ class SearchService extends Component
         array $entryTypeFilter,
         ?callable $onProgress = null,
         ?callable $isCancelled = null,
-        int $maxResults = self::MAX_RESULTS
+        int $maxResults = self::HARD_CEILING
     ): array {
         $results = [];
         $site = Craft::$app->getSites()->getSiteById($siteId);

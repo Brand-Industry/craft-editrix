@@ -57,6 +57,18 @@ class ReplaceController extends Controller
             ]);
         }
 
+        $rowLimit = Editrix::$plugin->getSettings()->maxRowsPerReplace;
+        if (count($selectedResults) > $rowLimit) {
+            return $this->asJson([
+                "success" => false,
+                "error" => Craft::t(
+                    "editrix",
+                    "Select at most {limit} rows per replace; you selected {count}. Replacing more in one request can run past the server's time limit and leave changes that are not logged.",
+                    ["limit" => $rowLimit, "count" => count($selectedResults)]
+                ),
+            ]);
+        }
+
         $confirmationError = $this->checkSafetyConfirmation(
             count($selectedResults),
             $request->getBodyParam("confirmationCode", "")

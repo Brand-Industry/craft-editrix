@@ -83,6 +83,8 @@ class SearchJob extends BaseJob
                     "groupedResults" => $grouped,
                     "truncated" => $meta["truncated"] ?? false,
                     "stopReason" => $meta["stopReason"] ?? null,
+                    "resultLimit" => $meta["resultLimit"] ?? null,
+                    "upgradeLimit" => $meta["upgradeLimit"] ?? null,
                 ]),
                 null,
                 $rows

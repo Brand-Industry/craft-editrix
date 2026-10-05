@@ -87,9 +87,10 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] **View** carga el texto completo del campo al abrirse (breve "Loading…") y resalta todas las apariciones. **Preview Changes** muestra el antes y el después del campo completo.
 - [ ] Si editas la entrada en otra pestaña después de buscar, **View** y **Preview Changes** avisan "Its content changed after the search…" y View no resalta posiciones viejas.
 - [ ] Abrir una búsqueda de **Recent searches** y usar View o Replace funciona igual que en una búsqueda recién hecha.
+- [ ] **Tope por reemplazo**: seleccionar más de 150 filas (Select All) deshabilita **Replace Selected** y muestra "Select at most 150 rows to replace at once." Con 150 o menos funciona normalmente. Una llamada directa a `editrix/api/replace` con más filas responde con ese mismo error y no cambia nada.
 - [ ] Al seleccionar esa fila y reemplazar, cambian **todas** las apariciones del campo; el mensaje dice cuántas apariciones se cambiaron. En **View**, todas las apariciones salen resaltadas.
 - [ ] Export CSV genera una línea por aparición.
-- [ ] Con una búsqueda muy amplia en un sitio grande (ej. una vocal en un sitio de miles de entradas) el resultado se corta en **5,000** y aparece el aviso amarillo "Showing the first 5,000 matches…". Con una búsqueda estrecha, ese aviso no aparece.
+- [ ] Con una búsqueda muy amplia en un sitio grande (ej. una vocal en un sitio de miles de entradas) el resultado se corta en el límite de la edición (**3,000** en Standard, **25,000** en Pro) y aparece el aviso amarillo "Showing the first N results…". En Standard el aviso añade "Your edition shows up to 3,000 results; Pro shows up to 25,000" con la insignia Pro; en Pro no. Con una búsqueda estrecha, ese aviso no aparece.
 - [ ] **Cola apagada**: pon `runQueueAutomatically => false` en `config/general.php`, sin worker, y busca. A los ~15 segundos aparece el aviso de que la cola de Craft quizá no está corriendo. Cancelar funciona.
 - [ ] Con la cola apagada, arranca el worker (`php craft queue/run`): la búsqueda empieza sola y el aviso desaparece.
 - [ ] **Worker caído**: lanza una búsqueda grande y mata el proceso del worker a mitad. A los ~2 minutos sin avance aparece el aviso de que la búsqueda dejó de reportar progreso. Cancelar la libera.
@@ -183,7 +184,8 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 
 ## 13. Pendientes y diferencias conocidas
 
-- **Tope de 5,000 resultados**: es un valor por defecto, cámbialo en `SearchService::MAX_RESULTS` si hace falta.
+- **Tope de resultados por edición** (Standard 3,000, Pro 25,000, techo absoluto 50,000): sale de `LicenseService::$limits['searchResultLimit']`; `maxSearchResults` solo puede bajarlo.
+- **Tope de 150 filas por reemplazo** (`maxRowsPerReplace`): es provisional hasta que exista el reemplazo en cola.
 - **Cola en producción**: confirmar con quien administra el servidor de Frommers que corre un worker o cron (o Craft Cloud).
 - **Frommers**: el error de Twig en `articleBookstore.twig` (línea 8, `is defined` en vez de comprobar null) es de su template. El plugin ya lo omite, pero conviene que lo corrijan.
 - **No cubierto por pruebas automáticas**: los endpoints del controlador y toda la interfaz. Por eso existe esta lista.
@@ -195,7 +197,7 @@ Prepara antes: una palabra que aparezca en 20 a 50 entradas, una entrada con neg
 1. Inicio: muestra las tarjetas y la actividad reciente.
 2. General Search con la palabra preparada, con **Case insensitive**. Abre un resultado con **View**.
 3. Segmented: elige una sección y un campo, y compara el número de resultados.
-4. Búsqueda amplia (una vocal) en un sitio grande: barra de progreso, **Cancel search**, luego dejarla llegar al aviso de 5,000.
+4. Búsqueda amplia (una vocal) en un sitio grande: barra de progreso, **Cancel search**, luego dejarla llegar al aviso del tope.
 5. Search & Replace: reemplaza la palabra por otra en 2 o 3 entradas con **Preview Changes** y **Dry Run** primero.
 6. Abre la entrada en Craft y enséñala cambiada.
 7. Logs & History: abre el reemplazo y haz **Revert**. Vuelve a la entrada.

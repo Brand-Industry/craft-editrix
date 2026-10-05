@@ -58,7 +58,7 @@
       </template>
     </p>
 
-    <p class="editrix-search-progress__tip" :key="tipIndex">{{ t(tips[tipIndex]) }}</p>
+    <p class="editrix-search-progress__tip" :key="tipIndex">{{ t(tips[tipIndex], { limit: (resultLimit || 0).toLocaleString() }) }}</p>
 
     <p v-if="jobStalled" class="editrix-form__warning">
       ⚠️ {{ t("This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.") }}
@@ -79,6 +79,7 @@
 
 <script setup>
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue';
+import { useConfig } from '../../composables/useConfig';
 import {
   searchPhase,
   formatElapsed,
@@ -89,6 +90,7 @@ import {
 
 const t = inject('t');
 const hasFeature = inject('hasFeature');
+const { resultLimit } = useConfig();
 
 const props = defineProps({
   query: { type: String, default: '' },

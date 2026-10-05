@@ -103,6 +103,13 @@ describe('waitingTips', () => {
     expect(waitingTips({ hasScopeFilters: true })[0]).toMatch(/leave this page/);
   });
 
+  it('leaves the limit to be filled in, so the tip never states a number that is wrong for the edition', () => {
+    const tip = waitingTips({ hasScopeFilters: false }).find(t => /stops at/.test(t));
+
+    expect(tip).toContain('{limit}');
+    expect(tip).not.toMatch(/\d,\d{3}/);
+  });
+
   it('only suggests narrowing by section where scope filters exist', () => {
     const withFilters = waitingTips({ hasScopeFilters: true }).join(' ');
     const without = waitingTips({ hasScopeFilters: false }).join(' ');
