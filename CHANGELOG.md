@@ -18,6 +18,7 @@ All notable changes to Editrix will be documented in this file.
 - Switching between General and Segmented Search now clears the previous results
 
 ### Fixed
+- A new search waited in the queue until the user opened another control panel page; Editrix now asks Craft to start the queue as soon as the search is queued
 - Replacing in a CKEditor field that contains nested entries flattened those entries into static HTML; they are now kept intact, and Revert restores them
 - A fresh install did not create the table that background searches need, so every search failed on a new site
 - Replacing inside a Matrix block failed on Craft 5
