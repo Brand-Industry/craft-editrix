@@ -58,6 +58,8 @@ export function useSearch(actionMode) {
   // PHP-FPM workers. These track that job while search() polls for it.
   const scannedCount = ref(0);
   const totalCount = ref(0);
+  // Matches found so far, reported by the job while it runs.
+  const matchCount = ref(0);
   const progress = computed(() =>
     totalCount.value > 0 ? scannedCount.value / totalCount.value : 0
   );
@@ -112,6 +114,7 @@ export function useSearch(actionMode) {
     selectedResults.value = [];
     scannedCount.value = 0;
     totalCount.value = 0;
+    matchCount.value = 0;
     truncated.value = false;
     stopReason.value = null;
     queueStalled.value = false;
@@ -200,6 +203,7 @@ export function useSearch(actionMode) {
 
           scannedCount.value = data.scannedCount || 0;
           totalCount.value = data.totalCount || 0;
+          matchCount.value = data.resultCount || 0;
           queueStalled.value =
             data.status === 'queued' &&
             Date.now() - startedAt >= QUEUE_STALL_MS;
@@ -263,6 +267,7 @@ export function useSearch(actionMode) {
     selectedResults.value = [];
     scannedCount.value = 0;
     totalCount.value = 0;
+    matchCount.value = 0;
     truncated.value = false;
     stopReason.value = null;
     queueStalled.value = false;
@@ -417,11 +422,14 @@ export function useSearch(actionMode) {
     error.value = null;
     scannedCount.value = 0;
     totalCount.value = 0;
+    matchCount.value = 0;
     queueStalled.value = false;
     jobStalled.value = false;
     // Lets any in-flight poll loop notice it's stale and stop on its next
-    // tick instead of overwriting this reset with a late response.
+    // tick instead of overwriting this reset with a late response. The job
+    // itself keeps running on the server; coming back re-attaches to it.
     currentSearchId.value = null;
+    loading.value = false;
   };
 
   // Reset form
@@ -455,6 +463,7 @@ export function useSearch(actionMode) {
     hasSearched,
     searchParams,
     scannedCount,
+    matchCount,
     totalCount,
     currentSearchId,
     queueStalled,

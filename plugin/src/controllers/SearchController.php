@@ -234,6 +234,7 @@ class SearchController extends Controller
                 "status",
                 "scannedCount",
                 "totalCount",
+                "resultCount",
                 "resultsJson",
                 "errorMessage",
                 "paramsJson",
@@ -255,6 +256,8 @@ class SearchController extends Controller
             "status" => $row["status"],
             "scannedCount" => (int) $row["scannedCount"],
             "totalCount" => (int) $row["totalCount"],
+            // Matches found so far while the search is still running.
+            "resultCount" => (int) $row["resultCount"],
             "params" => $row["paramsJson"]
                 ? Json::decode($row["paramsJson"])
                 : null,
@@ -803,7 +806,9 @@ class SearchController extends Controller
             "Cancel search",
             "You already have a search running. Open it, or cancel it before starting another.",
             "Other searches are using the server right now. Try again in a few minutes.",
-            "Searches in progress",
+            "Search in progress",
+            "Searching for \"{query}\"",
+            "{count} matches so far",
             "Recent searches",
             "{count} results",
             "cancelled",

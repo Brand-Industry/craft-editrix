@@ -41,8 +41,8 @@ class SearchJob extends BaseJob
                 $this->useRegex,
                 $this->caseSensitive,
                 array_merge($this->options, ["siteIds" => $this->siteIds]),
-                function (int $scanned, int $total) use ($queue) {
-                    $this->updateProgress($scanned, $total);
+                function (int $scanned, int $total, int $matches = 0) use ($queue) {
+                    $this->updateProgress($scanned, $total, $matches);
                     if ($total > 0) {
                         $this->setProgress($queue, min($scanned / $total, 1));
                     }
@@ -136,7 +136,7 @@ class SearchJob extends BaseJob
      * a search is cancelled (or somehow already finalized), a late progress
      * tick from a loop that hasn't noticed yet must not overwrite that.
      */
-    private function updateProgress(int $scanned, int $total): void
+    private function updateProgress(int $scanned, int $total, int $matches = 0): void
     {
         Craft::$app
             ->getDb()
@@ -146,6 +146,7 @@ class SearchJob extends BaseJob
                 [
                     "scannedCount" => $scanned,
                     "totalCount" => $total,
+                    "resultCount" => $matches,
                     "dateUpdated" => Db::prepareDateForDb(new \DateTime()),
                 ],
                 ["searchId" => $this->searchId, "status" => "running"]

@@ -42,6 +42,9 @@ class SearchService extends Component
      */
     private const ID_WINDOW = 10000;
 
+    /** Matches already found on earlier sites, so progress counts across sites. */
+    private int $matchesBase = 0;
+
     /** Why the last search ended before covering everything, if it did. */
     private ?string $stopReason = null;
 
@@ -58,6 +61,7 @@ class SearchService extends Component
         $results = [];
         $truncated = false;
         $this->stopReason = null;
+        $this->matchesBase = 0;
         $maxResults = (int) ($options["maxResults"] ?? self::MAX_RESULTS);
         $settings = Editrix::$plugin->getSettings();
 
@@ -81,6 +85,7 @@ class SearchService extends Component
             }
 
             if ($searchEntries) {
+                $this->matchesBase = count($results);
                 $results = array_merge(
                     $results,
                     $this->searchInEntries(
@@ -276,7 +281,7 @@ class SearchService extends Component
 
             if ($scanned % 250 === 0) {
                 if ($onProgress) {
-                    $onProgress($scanned, $total);
+                    $onProgress($scanned, $total, $this->matchesBase + count($results));
                 }
                 if ($isCancelled && $isCancelled()) {
                     break;
@@ -318,7 +323,7 @@ class SearchService extends Component
         }
 
         if ($onProgress) {
-            $onProgress($scanned, $total);
+            $onProgress($scanned, $total, $this->matchesBase + count($results));
         }
 
         return $results;

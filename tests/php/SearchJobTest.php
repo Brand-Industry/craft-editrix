@@ -6,6 +6,7 @@ use Craft;
 use craft\base\Element;
 use craft\elements\db\ElementQuery;
 use yii\base\Event;
+use brandindustry\editrix\jobs\SearchJob;
 
 class SearchJobTest extends EditrixTestCase
 {
@@ -85,6 +86,21 @@ class SearchJobTest extends EditrixTestCase
         $this->assertSame(3, $payload['totalResults']);
         $this->assertSame(3, (int) $row['resultCount']);
         $this->assertTrue($payload['truncated']);
+    }
+
+    public function testProgressTicksRecordTheMatchesFoundSoFar(): void
+    {
+        $searchId = $this->createSearchRow('running');
+        $job = new SearchJob(['searchId' => $searchId, 'query' => 'x', 'siteId' => $this->siteId()]);
+
+        $method = new \ReflectionMethod($job, 'updateProgress');
+        $method->setAccessible(true);
+        $method->invoke($job, 250, 1000, 17);
+
+        $row = $this->row($searchId);
+        $this->assertSame(250, (int) $row['scannedCount']);
+        $this->assertSame(1000, (int) $row['totalCount']);
+        $this->assertSame(17, (int) $row['resultCount']);
     }
 
     public function testASearchCancelledWhileQueuedStaysCancelledAndScansNothing(): void

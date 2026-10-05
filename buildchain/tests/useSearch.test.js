@@ -499,3 +499,80 @@ describe('useSearch starting the queue', () => {
     expect(s.loading.value).toBe(true);
   });
 });
+
+describe('useSearch live progress and leaving mid-search', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    post.mockReset();
+    get.mockReset();
+    post.mockResolvedValue({ success: true, searchId: 'abc' });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('exposes the matches found so far while the search runs', async () => {
+    get
+      .mockResolvedValueOnce(
+        status({ scannedCount: 250, totalCount: 1000, resultCount: 12 })
+      )
+      .mockResolvedValue(
+        status({ scannedCount: 500, totalCount: 1000, resultCount: 31 })
+      );
+
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.matchCount.value).toBe(12);
+
+    await tickPoll();
+    expect(s.matchCount.value).toBe(31);
+  });
+
+  it('starts the next search from zero matches', async () => {
+    get.mockResolvedValueOnce(
+      status({ status: 'completed', totalResults: 4, resultCount: 4, groupedResults: {} })
+    );
+    const s = useSearch();
+    const first = s.search();
+    await tickPoll();
+    await first;
+
+    get.mockResolvedValue(status({ scannedCount: 1, totalCount: 10 }));
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.matchCount.value).toBe(0);
+  });
+
+  it('stops showing a search as loading when the user leaves the view, and the job is untouched', async () => {
+    get.mockResolvedValue(status({ scannedCount: 100, totalCount: 1000 }));
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.loading.value).toBe(true);
+
+    s.reset();
+
+    expect(s.loading.value).toBe(false);
+    expect(s.matchCount.value).toBe(0);
+    expect(post).not.toHaveBeenCalledWith('/search/cancel', expect.anything());
+  });
+
+  it('follows the same search again after leaving and coming back', async () => {
+    get.mockResolvedValue(
+      status({ scannedCount: 400, totalCount: 1000, resultCount: 9, params: { query: 'hotel' } })
+    );
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+    s.reset();
+
+    s.openSearch('abc');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(s.loading.value).toBe(true);
+    expect(s.progress.value).toBe(0.4);
+    expect(s.matchCount.value).toBe(9);
+  });
+});
