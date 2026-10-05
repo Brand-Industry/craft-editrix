@@ -9,12 +9,16 @@ export const POLL_INTERVAL_MS = 1500;
 // A running job reports progress every few hundred entries. This long
 // without a report means the worker most likely died.
 export const JOB_IDLE_SECONDS = 120;
+// A running search that has been silent this long is a leftover from a
+// dead worker; don't re-attach to it automatically when the page opens.
+export const RESUME_MAX_IDLE_SECONDS = 3600;
 
 export function useSearch(actionMode) {
   const { post, get } = useApi();
   const {
     searchStartUrl,
     searchStatusUrl,
+    searchRecentUrl,
     searchCancelUrl,
     replaceUrl,
     previewUrl,
@@ -41,6 +45,7 @@ export function useSearch(actionMode) {
     totalCount.value > 0 ? scannedCount.value / totalCount.value : 0
   );
   const currentSearchId = ref(null);
+  const recentSearches = ref([]);
   const queueStalled = ref(false);
   const jobStalled = ref(false);
 
@@ -125,7 +130,9 @@ export function useSearch(actionMode) {
       }
 
       currentSearchId.value = startData.searchId;
-      return await pollSearch(startData.searchId);
+      const finished = await pollSearch(startData.searchId);
+      loadRecentSearches();
+      return finished;
     } catch (err) {
       error.value = err.message;
       results.value = {};
@@ -135,8 +142,9 @@ export function useSearch(actionMode) {
     }
   };
 
-  const pollSearch = searchId => {
+  const pollSearch = (searchId, onParams = null) => {
     const startedAt = Date.now();
+    let paramsApplied = false;
 
     return new Promise((resolve, reject) => {
       const tick = async () => {
@@ -163,6 +171,13 @@ export function useSearch(actionMode) {
             currentSearchId.value = null;
             resolve(data);
             return;
+          }
+
+          // Opening a saved search puts its form back as it was.
+          if (onParams && !paramsApplied && data.params) {
+            paramsApplied = true;
+            Object.assign(searchParams, data.params);
+            onParams(data.params);
           }
 
           scannedCount.value = data.scannedCount || 0;
@@ -208,6 +223,56 @@ export function useSearch(actionMode) {
 
       tick();
     });
+  };
+
+  const loadRecentSearches = async () => {
+    try {
+      const data = await get(searchRecentUrl.value);
+      recentSearches.value = data.success ? data.searches || [] : [];
+    } catch (err) {
+      // The list is a convenience; the search itself doesn't depend on it.
+    }
+    return recentSearches.value;
+  };
+
+  // Follows a search that already exists on the server - running, queued
+  // or finished - instead of starting a new one. This is what makes a
+  // search survive leaving the page or a reload.
+  const openSearch = async (searchId, onParams = null) => {
+    loading.value = true;
+    error.value = null;
+    hasSearched.value = true;
+    selectedResults.value = [];
+    scannedCount.value = 0;
+    totalCount.value = 0;
+    truncated.value = false;
+    stopReason.value = null;
+    queueStalled.value = false;
+    jobStalled.value = false;
+    currentSearchId.value = searchId;
+
+    try {
+      return await pollSearch(searchId, onParams);
+    } catch (err) {
+      error.value = err.message;
+      loading.value = false;
+      throw err;
+    }
+  };
+
+  // On page load: pick up a search still in progress, if there is one.
+  const resumeActiveSearch = async (onParams = null) => {
+    const recent = await loadRecentSearches();
+    const active = recent.find(
+      s =>
+        (s.status === 'queued' || s.status === 'running') &&
+        (s.idleSeconds || 0) < RESUME_MAX_IDLE_SECONDS
+    );
+
+    if (!active) return false;
+
+    openSearch(active.searchId, onParams).catch(() => {});
+    return true;
   };
 
   // Best-effort - the running job checks this flag on its own cadence
@@ -362,6 +427,10 @@ export function useSearch(actionMode) {
     totalResults,
     truncated,
     stopReason,
+    recentSearches,
+    loadRecentSearches,
+    openSearch,
+    resumeActiveSearch,
     selectedResults,
     hasSearched,
     searchParams,

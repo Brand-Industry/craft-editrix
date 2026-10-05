@@ -34,7 +34,7 @@ class Editrix extends Plugin
 {
     public static Editrix $plugin;
 
-    public string $schemaVersion = "1.1.0";
+    public string $schemaVersion = "1.2.0";
     public bool $hasCpSettings = true;
     public bool $hasCpSection = true;
 
@@ -213,6 +213,7 @@ class Editrix extends Plugin
             "editrix/api/search" => "editrix/search/search",
             "editrix/api/search/start" => "editrix/search/search-start",
             "editrix/api/search/status" => "editrix/search/search-status",
+            "editrix/api/search/recent" => "editrix/search/search-recent",
             "editrix/api/search/cancel" => "editrix/search/search-cancel",
             "editrix/api/replace" => "editrix/replace/execute",
             "editrix/api/preview" => "editrix/replace/preview",

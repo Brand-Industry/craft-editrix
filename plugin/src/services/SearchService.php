@@ -9,6 +9,8 @@ use craft\elements\Entry;
 use craft\elements\GlobalSet;
 use craft\elements\Category;
 use craft\fields\Matrix;
+use craft\db\Query;
+use craft\db\Table;
 use craft\fields\Tags;
 use brandindustry\editrix\helpers\FieldValue;
 use brandindustry\editrix\helpers\HtmlText;
@@ -32,6 +34,13 @@ class SearchService extends Component
      * returns what it has, instead of being killed with nothing to show.
      */
     private const MEMORY_STOP_RATIO = 0.8;
+
+    /**
+     * How many entry ids one window covers when scanning. Small enough that
+     * MySQL answers from a short primary-key range, large enough that a
+     * 3M-row table needs only a few hundred of them.
+     */
+    private const ID_WINDOW = 10000;
 
     /** Why the last search ended before covering everything, if it did. */
     private ?string $stopReason = null;
@@ -316,64 +325,95 @@ class SearchService extends Component
     }
 
     /**
-     * Walks the query in batches of 100, newest id first, without ever
-     * holding more than one batch. Paging is by id ("before the last one
-     * seen") rather than by offset, so it stays cheap deep into a table of
-     * hundreds of thousands of rows. If populating a batch throws (a bad
-     * row, or another plugin's populate listener), the batch is retried one
-     * entry at a time so only the entries that actually fail are skipped.
+     * Walks the query newest id first without holding more than one batch.
+     *
+     * Craft's own entry query pays for the whole joined table on every
+     * LIMIT/OFFSET page (on a site with ~2M element rows that is seconds
+     * per 100 entries), so this works in windows of ids instead: the ids
+     * in one window are listed with a query MySQL can answer from a short
+     * primary-key range, then hydrated 100 at a time. If hydrating a batch
+     * throws (a bad row, or another plugin's populate listener), it is
+     * retried one entry at a time so only the entries that actually fail
+     * are skipped.
      */
     protected function eachEntry($entryQuery): \Generator
     {
-        $lastId = null;
+        $bounds = (new Query())
+            ->select(["min" => "MIN([[id]])", "max" => "MAX([[id]])"])
+            ->from(Table::ENTRIES)
+            ->one();
 
-        while (true) {
-            $page = (clone $entryQuery)
-                ->orderBy("elements.id DESC")
-                ->limit(100);
+        if (!$bounds || $bounds["max"] === null) {
+            return;
+        }
 
-            if ($lastId !== null) {
-                $page->andWhere(["<", "elements.id", $lastId]);
-            }
+        $min = (int) $bounds["min"];
+
+        for ($hi = (int) $bounds["max"] + 1; $hi > $min; $hi -= self::ID_WINDOW) {
+            $lo = max($min, $hi - self::ID_WINDOW);
 
             try {
-                $batch = $page->all();
-                $ids = array_map(fn($e) => $e->id, $batch);
+                $ids = (clone $entryQuery)
+                    ->id("and, >= {$lo}, < {$hi}")
+                    ->orderBy("elements.id DESC")
+                    ->ids();
             } catch (\Throwable $e) {
                 Craft::error(
-                    "Editrix: could not load a batch of entries, retrying one by one - " .
+                    "Editrix: could not list entries {$lo}-{$hi}, skipping that range - " .
                         $e->getMessage(),
                     __METHOD__
                 );
-                $ids = (clone $page)->ids();
-                $batch = [];
+                continue;
+            }
 
-                foreach ($ids as $id) {
-                    try {
-                        $one = (clone $entryQuery)->id($id)->one();
-                        if ($one) {
-                            $batch[] = $one;
-                        }
-                    } catch (\Throwable $inner) {
-                        Craft::error(
-                            "Editrix: skipped entry #{$id} - " . $inner->getMessage(),
-                            __METHOD__
-                        );
+            foreach (array_chunk($ids, 100) as $chunk) {
+                yield from $this->loadEntries($entryQuery, $chunk);
+            }
+        }
+    }
+
+    /**
+     * Hydrates these ids, in the order given. A failing batch is retried
+     * one entry at a time.
+     */
+    private function loadEntries($entryQuery, array $ids): array
+    {
+        try {
+            $byId = [];
+            foreach ((clone $entryQuery)->id($ids)->limit(null)->all() as $entry) {
+                $byId[$entry->id] = $entry;
+            }
+        } catch (\Throwable $e) {
+            Craft::error(
+                "Editrix: could not load a batch of entries, retrying one by one - " .
+                    $e->getMessage(),
+                __METHOD__
+            );
+            $byId = [];
+
+            foreach ($ids as $id) {
+                try {
+                    $one = (clone $entryQuery)->id($id)->one();
+                    if ($one) {
+                        $byId[$one->id] = $one;
                     }
+                } catch (\Throwable $inner) {
+                    Craft::error(
+                        "Editrix: skipped entry #{$id} - " . $inner->getMessage(),
+                        __METHOD__
+                    );
                 }
             }
-
-            if (empty($ids)) {
-                return;
-            }
-
-            foreach ($batch as $entry) {
-                yield $entry;
-            }
-
-            $lastId = min($ids);
-            unset($batch, $page);
         }
+
+        $ordered = [];
+        foreach ($ids as $id) {
+            if (isset($byId[$id])) {
+                $ordered[] = $byId[$id];
+            }
+        }
+
+        return $ordered;
     }
 
     /**

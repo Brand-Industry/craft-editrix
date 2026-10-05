@@ -10,10 +10,17 @@ All notable changes to Editrix will be documented in this file.
 - A warning appears when a running search stops reporting progress for two minutes, which usually means the server killed the worker; the search can be cancelled from the same screen
 - Searches stop at 5,000 matches and show a notice asking the user to narrow the search, so a broad query can't exhaust memory on a large site
 
+- A search keeps running when the user leaves the page: reopening Editrix picks up the search in progress, and a "Recent searches" list reopens any of the last ten (kept for a day) with its results and form as they were
+- A search that reaches the server's memory limit now stops with the matches found so far and says why, instead of being killed
+
 ### Changed
+- Rich text fields are now searched, replaced and reverted using their stored HTML, and entries embedded in a CKEditor field are searched as their own results
 - Switching between General and Segmented Search now clears the previous results
 
 ### Fixed
+- Replacing in a CKEditor field that contains nested entries flattened those entries into static HTML; they are now kept intact, and Revert restores them
+- A fresh install did not create the table that background searches need, so every search failed on a new site
+- Replacing inside a Matrix block failed on Craft 5
 - "Replace Selected" appeared in Search mode, where nothing can be replaced
 - A single entry that fails to load (for example, a template error from another plugin) no longer aborts the whole search; it is logged and skipped
 

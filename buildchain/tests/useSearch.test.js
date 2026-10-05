@@ -12,6 +12,7 @@ vi.mock('../src/js/composables/useConfig', () => ({
   useConfig: () => ({
     searchStartUrl: ref('/search/start'),
     searchStatusUrl: ref('/search/status'),
+    searchRecentUrl: ref('/search/recent'),
     searchCancelUrl: ref('/search/cancel'),
     replaceUrl: ref('/replace'),
     previewUrl: ref('/preview'),
@@ -19,7 +20,7 @@ vi.mock('../src/js/composables/useConfig', () => ({
   }),
 }));
 
-const { useSearch, QUEUE_STALL_MS, POLL_INTERVAL_MS, JOB_IDLE_SECONDS } = await import(
+const { useSearch, QUEUE_STALL_MS, POLL_INTERVAL_MS, JOB_IDLE_SECONDS, RESUME_MAX_IDLE_SECONDS } = await import(
   '../src/js/composables/useSearch'
 );
 
@@ -308,5 +309,107 @@ describe('useSearch stalled job warning', () => {
     get.mockResolvedValue(status({ status: 'running', totalCount: 100, idleSeconds: 1 }));
     await tickPoll();
     expect(s.jobStalled.value).toBe(false);
+  });
+});
+
+describe('useSearch leaving and coming back', () => {
+  const recent = (...searches) => ({ success: true, searches });
+  const saved = (overrides = {}) => ({
+    searchId: 'old',
+    status: 'running',
+    query: 'hotel',
+    idleSeconds: 3,
+    ...overrides,
+  });
+
+  // The recent list and the status poll share one mocked GET.
+  const serve = ({ list, poll }) =>
+    get.mockImplementation(async url => (url === '/search/recent' ? list : poll));
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    post.mockReset();
+    get.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('re-attaches to a search that is still running when the page opens', async () => {
+    serve({
+      list: recent(saved()),
+      poll: status({ status: 'running', scannedCount: 500, totalCount: 1000 }),
+    });
+
+    const s = useSearch();
+    const resumed = await s.resumeActiveSearch();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(resumed).toBe(true);
+    expect(s.loading.value).toBe(true);
+    expect(s.hasSearched.value).toBe(true);
+    expect(s.progress.value).toBe(0.5);
+    expect(get).toHaveBeenCalledWith('/search/status', { id: 'old' });
+  });
+
+  it('does nothing when no search is in progress', async () => {
+    serve({ list: recent(saved({ status: 'completed' })), poll: status() });
+
+    const s = useSearch();
+    const resumed = await s.resumeActiveSearch();
+
+    expect(resumed).toBe(false);
+    expect(s.loading.value).toBe(false);
+    expect(s.recentSearches.value).toHaveLength(1);
+  });
+
+  it('does not re-attach to a search whose worker went quiet long ago', async () => {
+    serve({
+      list: recent(saved({ idleSeconds: RESUME_MAX_IDLE_SECONDS })),
+      poll: status(),
+    });
+
+    const s = useSearch();
+    expect(await s.resumeActiveSearch()).toBe(false);
+  });
+
+  it('opens a finished search and puts its form back', async () => {
+    serve({
+      list: recent(),
+      poll: status({
+        status: 'completed',
+        totalResults: 7,
+        groupedResults: { default: { results: [{ uniqueKey: 'a' }] } },
+        params: { query: 'hotel', sections: ['articles'], useRegex: true },
+      }),
+    });
+
+    const onParams = vi.fn();
+    const s = useSearch();
+    await s.openSearch('old', onParams);
+
+    expect(s.searchParams.query).toBe('hotel');
+    expect(s.searchParams.sections).toEqual(['articles']);
+    expect(s.searchParams.useRegex).toBe(true);
+    expect(onParams).toHaveBeenCalledTimes(1);
+    expect(s.totalResults.value).toBe(7);
+    expect(s.loading.value).toBe(false);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('can cancel a search it re-attached to', async () => {
+    serve({
+      list: recent(saved()),
+      poll: status({ status: 'running', totalCount: 10 }),
+    });
+    post.mockResolvedValue({ success: true });
+
+    const s = useSearch();
+    await s.resumeActiveSearch();
+    await vi.advanceTimersByTimeAsync(0);
+    await s.cancelSearch();
+
+    expect(post).toHaveBeenCalledWith('/search/cancel', { id: 'old' });
   });
 });

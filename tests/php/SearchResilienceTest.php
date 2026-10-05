@@ -74,6 +74,44 @@ class SearchResilienceTest extends EditrixTestCase
         $this->assertSame('results', $meta['stopReason']);
     }
 
+    public function testTheWindowedScanVisitsExactlyTheEntriesCraftReturns(): void
+    {
+        $section = $this->smallestSection(150);
+        if (!$section) {
+            $this->markTestSkipped('No section has more than one batch of entries.');
+        }
+
+        $service = new class extends SearchService {
+            public function ids(EntryQuery $query): array
+            {
+                $ids = [];
+                foreach ($this->eachEntry($query) as $entry) {
+                    $ids[] = $entry->id;
+                }
+                return $ids;
+            }
+        };
+
+        $make = fn() => Entry::find()
+            ->siteId($this->siteId())
+            ->section($section[0])
+            ->status(null)
+            ->drafts(false)
+            ->revisions(false);
+
+        $visited = $service->ids($make());
+        $expected = $make()->ids();
+
+        sort($expected);
+        $sorted = $visited;
+        sort($sorted);
+
+        $this->assertSame($expected, $sorted);
+        $descending = $visited;
+        rsort($descending);
+        $this->assertSame($descending, $visited, 'Entries should come newest id first.');
+    }
+
     public function testABatchThatFailsToLoadIsRetriedEntryByEntry(): void
     {
         $section = $this->smallestSection(150);
@@ -99,7 +137,7 @@ class SearchResilienceTest extends EditrixTestCase
         $query = new class(Entry::class) extends EntryQuery {
             public function all($db = null): array
             {
-                if (empty($this->id)) {
+                if (is_array($this->id) && count($this->id) > 1) {
                     throw new \RuntimeException('simulated bad batch');
                 }
                 return parent::all($db);

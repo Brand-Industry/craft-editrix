@@ -197,6 +197,32 @@
             @search="handleSearch"
           />
 
+          <details v-if="recentSearches.length > 0 && !loading" class="editrix-recent-searches">
+            <summary>{{ t('Recent searches') }} ({{ recentSearches.length }})</summary>
+            <ul>
+              <li v-for="s in recentSearches" :key="s.searchId">
+                <span class="editrix-recent-searches__query">{{ s.query }}</span>
+                <span class="editrix-recent-searches__meta">
+                  <template v-if="s.status === 'completed' || s.status === 'cancelled'">
+                    {{ t('{count} results', { count: (s.resultCount ?? 0).toLocaleString() }) }}
+                    <template v-if="s.status === 'cancelled'"> · {{ t('cancelled') }}</template>
+                  </template>
+                  <template v-else-if="s.status === 'error'">{{ t('failed') }}</template>
+                  <template v-else>{{ t('in progress') }}</template>
+                  · {{ new Date(s.dateCreated).toLocaleString() }}
+                </span>
+                <button
+                  v-if="s.status !== 'error'"
+                  type="button"
+                  class="editrix-btn editrix-btn--secondary editrix-btn--sm"
+                  @click="openRecentSearch(s.searchId)"
+                >
+                  {{ t('Open') }}
+                </button>
+              </li>
+            </ul>
+          </details>
+
           <div v-if="loading" class="editrix-search-progress">
             <div class="editrix-search-progress__bar">
               <div
@@ -469,6 +495,24 @@ const rerunLog = (log) => {
     searchParams.sections.length > 0 ? 'segmented' : 'general';
 
   handleSearch();
+  return true;
+};
+
+// Puts the screen back the way a saved search had it: text search, search
+// mode (never replace), and the scope it was run with.
+const applySavedParams = (params) => {
+  searchType.value = 'text';
+  actionMode.value = 'search';
+  searchMode.value =
+    (params.sections || []).length > 0 ? 'segmented' : 'general';
+};
+
+const openRecentSearch = async (searchId) => {
+  try {
+    await openSearch(searchId, applySavedParams);
+  } catch (err) {
+    window.Craft?.cp?.displayError?.(err.message || 'Search failed');
+  }
 };
 
 const searchMode = ref('general');
@@ -482,6 +526,10 @@ const {
   totalResults,
   truncated,
   stopReason,
+  recentSearches,
+  loadRecentSearches,
+  openSearch,
+  resumeActiveSearch,
   selectedResults,
   hasSearched,
   searchParams,
@@ -575,7 +623,11 @@ const totalEntries = computed(() => {
 onMounted(() => {
   searchParams.siteId = currentSiteId.value;
   assignmentParams.siteId = currentSiteId.value;
-  restoreFromHistory();
+  if (!restoreFromHistory()) {
+    resumeActiveSearch(applySavedParams).then(resumed => {
+      if (!resumed) loadRecentSearches();
+    });
+  }
   fetchRecentActivity();
   fetchDailyCounts();
 });
@@ -586,7 +638,7 @@ onMounted(() => {
 const restoreFromHistory = () => {
   const params = new URLSearchParams(window.location.search);
   const q = params.get('q');
-  if (!q) return;
+  if (!q) return false;
 
   searchParams.query = q;
   searchParams.useRegex = params.get('regex') === '1';
