@@ -22,6 +22,7 @@ All notable changes to Editrix will be documented in this file.
 ### Changed
 - Results show one row per field instead of one per match: a word that appears four times in an article body is one row marked "4 matches", with a list of each occurrence, and selecting the row replaces every occurrence in that field, as Replace always did. The 5,000 limit now counts rows, so a field with many matches no longer uses it up, and the field's text is stored once per row
 - Results no longer carry the full text of every matched field, only a short context and a fingerprint; the text is read again when a row is opened, previewed or replaced. A 1,500-row search went from about 14 MB to 1.5 MB, so a 5,000-row search is about 5 MB. Replace uses the field's current text and refuses it if the fingerprint shows it changed since the search
+- A search no longer keeps the full text of every matched field in memory, only its fingerprint: on Frommers, a 3,000-row search peaks at about 41 MB instead of 96 MB, and each extra row costs about 3 KB
 - The match preview wraps instead of being cut at the edge of the cell, which used to hide the highlighted word
 - The success message after a replace counts occurrences, not fields
 - Rich text fields are now searched, replaced and reverted using their stored HTML, and entries embedded in a CKEditor field are searched as their own results

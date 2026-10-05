@@ -316,7 +316,7 @@ class SearchService extends Component
             if ($result->readOnlyReason === "tag") {
                 $row["fieldValue"] = $result->fieldValue;
             } else {
-                $row["valueHash"] = ReplaceService::hashValue($result->fieldValue);
+                $row["valueHash"] = $result->valueHash;
             }
 
             $grouped[$siteHandle]["results"][] = $row;
@@ -615,7 +615,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $site->handle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = (string) $entry->title;
+                    $result->valueHash = ReplaceService::hashValue((string) $entry->title);
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $results[] = $result;
@@ -661,7 +661,7 @@ class SearchService extends Component
                         $result->siteId = $siteId;
                         $result->siteHandle = $site->handle;
                         $result->matchContext = $match["context"];
-                        $result->fieldValue = FieldValue::toString($value);
+                        $result->valueHash = ReplaceService::hashValue(FieldValue::toString($value));
                         $result->matchStart = $match["start"];
                         $result->matchEnd = $match["end"];
                         $result->isRichText = $isRich;
@@ -881,7 +881,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $siteHandle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = FieldValue::toString($value);
+                    $result->valueHash = ReplaceService::hashValue(FieldValue::toString($value));
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->parentId = $entry->id;
@@ -1011,7 +1011,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $siteHandle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = FieldValue::toString($value);
+                    $result->valueHash = ReplaceService::hashValue(FieldValue::toString($value));
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->parentId = $entry->id;
@@ -1089,7 +1089,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $site->handle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = FieldValue::toString($value);
+                    $result->valueHash = ReplaceService::hashValue(FieldValue::toString($value));
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->isRichText = $isRich;
@@ -1139,7 +1139,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $site->handle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = (string) $category->title;
+                    $result->valueHash = ReplaceService::hashValue((string) $category->title);
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->isRichText = false;
@@ -1195,7 +1195,7 @@ class SearchService extends Component
                     $result->siteId = $siteId;
                     $result->siteHandle = $site->handle;
                     $result->matchContext = $match["context"];
-                    $result->fieldValue = FieldValue::toString($value);
+                    $result->valueHash = ReplaceService::hashValue(FieldValue::toString($value));
                     $result->matchStart = $match["start"];
                     $result->matchEnd = $match["end"];
                     $result->isRichText = $isRich;

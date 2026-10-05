@@ -7,6 +7,7 @@ use craft\elements\Entry;
 use craft\helpers\Json;
 use brandindustry\editrix\Editrix;
 use brandindustry\editrix\helpers\FieldValue;
+use brandindustry\editrix\services\ReplaceService;
 use brandindustry\editrix\services\SearchService;
 
 /**
@@ -174,11 +175,8 @@ class RichTextNestedEntriesTest extends EditrixTestCase
         ));
 
         $this->assertNotEmpty($own, "\"{$word}\" should be found in {$handle}.");
-        $this->assertSame($raw, $own[0]['fieldValue']);
-        $this->assertSame(
-            substr_count($raw, '<craft-entry'),
-            substr_count($own[0]['fieldValue'], '<craft-entry')
-        );
+        $this->assertSame('', $own[0]['fieldValue'], 'The text is not kept on the result.');
+        $this->assertSame(ReplaceService::hashValue($raw), $own[0]['valueHash']);
     }
 
     public function testReplaceKeepsTheNestedEntryMarkers(): void
