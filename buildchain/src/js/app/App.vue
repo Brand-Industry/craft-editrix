@@ -232,46 +232,21 @@
             </ul>
           </details>
 
-          <div v-if="loading" class="editrix-search-progress" role="status" aria-live="polite">
-            <div class="editrix-search-progress__head">
-              <span class="editrix-search-progress__spinner" aria-hidden="true"></span>
-              <span class="editrix-search-progress__title">
-                {{ t('Searching for "{query}"', { query: searchParams.query }) }}
-              </span>
-            </div>
-            <div class="editrix-search-progress__bar">
-              <div
-                class="editrix-search-progress__fill"
-                :class="{ 'is-active': !queueStalled && !jobStalled }"
-                :style="{ width: totalCount > 0 ? `${Math.max(1, Math.round(progress * 100))}%` : '4%' }"
-              ></div>
-            </div>
-            <p class="editrix-search-progress__label">
-              {{ totalCount > 0
-                ? t('Scanning {scanned} of {total} entries ({pct}%)…', {
-                    scanned: scannedCount.toLocaleString(),
-                    total: totalCount.toLocaleString(),
-                    pct: Math.round(progress * 100),
-                  })
-                : t('Starting search…') }}
-            </p>
-            <p v-if="matchCount > 0" class="editrix-search-progress__matches">
-              {{ t('{count} matches so far', { count: matchCount.toLocaleString() }) }}
-            </p>
-            <p v-if="jobStalled" class="editrix-form__warning">
-              ⚠️ {{ t("This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.") }}
-            </p>
-            <p v-if="queueStalled" class="editrix-form__warning">
-              ⚠️ {{ t("This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.") }}
-            </p>
-            <button
-              type="button"
-              class="editrix-btn editrix-btn--secondary editrix-btn--sm"
-              @click="cancelSearch"
-            >
-              {{ t('Cancel search') }}
-            </button>
-          </div>
+          <SearchProgress
+            v-if="loading"
+            :query="searchParams.query"
+            :has-id="currentSearchId !== null"
+            :job-status="jobStatus"
+            :scanned="scannedCount"
+            :total="totalCount"
+            :progress="progress"
+            :matches="matchCount"
+            :started-at-ms="startedAtMs"
+            :scan-sample="scanSample"
+            :queue-stalled="queueStalled"
+            :job-stalled="jobStalled"
+            @cancel="cancelSearch"
+          />
 
           <div v-else-if="error" class="editrix-form__warning" style="margin-top: 16px;">
             ⚠️ {{ error }}
@@ -378,6 +353,7 @@ import AssignmentSearchForm from '../components/assignments/AssignmentSearchForm
 import AssignmentResultsList from '../components/assignments/AssignmentResultsList.vue';
 import RecentActivity from '../components/search/RecentActivity.vue';
 import ActivityChart from '../components/logs/ActivityChart.vue';
+import SearchProgress from '../components/search/SearchProgress.vue';
 
 const {
   t,
@@ -579,6 +555,10 @@ const {
   scannedCount,
   totalCount,
   matchCount,
+  jobStatus,
+  startedAtMs,
+  scanSample,
+  currentSearchId,
   progress,
   queueStalled,
   jobStalled,

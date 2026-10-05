@@ -696,3 +696,70 @@ describe('useSearch after a replace', () => {
     expect(s.rowState(row(1))).toBe(null);
   });
 });
+
+describe('useSearch waiting-screen data', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    post.mockReset();
+    get.mockReset();
+    post.mockResolvedValue({ success: true, searchId: 'abc' });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reports the job state so the screen can tell queued from counting', async () => {
+    get.mockResolvedValueOnce(status({ status: 'queued' })).mockResolvedValue(status({ status: 'running' }));
+
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.jobStatus.value).toBe('queued');
+
+    await tickPoll();
+    expect(s.jobStatus.value).toBe('running');
+  });
+
+  it('takes the start time from the server so a reopened search shows real elapsed time', async () => {
+    vi.setSystemTime(1_000_000);
+    get.mockResolvedValue(status({ status: 'running', totalCount: 100, elapsedSeconds: 300 }));
+
+    const s = useSearch();
+    s.openSearch('old');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(s.startedAtMs.value).toBe(1_000_000 - 300_000);
+  });
+
+  it('records the first scan reading once, for the time estimate', async () => {
+    vi.setSystemTime(5_000);
+    get
+      .mockResolvedValueOnce(status({ status: 'running', scannedCount: 0, totalCount: 1000 }))
+      .mockResolvedValueOnce(status({ status: 'running', scannedCount: 250, totalCount: 1000 }))
+      .mockResolvedValue(status({ status: 'running', scannedCount: 500, totalCount: 1000 }));
+
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.scanSample.value).toBe(null);
+
+    await tickPoll();
+    expect(s.scanSample.value.scanned).toBe(250);
+
+    await tickPoll();
+    expect(s.scanSample.value.scanned).toBe(250);
+  });
+
+  it('forgets the previous search\'s timing when a new one starts', async () => {
+    get.mockResolvedValue(status({ status: 'running', scannedCount: 250, totalCount: 1000 }));
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.scanSample.value).not.toBe(null);
+
+    s.reset();
+    expect(s.scanSample.value).toBe(null);
+    expect(s.startedAtMs.value).toBe(null);
+  });
+});

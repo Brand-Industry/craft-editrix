@@ -1637,24 +1637,8 @@
 }
 
 .editrix-search-progress {
-  &__head {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin-bottom: $spacing-md;
-  }
-
-  &__spinner {
-    width: 18px;
-    height: 18px;
-    border: 2px solid $gray-200;
-    border-top-color: $secondary;
-    border-radius: 50%;
-    animation: editrix-spin 0.8s linear infinite;
-  }
-
   &__title {
+    margin: 0 auto $spacing-md;
     font-weight: 600;
     max-width: 70%;
     overflow: hidden;
@@ -1726,7 +1710,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .editrix-search-progress__spinner,
   .editrix-search-progress__fill.is-active,
   .editrix-live-tag__dot {
     animation: none;
@@ -1756,5 +1739,175 @@
 
   &__done a {
     margin-left: 8px;
+  }
+}
+
+// Illustration shown while a search runs. One SVG; the phase class decides
+// which parts move.
+.editrix-search-art {
+  display: block;
+  margin: 0 auto $spacing-md;
+  overflow: visible;
+
+  &__row {
+    fill: $gray-200;
+
+    &.is-hit {
+      animation: editrix-hit 2.4s ease-in-out infinite;
+    }
+  }
+
+  &__lens {
+    fill: none;
+    stroke: $secondary;
+    stroke-width: 4;
+    stroke-linecap: round;
+    transform-box: fill-box;
+    transform-origin: center;
+    opacity: 0;
+  }
+
+  &__dots {
+    fill: $secondary;
+    opacity: 0;
+
+    circle {
+      animation: editrix-dot 1.2s ease-in-out infinite;
+
+      &:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      &:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+    }
+  }
+
+  &__check {
+    fill: none;
+    stroke: $success;
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 80;
+    stroke-dashoffset: 80;
+    opacity: 0;
+  }
+
+  &.is-sending &__dots,
+  &.is-queued &__dots {
+    opacity: 1;
+  }
+
+  &.is-sending &__row,
+  &.is-queued &__row {
+    opacity: 0.35;
+  }
+
+  &.is-counting &__lens,
+  &.is-scanning &__lens {
+    opacity: 1;
+  }
+
+  &.is-counting &__lens {
+    animation: editrix-lens-pulse 1.3s ease-in-out infinite;
+  }
+
+  &.is-scanning &__lens {
+    animation: editrix-lens-sweep 3.2s ease-in-out infinite;
+  }
+
+  &.is-finishing &__row {
+    animation: editrix-settle 0.9s ease-out forwards;
+  }
+
+  &.is-finishing &__check {
+    opacity: 1;
+    animation: editrix-draw 0.8s ease-out 0.2s forwards;
+  }
+}
+
+.editrix-search-progress {
+  &__time {
+    margin: 0 0 $spacing-sm;
+    font-size: 12px;
+    color: $text-muted;
+  }
+
+  &__tip {
+    min-height: 2.6em;
+    margin: $spacing-md auto;
+    max-width: 440px;
+    font-size: 13px;
+    color: $text-muted;
+    animation: editrix-fade-in 0.6s ease-out;
+  }
+}
+
+@keyframes editrix-lens-sweep {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(46px);
+  }
+}
+
+@keyframes editrix-lens-pulse {
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+@keyframes editrix-dot {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+@keyframes editrix-hit {
+  0%, 100% {
+    fill: $gray-200;
+  }
+  50% {
+    fill: $secondary;
+  }
+}
+
+@keyframes editrix-settle {
+  to {
+    opacity: 0.25;
+  }
+}
+
+@keyframes editrix-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes editrix-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editrix-search-art__lens,
+  .editrix-search-art__row.is-hit,
+  .editrix-search-art__dots circle,
+  .editrix-search-art__check,
+  .editrix-search-progress__tip {
+    animation: none !important;
+  }
+
+  .editrix-search-art__check {
+    stroke-dashoffset: 0;
   }
 }

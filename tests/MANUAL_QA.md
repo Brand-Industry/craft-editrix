@@ -67,7 +67,11 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 
 ## 4. Búsqueda en segundo plano
 
-- [ ] Al buscar aparece la barra de progreso con "Scanning X of Y entries (Z%)…" y el porcentaje sube.
+- [ ] Al buscar, la pantalla pasa por fases con su texto y su animación: "Sending your search…" y "Waiting for the server to pick up your search…" (tres puntos que laten), "Counting the entries to search…" (lupa que pulsa), "Scanning X of Y entries (Z%)…" (lupa que recorre las filas; las filas se iluminan cuando hay coincidencias) y "Preparing your results…" (palomita verde). Ninguna fase se queda sin texto.
+- [ ] Debajo aparecen "Elapsed m:ss", que avanza cada segundo, y, tras unos 15 segundos de escaneo, "Up to about N min left". Recargando la página, el tiempo transcurrido sigue contando desde que empezó la búsqueda, no desde cero.
+- [ ] Un consejo cambia cada ~8 segundos y el primero dice que se puede salir de la página. Sin Pro no aparece el consejo de Segmented Search.
+- [ ] Con "reducir movimiento" activado en el sistema, las animaciones se detienen y el texto sigue ahí.
+- [ ] La barra de progreso sube y el porcentaje coincide con X de Y.
 - [ ] El botón **Cancel search** detiene la búsqueda en pocos segundos y muestra lo encontrado hasta ese momento.
 - [ ] Cancelar y lanzar otra búsqueda enseguida muestra solo los resultados de la nueva.
 - [ ] **Recargar a mitad de búsqueda**: lanza una búsqueda grande y recarga la página. Te deja en la vista de búsqueda de texto, siguiendo la misma búsqueda: spinner, barra con movimiento, "Scanning X of Y entries", "N matches so far" y el botón **Cancel search**. El formulario se ve con los valores usados y deshabilitado.
