@@ -78,7 +78,9 @@ class SearchJob extends BaseJob
                     "groupedResults" => $grouped,
                     "truncated" => $meta["truncated"] ?? false,
                     "stopReason" => $meta["stopReason"] ?? null,
-                ])
+                ]),
+                null,
+                count($results)
             );
         } catch (\Throwable $e) {
             Craft::error(
@@ -159,7 +161,8 @@ class SearchJob extends BaseJob
     private function finalizeRow(
         string $status,
         ?string $resultsJson,
-        ?string $errorMessage = null
+        ?string $errorMessage = null,
+        ?int $resultCount = null
     ): void {
         Craft::$app
             ->getDb()
@@ -169,6 +172,7 @@ class SearchJob extends BaseJob
                 [
                     "status" => $status,
                     "resultsJson" => $resultsJson,
+                    "resultCount" => $resultCount,
                     "errorMessage" => $errorMessage,
                     "dateUpdated" => Db::prepareDateForDb(new \DateTime()),
                 ],

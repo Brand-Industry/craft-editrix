@@ -145,6 +145,7 @@ class SearchController extends Controller
                 "searchId" => $searchId,
                 "userId" => Craft::$app->getUser()->getId(),
                 "status" => "queued",
+                "paramsJson" => Json::encode($this->formParams()),
                 "dateCreated" => $now,
                 "dateUpdated" => $now,
                 "uid" => StringHelper::UUID(),
@@ -202,6 +203,7 @@ class SearchController extends Controller
                 "totalCount",
                 "resultsJson",
                 "errorMessage",
+                "paramsJson",
                 "dateUpdated",
             ])
             ->from(SearchSessions::TABLE_SEARCHES)
@@ -220,6 +222,9 @@ class SearchController extends Controller
             "status" => $row["status"],
             "scannedCount" => (int) $row["scannedCount"],
             "totalCount" => (int) $row["totalCount"],
+            "params" => $row["paramsJson"]
+                ? Json::decode($row["paramsJson"])
+                : null,
             // A running job writes progress every few hundred entries. If
             // that goes quiet, the worker was probably killed (out of
             // memory, restarted) and the row will never be finalized.
@@ -244,6 +249,64 @@ class SearchController extends Controller
         }
 
         return $this->asJson($response);
+    }
+
+    /**
+     * The current user's latest searches, newest first, without their
+     * results (those are loaded through actionSearchStatus() on demand).
+     * This is what lets someone leave the plugin, or reload, and find a
+     * running search again or open a finished one instead of re-running it.
+     */
+    public function actionSearchRecent(): Response
+    {
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
+
+        $rows = (new Query())
+            ->select([
+                "searchId",
+                "status",
+                "scannedCount",
+                "totalCount",
+                "resultCount",
+                "paramsJson",
+                "dateCreated",
+                "dateUpdated",
+            ])
+            ->from(SearchSessions::TABLE_SEARCHES)
+            ->where(["userId" => Craft::$app->getUser()->getId()])
+            ->orderBy(["id" => SORT_DESC])
+            ->limit(10)
+            ->all();
+
+        $searches = array_map(function (array $row) {
+            $params = $row["paramsJson"] ? Json::decode($row["paramsJson"]) : [];
+
+            return [
+                "searchId" => $row["searchId"],
+                "status" => $row["status"],
+                "query" => $params["query"] ?? "",
+                "scannedCount" => (int) $row["scannedCount"],
+                "totalCount" => (int) $row["totalCount"],
+                "resultCount" => $row["resultCount"] === null
+                    ? null
+                    : (int) $row["resultCount"],
+                "dateCreated" => DateTimeHelper::toDateTime($row["dateCreated"])
+                    ->format(\DateTime::ATOM),
+                "idleSeconds" => max(
+                    0,
+                    time() - DateTimeHelper::toDateTime($row["dateUpdated"])->getTimestamp()
+                ),
+            ];
+        }, $rows);
+
+        return $this->asJson(["success" => true, "searches" => $searches]);
     }
 
     public function actionSearchCancel(): Response
@@ -435,6 +498,33 @@ class SearchController extends Controller
         ];
     }
 
+    /**
+     * The search form as the user filled it, in the frontend's own shape,
+     * so a saved search can put the form back exactly as it was.
+     */
+    private function formParams(): array
+    {
+        $body = Craft::$app->getRequest()->getBodyParams();
+
+        return array_intersect_key($body, array_flip([
+            "query",
+            "siteId",
+            "allSites",
+            "siteIds",
+            "useRegex",
+            "caseInsensitive",
+            "wholeWords",
+            "dryRun",
+            "searchEntries",
+            "searchGlobals",
+            "searchMatrix",
+            "searchCategories",
+            "sections",
+            "fields",
+            "entryTypes",
+        ]));
+    }
+
     private function searchOptions(array $p): array
     {
         return [
@@ -503,6 +593,9 @@ class SearchController extends Controller
             ),
             "searchStatusUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/search-status"
+            ),
+            "searchRecentUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/search/search-recent"
             ),
             "searchCancelUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/search-cancel"
@@ -656,6 +749,12 @@ class SearchController extends Controller
             "Scanning {scanned} of {total} entries ({pct}%)…",
             "Starting search…",
             "Cancel search",
+            "Recent searches",
+            "{count} results",
+            "cancelled",
+            "failed",
+            "in progress",
+            "Open",
             "This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.",
             "This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.",
             "Showing the first {count} matches. Narrow your search for more precise results.",

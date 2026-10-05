@@ -70,7 +70,10 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] Al buscar aparece la barra de progreso con "Scanning X of Y entries (Z%)…" y el porcentaje sube.
 - [ ] El botón **Cancel search** detiene la búsqueda en pocos segundos y muestra lo encontrado hasta ese momento.
 - [ ] Cancelar y lanzar otra búsqueda enseguida muestra solo los resultados de la nueva.
-- [ ] Recargar la página a mitad de una búsqueda no deja nada colgado (se puede buscar de nuevo).
+- [ ] **Salir y volver**: lanza una búsqueda grande, recarga la página (o abre otra sección del panel y regresa). La pantalla retoma la búsqueda en curso con su barra de progreso y su botón **Cancel search**, sin lanzar una nueva.
+- [ ] Al terminar una búsqueda, sal del plugin y vuelve: en **Recent searches** aparece con su número de resultados. **Open** muestra los mismos resultados sin buscar de nuevo y restaura el formulario (texto, secciones, opciones).
+- [ ] Una búsqueda terminada abierta desde **Recent searches** se puede usar en Search & Replace (la selección y el preview funcionan).
+- [ ] Un segundo usuario no ve las búsquedas del primero.
 - [ ] Con una búsqueda muy amplia en un sitio grande (ej. una vocal en un sitio de miles de entradas) el resultado se corta en **5,000** y aparece el aviso amarillo "Showing the first 5,000 matches…". Con una búsqueda estrecha, ese aviso no aparece.
 - [ ] **Cola apagada**: pon `runQueueAutomatically => false` en `config/general.php`, sin worker, y busca. A los ~15 segundos aparece el aviso de que la cola de Craft quizá no está corriendo. Cancelar funciona.
 - [ ] Con la cola apagada, arranca el worker (`php craft queue/run`): la búsqueda empieza sola y el aviso desaparece.
@@ -95,6 +98,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] "Apply to this element" y "Skip" por elemento funcionan.
 - [ ] **Dry Run Mode**: no cambia nada en las entradas ni crea cambios reales.
 - [ ] Reemplazo real: aparece "Successfully replaced N occurrence(s)." y la entrada, abierta en otra pestaña, tiene el texto nuevo.
+- [ ] **CKEditor con entradas anidadas** (en un sitio de pruebas grande: la entrada an entry, campo `articleBody`): reemplaza una palabra del texto, abre la entrada en el editor y comprueba que los bloques anidados siguen ahí. Revierte desde Logs & History y vuelve igual.
 - [ ] El reemplazo funciona en título, campo de texto, texto largo, CKEditor/Redactor, global, bloque Matrix y categoría.
 - [ ] Reemplazar por texto con `$1`, `$100`, `\` o `${1}` lo guarda **tal cual**, sin corromper el contenido.
 - [ ] Case insensitive y Whole words reemplazan solo lo que se ve en la vista previa.

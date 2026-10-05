@@ -31,6 +31,7 @@ class SearchJobTest extends EditrixTestCase
         $payload = json_decode($row['resultsJson'], true);
         $this->assertSame(0, $payload['totalResults']);
         $this->assertFalse($payload['truncated']);
+        $this->assertSame(0, (int) $row['resultCount'], 'The recent-searches list reads this instead of the results.');
     }
 
     public function testTheRowReadsRunningOnceTheJobHasStarted(): void
@@ -82,6 +83,7 @@ class SearchJobTest extends EditrixTestCase
 
         $this->assertSame('completed', $row['status']);
         $this->assertSame(3, $payload['totalResults']);
+        $this->assertSame(3, (int) $row['resultCount']);
         $this->assertTrue($payload['truncated']);
     }
 
