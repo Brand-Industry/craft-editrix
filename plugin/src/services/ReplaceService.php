@@ -32,21 +32,22 @@ class ReplaceService extends Component
             $key = self::keyFor($result);
 
             if (!isset($processedElements[$key])) {
-                $processedElements[$key] = [
-                    "result" => $result,
-                    "oldValue" => $result["fieldValue"],
-                ];
+                $processedElements[$key] = ["result" => $result];
             }
         }
 
         foreach ($processedElements as $data) {
             $result = $data["result"];
-            $oldValue = $data["oldValue"];
 
-            // The search results are a snapshot. If the field was edited
-            // since (by someone else, or by an earlier replace), writing a
-            // value computed from the snapshot would undo that edit.
-            $reason = $this->staleReason($result, $oldValue);
+            // Rows don't carry the field's text, only a fingerprint of it
+            // from when the search ran. The text is read now, and used only
+            // if it still matches that fingerprint: if the field was edited
+            // since (by someone else, or by an earlier replace), the user
+            // never saw this content and rewriting it would be a guess.
+            $oldValue = $this->currentValueFor($result);
+            $reason = $oldValue === null
+                ? "missing"
+                : ($this->matchesSearchSnapshot($result, $oldValue) ? null : "changed");
             if ($reason !== null) {
                 $skipped[] = [
                     "key" => self::keyFor($result),
@@ -120,10 +121,12 @@ class ReplaceService extends Component
         $total = 0;
         foreach ($replacedKeys as $key) {
             $row = $byKey[$key] ?? [];
-            $skipped = count(array_filter(
-                $row["matches"] ?? [],
-                fn($m) => !empty($m["readOnly"])
-            ));
+            $skipped = isset($row["readOnlyMatchCount"])
+                ? (int) $row["readOnlyMatchCount"]
+                : count(array_filter(
+                    $row["matches"] ?? [],
+                    fn($m) => !empty($m["readOnly"])
+                ));
             $total += max(1, (int) ($row["matchCount"] ?? 1) - $skipped);
         }
 
@@ -131,25 +134,47 @@ class ReplaceService extends Component
     }
 
     /**
-     * Why this result can't be replaced from its snapshot, or null if the
-     * stored value still equals what the search saw.
+     * A short fingerprint of a field's content, compared ignoring the
+     * fallback URL Craft rewrites in reference tags. Not for security.
      */
-    private function staleReason(array $result, string $searchedValue): ?string
+    public static function hashValue(string $value): string
+    {
+        return md5(FieldValue::withoutRefFallbacks($value));
+    }
+
+    /**
+     * The field's stored text right now, or null if the element is gone.
+     * Same reader the search used, so the two are comparable.
+     */
+    public function currentValueFor(array $result): ?string
     {
         $element = $this->getElement($result);
 
         if (!$element) {
-            return "missing";
+            return null;
         }
 
-        $current = FieldValue::toString(
+        return FieldValue::toString(
             $this->getElementValue($element, $result["fieldHandle"])
         );
+    }
 
-        return FieldValue::withoutRefFallbacks($current) ===
-            FieldValue::withoutRefFallbacks($searchedValue)
-            ? null
-            : "changed";
+    /**
+     * Whether $current is what the search saw. Rows carry a "valueHash";
+     * older saved searches carry the text itself. A row with neither
+     * can't be verified, so it counts as changed.
+     */
+    public function matchesSearchSnapshot(array $result, string $current): bool
+    {
+        if (isset($result["valueHash"])) {
+            $expected = $result["valueHash"];
+        } elseif (isset($result["fieldValue"])) {
+            $expected = self::hashValue((string) $result["fieldValue"]);
+        } else {
+            return false;
+        }
+
+        return self::hashValue($current) === $expected;
     }
 
     /**
@@ -476,7 +501,7 @@ class ReplaceService extends Component
      * server-side backstop, for every element type this class can write to
      * (entries, Matrix/Neo blocks, categories, globals).
      */
-    private function isReplaceableField(array $result): bool
+    public function isReplaceableField(array $result): bool
     {
         if ($result["fieldHandle"] === "title") {
             return true;

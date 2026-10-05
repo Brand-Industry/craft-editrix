@@ -305,6 +305,7 @@
       :original="previewData?.original ?? previewResult?.fieldValue ?? ''"
       :proposed="previewData?.proposed ?? previewResult?.fieldValue ?? ''"
       :changed="previewData?.changed ?? false"
+      :stale="previewData?.stale ?? false"
       :loading="previewLoading"
       @close="previewResult = null"
       @apply="applyToSingle"

@@ -84,6 +84,9 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] Una búsqueda terminada abierta desde **Recent searches** se puede usar en Search & Replace (la selección y el preview funcionan).
 - [ ] Un segundo usuario no ve las búsquedas del primero.
 - [ ] **Una fila por campo**: una palabra que aparece varias veces en el mismo campo de una entrada sale en **una sola fila** con la etiqueta "N matches". "Show all N matches" despliega cada aparición con la palabra resaltada, y la vista previa se ve completa (la palabra resaltada no queda cortada). El encabezado muestra el número de filas y, al lado, el total de coincidencias.
+- [ ] **View** carga el texto completo del campo al abrirse (breve "Loading…") y resalta todas las apariciones. **Preview Changes** muestra el antes y el después del campo completo.
+- [ ] Si editas la entrada en otra pestaña después de buscar, **View** y **Preview Changes** avisan "Its content changed after the search…" y View no resalta posiciones viejas.
+- [ ] Abrir una búsqueda de **Recent searches** y usar View o Replace funciona igual que en una búsqueda recién hecha.
 - [ ] Al seleccionar esa fila y reemplazar, cambian **todas** las apariciones del campo; el mensaje dice cuántas apariciones se cambiaron. En **View**, todas las apariciones salen resaltadas.
 - [ ] Export CSV genera una línea por aparición.
 - [ ] Con una búsqueda muy amplia en un sitio grande (ej. una vocal en un sitio de miles de entradas) el resultado se corta en **5,000** y aparece el aviso amarillo "Showing the first 5,000 matches…". Con una búsqueda estrecha, ese aviso no aparece.
