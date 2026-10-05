@@ -625,6 +625,19 @@ describe('useSearch after a replace', () => {
     expect(post.mock.calls[0][0]).toBe('/replace');
   });
 
+  it('sends rows without their lists of contexts', async () => {
+    post.mockResolvedValue({ success: true, replacedKeys: [], skipped: [] });
+
+    await s.replace({
+      results: [{ ...row(1), matches: [{ context: 'x', readOnly: true }, { context: 'y' }] }],
+      replaceWith: 'x',
+    });
+
+    const sent = post.mock.calls[0][1].selectedResults[0];
+    expect(sent.matches).toBeUndefined();
+    expect(sent.readOnlyMatchCount).toBe(1);
+  });
+
   it('tells the server which saved search the replace came from', async () => {
     post.mockResolvedValue({ success: true, replacedKeys: [], skipped: [] });
 

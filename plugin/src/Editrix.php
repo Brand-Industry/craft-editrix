@@ -214,6 +214,7 @@ class Editrix extends Plugin
             "editrix/api/search/start" => "editrix/search/search-start",
             "editrix/api/search/status" => "editrix/search/search-status",
             "editrix/api/search/recent" => "editrix/search/search-recent",
+            "editrix/api/search/value" => "editrix/search/field-value",
             "editrix/api/search/cancel" => "editrix/search/search-cancel",
             "editrix/api/replace" => "editrix/replace/execute",
             "editrix/api/preview" => "editrix/replace/preview",

@@ -10,6 +10,7 @@ export function useConfig() {
   const searchStartUrl = computed(() => config.value.searchStartUrl || '');
   const searchStatusUrl = computed(() => config.value.searchStatusUrl || '');
   const searchRecentUrl = computed(() => config.value.searchRecentUrl || '');
+  const fieldValueUrl = computed(() => config.value.fieldValueUrl || '');
   const searchCancelUrl = computed(() => config.value.searchCancelUrl || '');
   const replaceUrl = computed(() => config.value.replaceUrl || '');
   const previewUrl = computed(() => config.value.previewUrl || '');
@@ -72,6 +73,7 @@ export function useConfig() {
     searchStartUrl,
     searchStatusUrl,
     searchRecentUrl,
+    fieldValueUrl,
     searchCancelUrl,
     replaceUrl,
     previewUrl,

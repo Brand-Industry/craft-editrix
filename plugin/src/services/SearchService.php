@@ -283,7 +283,7 @@ class SearchService extends Component
             }
 
             $rowIndex[$siteHandle][$key] = count($grouped[$siteHandle]["results"]);
-            $grouped[$siteHandle]["results"][] = [
+            $row = [
                 "uniqueKey" => $key,
                 "matches" => [$match],
                 "matchCount" => 1,
@@ -295,7 +295,6 @@ class SearchService extends Component
                 "fieldName" => $result->fieldName,
                 "fieldHandle" => $result->fieldHandle,
                 "matchContext" => $result->matchContext,
-                "fieldValue" => $result->fieldValue,
                 "matchStart" => $result->matchStart,
                 "matchEnd" => $result->matchEnd,
                 "isRichText" => $result->isRichText,
@@ -308,6 +307,19 @@ class SearchService extends Component
                 "readOnly" => $result->readOnly,
                 "readOnlyReason" => $result->readOnlyReason,
             ];
+
+            // The field's text is not stored with the row: it can be long
+            // and every row of a big search would carry its own copy. A
+            // fingerprint is enough to know later whether it changed, and
+            // the text is read again when it is needed. A tag's value is
+            // just its title, so that stays.
+            if ($result->readOnlyReason === "tag") {
+                $row["fieldValue"] = $result->fieldValue;
+            } else {
+                $row["valueHash"] = ReplaceService::hashValue($result->fieldValue);
+            }
+
+            $grouped[$siteHandle]["results"][] = $row;
         }
 
         return $grouped;

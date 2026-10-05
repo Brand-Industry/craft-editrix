@@ -64,15 +64,37 @@ class SearchGroupingTest extends TestCase
         $this->assertSame([0, 20, 40, 60], array_column($rows[0]['matches'], 'start'));
     }
 
-    public function testTheFieldValueIsStoredOncePerRow(): void
+    public function testARowCarriesAFingerprintNotTheFieldText(): void
     {
         $rows = $this->rows([
             $this->match(['matchStart' => 0]),
             $this->match(['matchStart' => 20]),
         ]);
 
-        $this->assertSame(str_repeat('x', 100), $rows[0]['fieldValue']);
+        $this->assertArrayNotHasKey('fieldValue', $rows[0]);
         $this->assertArrayNotHasKey('fieldValue', $rows[0]['matches'][0]);
+        $this->assertSame(ReplaceService::hashValue(str_repeat('x', 100)), $rows[0]['valueHash']);
+    }
+
+    public function testTheRowStaysSmallWhateverTheFieldLength(): void
+    {
+        $short = $this->rows([$this->match(['fieldValue' => 'short'])])[0];
+        $long = $this->rows([$this->match(['fieldValue' => str_repeat('long ', 50000)])])[0];
+
+        $this->assertSame(strlen(json_encode($short)), strlen(json_encode($long)));
+    }
+
+    public function testATagRowKeepsItsShortValue(): void
+    {
+        $row = $this->rows([$this->match([
+            'fieldHandle' => 'tags',
+            'fieldValue' => 'Hotels',
+            'readOnly' => true,
+            'readOnlyReason' => 'tag',
+        ])])[0];
+
+        $this->assertSame('Hotels', $row['fieldValue']);
+        $this->assertArrayNotHasKey('valueHash', $row);
     }
 
     public function testDifferentFieldsAreDifferentRows(): void

@@ -21,6 +21,11 @@
         <div v-if="loading" class="editrix-diff__loading">{{ t('Loading...') }}</div>
 
         <template v-else>
+          <div v-if="stale" class="editrix-diff__notice editrix-diff__notice--warning">
+            <span>⚠️</span>
+            <p>{{ t('Its content changed after the search. Search again to see the current text.') }}</p>
+          </div>
+
           <div v-if="!changed" class="editrix-diff__notice editrix-diff__notice--warning">
             <span>⚠️</span>
             <p>{{ t("This occurrence won't be changed by this replacement.") }}</p>
@@ -87,6 +92,8 @@ const props = defineProps({
   original: { type: String, default: '' },
   proposed: { type: String, default: '' },
   changed: { type: Boolean, default: false },
+  // The field was edited after the search.
+  stale: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
 });
 

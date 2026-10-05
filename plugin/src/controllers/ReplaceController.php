@@ -176,14 +176,36 @@ class ReplaceController extends Controller
             $result = json_decode($result, true) ?? [];
         }
 
-        if (empty($result) || (string) ($result["fieldValue"] ?? "") === "") {
+        if (empty($result) || empty($result["elementId"]) || empty($result["fieldHandle"])) {
             return $this->asJson([
                 "success" => false,
                 "error" => "Invalid result data",
             ]);
         }
 
-        $originalValue = $result["fieldValue"];
+        // A tag row still carries its own (short) value; every other row
+        // has only a fingerprint, so the text is read from the element.
+        if (isset($result["fieldValue"]) && ($result["readOnlyReason"] ?? null) === "tag") {
+            $originalValue = (string) $result["fieldValue"];
+            $stale = false;
+        } else {
+            if (!Editrix::$plugin->replace->isReplaceableField($result)) {
+                return $this->asJson([
+                    "success" => false,
+                    "error" => "Invalid result data",
+                ]);
+            }
+
+            $originalValue = Editrix::$plugin->replace->currentValueFor($result);
+            if ($originalValue === null) {
+                return $this->asJson([
+                    "success" => false,
+                    "error" => Craft::t("editrix", "This content no longer exists."),
+                ]);
+            }
+            $stale = !Editrix::$plugin->replace->matchesSearchSnapshot($result, $originalValue);
+        }
+
         $newValue = Editrix::$plugin->replace->computeNewValue(
             $result,
             $originalValue,
@@ -199,6 +221,9 @@ class ReplaceController extends Controller
             "original" => $originalValue,
             "proposed" => $newValue,
             "changed" => $originalValue !== $newValue,
+            // The field was edited after the search, so this is not what
+            // the user saw in the results.
+            "stale" => $stale,
         ]);
     }
 

@@ -250,4 +250,67 @@ class ReplaceRevertTest extends EditrixTestCase
 
         $this->assertSame(1, ReplaceService::countOccurrences([$row], [ReplaceService::keyFor($row)]));
     }
+
+    public function testTheCurrentValueIsReadFromTheElement(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+        $result = $this->titleResult($word, $entry->id, $section);
+
+        $this->assertSame($this->originalTitle, Editrix::$plugin->replace->currentValueFor($result));
+    }
+
+    public function testARowMatchesItsSnapshotUntilTheFieldChanges(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+        $result = $this->titleResult($word, $entry->id, $section);
+        $service = Editrix::$plugin->replace;
+
+        $this->assertArrayNotHasKey('fieldValue', $result, 'Rows carry a fingerprint, not the text.');
+        $this->assertTrue($service->matchesSearchSnapshot($result, $this->originalTitle));
+        $this->assertFalse($service->matchesSearchSnapshot($result, $this->originalTitle . ' edited'));
+    }
+
+    public function testASavedSearchFromBeforeFingerprintsStillWorks(): void
+    {
+        $service = Editrix::$plugin->replace;
+        $old = ['fieldValue' => 'the old text'];
+
+        $this->assertTrue($service->matchesSearchSnapshot($old, 'the old text'));
+        $this->assertFalse($service->matchesSearchSnapshot($old, 'the new text'));
+    }
+
+    public function testARowThatCannotBeVerifiedIsNeverReplaced(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+        $result = $this->titleResult($word, $entry->id, $section);
+        unset($result['valueHash']);
+
+        $skipped = [];
+        $replacements = Editrix::$plugin->replace->replace(
+            [$result],
+            $word,
+            'EditrixQA' . random_int(1000, 9999),
+            false,
+            true,
+            false,
+            $skipped
+        );
+
+        $this->assertSame([], $replacements);
+        $this->assertSame('changed', $skipped[0]['reason']);
+        $this->assertSame($this->originalTitle, $this->currentTitle());
+    }
+
+    public function testTheLogKeepsTheTextThatWasReplacedNotJustAFingerprint(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+        $replacement = 'EditrixQA' . random_int(1000, 9999);
+
+        $result = $this->titleResult($word, $entry->id, $section);
+        $replacements = Editrix::$plugin->replace->replace([$result], $word, $replacement, false, true, false);
+
+        $this->assertSame($this->originalTitle, $replacements[0]['oldValue'], 'Revert needs the real previous text.');
+        $this->assertTrue(Editrix::$plugin->replace->revert($replacements[0]));
+        $this->assertSame($this->originalTitle, $this->currentTitle());
+    }
 }

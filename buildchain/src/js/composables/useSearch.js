@@ -1,6 +1,7 @@
 import { ref, computed, reactive } from 'vue';
 import { useApi } from './useApi';
 import { useConfig } from './useConfig';
+import { slimRow } from '../utils/fieldValue';
 
 // How long a search may sit in "queued" before we tell the user the queue
 // probably isn't running.
@@ -425,7 +426,7 @@ export function useSearch(actionMode) {
       const data = await post(replaceUrl.value, {
         searchQuery: searchParams.query,
         replaceWith: replaceWith ?? searchParams.replaceWith,
-        selectedResults: toReplace,
+        selectedResults: toReplace.map(slimRow),
         siteId: searchParams.siteId,
         useRegex: searchParams.useRegex,
         caseInsensitive: searchParams.caseInsensitive,
@@ -460,7 +461,7 @@ export function useSearch(actionMode) {
   const getPreview = async (result) => {
     try {
       const data = await post(previewUrl.value, {
-        result: result,
+        result: slimRow(result),
         searchQuery: searchParams.query,
         replaceWith: searchParams.replaceWith,
         useRegex: searchParams.useRegex,

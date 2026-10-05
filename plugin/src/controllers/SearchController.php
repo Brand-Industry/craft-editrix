@@ -379,6 +379,61 @@ class SearchController extends Controller
         return $this->asJson(["success" => true, "searches" => $searches]);
     }
 
+    /**
+     * The full text of one result's field, read now. Rows of a search carry
+     * only a short context, so the detail view asks for the whole value
+     * when it is opened. "stale" says the field was edited after the
+     * search, in which case the match positions no longer apply.
+     */
+    public function actionFieldValue(): Response
+    {
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:search")) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Permission denied",
+            ]);
+        }
+
+        $request = Craft::$app->getRequest();
+        $result = [
+            "elementType" => (string) $request->getParam("elementType", ""),
+            "elementId" => (int) $request->getParam("elementId", 0),
+            "fieldHandle" => (string) $request->getParam("fieldHandle", ""),
+            "siteId" => (int) $request->getParam("siteId", 0),
+            "valueHash" => $request->getParam("valueHash"),
+        ];
+
+        $service = Editrix::$plugin->replace;
+
+        if (
+            !$result["elementId"] ||
+            $result["fieldHandle"] === "" ||
+            !$service->isReplaceableField($result)
+        ) {
+            return $this->asJson([
+                "success" => false,
+                "error" => "Invalid result data",
+            ]);
+        }
+
+        $value = $service->currentValueFor($result);
+
+        if ($value === null) {
+            return $this->asJson([
+                "success" => false,
+                "error" => Craft::t("editrix", "This content no longer exists."),
+            ]);
+        }
+
+        return $this->asJson([
+            "success" => true,
+            "value" => $value,
+            "stale" => !$service->matchesSearchSnapshot($result, $value),
+        ]);
+    }
+
     public function actionSearchCancel(): Response
     {
         $this->requirePostRequest();
@@ -666,6 +721,9 @@ class SearchController extends Controller
             ),
             "searchRecentUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/search-recent"
+            ),
+            "fieldValueUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/search/field-value"
             ),
             "searchCancelUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/search-cancel"
