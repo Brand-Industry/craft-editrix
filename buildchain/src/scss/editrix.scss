@@ -1732,3 +1732,29 @@
     animation: none;
   }
 }
+
+.editrix-results tr.is-replaced td {
+  background: $success-light;
+  opacity: 0.75;
+}
+
+.editrix-results tr.is-stale td {
+  background: $gray-50;
+  opacity: 0.75;
+}
+
+.editrix-replace-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+
+  p {
+    margin: 0;
+  }
+
+  &__done a {
+    margin-left: 8px;
+  }
+}

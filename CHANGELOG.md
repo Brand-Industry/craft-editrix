@@ -15,11 +15,15 @@ All notable changes to Editrix will be documented in this file.
 - A search keeps running when the user leaves the page: reloading returns to it, and a "Recent searches" list reopens any of the last ten (kept for a day) with its results and form as they were
 - A search that reaches the server's memory limit now stops with the matches found so far and says why, instead of being killed
 
+- After a replace, the replaced rows are marked in place instead of the whole search running again, and a summary shows how many were replaced with a link to Logs & History; reopening a saved search shows those rows as replaced
+- A match whose field was edited after the search is skipped and marked "Changed since search" instead of being overwritten with the older content
+
 ### Changed
 - Rich text fields are now searched, replaced and reverted using their stored HTML, and entries embedded in a CKEditor field are searched as their own results
 - Switching between General and Segmented Search now clears the previous results
 
 ### Fixed
+- Replacing the same field on two sites of a multi-site install only changed the first site
 - A new search waited in the queue until the user opened another control panel page; Editrix now asks Craft to start the queue as soon as the search is queued
 - Replacing in a CKEditor field that contains nested entries flattened those entries into static HTML; they are now kept intact, and Revert restores them
 - A fresh install did not create the table that background searches need, so every search failed on a new site

@@ -34,7 +34,7 @@ class Editrix extends Plugin
 {
     public static Editrix $plugin;
 
-    public string $schemaVersion = "1.2.0";
+    public string $schemaVersion = "1.3.0";
     public bool $hasCpSettings = true;
     public bool $hasCpSection = true;
 

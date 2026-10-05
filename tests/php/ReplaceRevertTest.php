@@ -5,6 +5,7 @@ namespace brandindustry\editrix\tests;
 use Craft;
 use craft\elements\Entry;
 use brandindustry\editrix\Editrix;
+use brandindustry\editrix\services\ReplaceService;
 
 /**
  * Search, replace and revert on a real entry title. The original title is
@@ -130,5 +131,85 @@ class ReplaceRevertTest extends EditrixTestCase
 
         $this->assertSame([], $replacements);
         $this->assertSame($this->originalTitle, $this->currentTitle());
+    }
+
+    public function testAFieldEditedAfterTheSearchIsSkippedNotOverwritten(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+        $replacement = 'EditrixQA' . random_int(1000, 9999);
+
+        $result = $this->titleResult($word, $entry->id, $section);
+
+        // Someone edits the title after the search ran.
+        $edited = Entry::find()->id($entry->id)->siteId($this->siteId())->status(null)->one();
+        $edited->title = $this->originalTitle . ' edited meanwhile';
+        Craft::$app->getElements()->saveElement($edited, false);
+
+        $skipped = [];
+        $replacements = Editrix::$plugin->replace->replace(
+            [$result],
+            $word,
+            $replacement,
+            false,
+            true,
+            false,
+            $skipped
+        );
+
+        $this->assertSame([], $replacements);
+        $this->assertCount(1, $skipped);
+        $this->assertSame('changed', $skipped[0]['reason']);
+        $this->assertSame(ReplaceService::keyFor($result), $skipped[0]['key']);
+        $this->assertSame($this->originalTitle . ' edited meanwhile', $this->currentTitle(), 'The newer edit must survive.');
+    }
+
+    public function testReplacingTheSameResultTwiceOnlyAppliesOnce(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+        $replacement = 'EditrixQA' . random_int(1000, 9999);
+
+        $result = $this->titleResult($word, $entry->id, $section);
+        $first = Editrix::$plugin->replace->replace([$result], $word, $replacement, false, true, false);
+        $this->assertCount(1, $first);
+
+        $skipped = [];
+        $second = Editrix::$plugin->replace->replace([$result], $word, $replacement, false, true, false, $skipped);
+
+        $this->assertSame([], $second);
+        $this->assertSame('changed', $skipped[0]['reason']);
+    }
+
+    public function testTheSameFieldOnTwoSitesHasTwoKeys(): void
+    {
+        $base = ['elementType' => 'entry', 'elementId' => 5, 'fieldHandle' => 'title'];
+
+        $this->assertNotSame(
+            ReplaceService::keyFor($base + ['siteId' => 1]),
+            ReplaceService::keyFor($base + ['siteId' => 2])
+        );
+    }
+
+    public function testReplacedMatchesAreRememberedOnTheSavedSearch(): void
+    {
+        $searchId = $this->createSearchRow('completed');
+        $userId = (int) $this->row($searchId)['userId'];
+
+        Editrix::$plugin->replace->markReplaced($searchId, $userId, ['a_1_title_1']);
+        Editrix::$plugin->replace->markReplaced($searchId, $userId, ['a_1_title_1', 'b_2_body_1']);
+
+        $this->assertSame(
+            ['a_1_title_1', 'b_2_body_1'],
+            json_decode($this->row($searchId)['replacedJson'], true)
+        );
+    }
+
+    public function testAnotherUserCannotMarkSomeoneElsesSearch(): void
+    {
+        $searchId = $this->createSearchRow('completed');
+        $userId = (int) $this->row($searchId)['userId'];
+
+        Editrix::$plugin->replace->markReplaced($searchId, $userId + 999999, ['a_1_title_1']);
+
+        $this->assertNull($this->row($searchId)['replacedJson']);
     }
 }

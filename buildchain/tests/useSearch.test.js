@@ -20,7 +20,7 @@ vi.mock('../src/js/composables/useConfig', () => ({
   }),
 }));
 
-const { useSearch, QUEUE_STALL_MS, POLL_INTERVAL_MS, JOB_IDLE_SECONDS, ACTIVE_MAX_IDLE_SECONDS } = await import(
+const { useSearch, resultKey, QUEUE_STALL_MS, POLL_INTERVAL_MS, JOB_IDLE_SECONDS, ACTIVE_MAX_IDLE_SECONDS } = await import(
   '../src/js/composables/useSearch'
 );
 
@@ -574,5 +574,125 @@ describe('useSearch live progress and leaving mid-search', () => {
     expect(s.loading.value).toBe(true);
     expect(s.progress.value).toBe(0.4);
     expect(s.matchCount.value).toBe(9);
+  });
+});
+
+describe('useSearch after a replace', () => {
+  const row = (id, field = 'body') => ({
+    uniqueKey: `u${id}${field}`,
+    elementType: 'entry',
+    elementId: id,
+    fieldHandle: field,
+    siteId: 1,
+  });
+
+  const finished = rows => ({
+    success: true,
+    status: 'completed',
+    totalResults: rows.length,
+    groupedResults: { default: { results: rows } },
+    replaced: [],
+  });
+
+  let s;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    post.mockReset();
+    get.mockReset();
+    post.mockResolvedValue({ success: true, searchId: 'abc' });
+    get.mockResolvedValue(finished([row(1), row(2), row(3)]));
+
+    s = useSearch(ref('replace'));
+    const done = s.search();
+    await tickPoll();
+    await done;
+    post.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('marks replaced rows in place without starting another search', async () => {
+    post.mockResolvedValue({ success: true, replacedCount: 1, replacedKeys: [resultKey(row(1))], skipped: [] });
+
+    await s.replace({ results: [row(1)], replaceWith: 'x' });
+
+    expect(s.rowState(row(1))).toBe('replaced');
+    expect(s.rowState(row(2))).toBe(null);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0]).toBe('/replace');
+  });
+
+  it('tells the server which saved search the replace came from', async () => {
+    post.mockResolvedValue({ success: true, replacedKeys: [], skipped: [] });
+
+    await s.replace({ results: [row(1)], replaceWith: 'x' });
+
+    expect(post.mock.calls[0][1].searchId).toBe('abc');
+  });
+
+  it('marks rows the server skipped as changed since the search', async () => {
+    post.mockResolvedValue({
+      success: true,
+      replacedKeys: [],
+      skipped: [{ key: resultKey(row(2)), reason: 'changed' }],
+    });
+
+    await s.replace({ results: [row(2)], replaceWith: 'x' });
+
+    expect(s.rowState(row(2))).toBe('stale');
+  });
+
+  it('leaves replaced and stale rows out of select all and out of the selection', async () => {
+    s.selectAll();
+    expect(s.selectedCount.value).toBe(3);
+
+    post.mockResolvedValue({
+      success: true,
+      replacedKeys: [resultKey(row(1))],
+      skipped: [{ key: resultKey(row(2)) }],
+    });
+    await s.replace({ replaceWith: 'x' });
+
+    expect(s.selectedResults.value.map(r => r.elementId)).toEqual([3]);
+    s.deselectAll();
+    s.selectAll();
+    expect(s.selectedResults.value.map(r => r.elementId)).toEqual([3]);
+
+    s.toggleResult(row(1));
+    s.toggleResult(row(2));
+    expect(s.selectedResults.value.map(r => r.elementId)).toEqual([3]);
+  });
+
+  it('does not mark anything when the replace fails', async () => {
+    post.mockResolvedValue({ success: false, error: 'nope' });
+
+    await s.replace({ results: [row(1)], replaceWith: 'x' });
+
+    expect(s.rowState(row(1))).toBe(null);
+  });
+
+  it('shows rows already replaced when a saved search is reopened', async () => {
+    get.mockResolvedValue({ ...finished([row(1), row(2)]), replaced: [resultKey(row(2))] });
+
+    s.openSearch('old');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(s.rowState(row(2))).toBe('replaced');
+    expect(s.rowState(row(1))).toBe(null);
+  });
+
+  it('clears the marks when a new search starts', async () => {
+    post.mockResolvedValue({ success: true, replacedKeys: [resultKey(row(1))], skipped: [] });
+    await s.replace({ results: [row(1)], replaceWith: 'x' });
+    expect(s.rowState(row(1))).toBe('replaced');
+
+    post.mockResolvedValue({ success: true, searchId: 'next' });
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(s.rowState(row(1))).toBe(null);
   });
 });

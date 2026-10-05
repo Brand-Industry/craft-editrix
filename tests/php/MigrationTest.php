@@ -13,7 +13,7 @@ class MigrationTest extends TestCase
 
         $this->assertNotNull($schema, 'editrix_searches is missing; run the plugin migrations.');
 
-        foreach (['searchId', 'userId', 'status', 'scannedCount', 'totalCount', 'resultCount', 'paramsJson', 'resultsJson', 'errorMessage'] as $column) {
+        foreach (['searchId', 'userId', 'status', 'scannedCount', 'totalCount', 'resultCount', 'paramsJson', 'resultsJson', 'replacedJson', 'errorMessage'] as $column) {
             $this->assertArrayHasKey($column, $schema->columns, "Missing column {$column}");
         }
 
@@ -54,7 +54,7 @@ class MigrationTest extends TestCase
         $install->createTables();
 
         $this->assertArrayHasKey('{{%editrix_searches}}', $install->created);
-        foreach (['searchId', 'userId', 'status', 'resultCount', 'paramsJson', 'resultsJson'] as $column) {
+        foreach (['searchId', 'userId', 'status', 'resultCount', 'paramsJson', 'resultsJson', 'replacedJson'] as $column) {
             $this->assertContains($column, $install->created['{{%editrix_searches}}']);
         }
     }
