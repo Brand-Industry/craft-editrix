@@ -70,9 +70,11 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] Al buscar aparece la barra de progreso con "Scanning X of Y entries (Z%)…" y el porcentaje sube.
 - [ ] El botón **Cancel search** detiene la búsqueda en pocos segundos y muestra lo encontrado hasta ese momento.
 - [ ] Cancelar y lanzar otra búsqueda enseguida muestra solo los resultados de la nueva.
-- [ ] **Salir y volver**: lanza una búsqueda grande y recarga la página (o abre otra sección del panel y regresa). En la pantalla de inicio aparece **Searches in progress** con la consulta, una barra y el porcentaje, que sube solo cada pocos segundos. **Open** lleva a esa búsqueda con su progreso y su botón **Cancel search**; **Cancel search** de la lista la cancela sin abrirla.
-- [ ] **Una búsqueda a la vez**: con una búsqueda en curso, entra a Text. El botón de buscar está deshabilitado y aparece el aviso "You already have a search running…" con la lista para abrirla o cancelarla. Al cancelarla o terminar, el botón vuelve a funcionar.
-- [ ] Si el worker murió y la búsqueda lleva más de 10 minutos sin avance, deja de aparecer como en curso y ya no bloquea nuevas búsquedas.
+- [ ] **Recargar a mitad de búsqueda**: lanza una búsqueda grande y recarga la página. Te deja en la vista de búsqueda de texto, siguiendo la misma búsqueda: spinner, barra con movimiento, "Scanning X of Y entries", "N matches so far" y el botón **Cancel search**. El formulario se ve con los valores usados y deshabilitado.
+- [ ] **Salir al menú y volver**: con una búsqueda corriendo, pulsa "Choose a different tool". En el menú, la tarjeta **Text** muestra la etiqueta "Search in progress · N%" (se actualiza sola). Al entrar a Text, vuelves a ver la búsqueda con su progreso, no un formulario vacío. Entrar a Categories o Tags no se ve afectado.
+- [ ] **Una búsqueda a la vez**: con una búsqueda en curso, abrir Editrix en otra pestaña te lleva a esa misma búsqueda. Si alguien intenta lanzar otra (por ejemplo, con una llamada directa), el servidor responde "You already have a search running…".
+- [ ] Cancelar durante la búsqueda la detiene en pocos segundos, muestra lo encontrado y deja buscar de nuevo.
+- [ ] Si el worker murió y la búsqueda lleva más de 10 minutos sin avance, deja de contar como en curso: la etiqueta de la tarjeta desaparece y ya no bloquea nuevas búsquedas.
 - [ ] Un segundo usuario puede buscar a la vez que el primero, hasta el límite del servidor (`maxConcurrentSearches`, 2 por defecto). Con el límite alcanzado ve "Other searches are using the server right now…".
 - [ ] Al terminar una búsqueda, sal del plugin y vuelve: en **Recent searches** aparece con su número de resultados. **Open** muestra los mismos resultados sin buscar de nuevo y restaura el formulario (texto, secciones, opciones).
 - [ ] Una búsqueda terminada abierta desde **Recent searches** se puede usar en Search & Replace (la selección y el preview funcionan).

@@ -38,7 +38,13 @@
         <div v-if="!searchType" class="editrix-tool-picker">
           <button type="button" class="editrix-tool-card editrix-tool-card--text" @click="searchType = 'text'">
             <span class="editrix-tool-card__icon">🔤</span>
-            <h3>{{ t('Text') }}</h3>
+            <h3>
+              {{ t('Text') }}
+              <span v-if="activeSearch" class="editrix-live-tag">
+                <span class="editrix-live-tag__dot" aria-hidden="true"></span>
+                {{ t('Search in progress') }}<template v-if="activePct !== null"> · {{ activePct }}%</template>
+              </span>
+            </h3>
             <p>{{ t('Search for text within field content.') }}</p>
             <span class="editrix-tool-card__arrow">→</span>
           </button>
@@ -73,13 +79,6 @@
             <span class="editrix-tool-card__arrow">→</span>
           </button>
         </div>
-
-        <ActiveSearches
-          v-if="!searchType"
-          :searches="activeSearches"
-          @open="openRecentSearch"
-          @cancel="cancelSearchById"
-        />
 
         <RecentActivity
           v-if="!searchType"
@@ -186,6 +185,7 @@
         </template>
 
         <template v-if="searchType === 'text'">
+          <fieldset class="editrix-form-lock" :disabled="loading">
           <SearchForm
             v-model:query="searchParams.query"
             v-model:replace-with="searchParams.replaceWith"
@@ -200,20 +200,11 @@
             v-model:search-matrix="searchParams.searchMatrix"
             v-model:search-categories="searchParams.searchCategories"
             :loading="loading"
-            :blocked="activeSearches.length > 0 && !loading"
             :action-mode="actionMode"
             @search="handleSearch"
           />
+          </fieldset>
 
-          <div v-if="activeSearches.length > 0 && !loading" class="editrix-form__warning" style="margin-top: 16px;">
-            ⚠️ {{ t('You already have a search running. Open it, or cancel it before starting another.') }}
-          </div>
-          <ActiveSearches
-            v-if="!loading"
-            :searches="activeSearches"
-            @open="openRecentSearch"
-            @cancel="cancelSearchById"
-          />
 
           <details v-if="recentSearches.length > 0 && !loading" class="editrix-recent-searches">
             <summary>{{ t('Recent searches') }} ({{ recentSearches.length }})</summary>
@@ -241,11 +232,18 @@
             </ul>
           </details>
 
-          <div v-if="loading" class="editrix-search-progress">
+          <div v-if="loading" class="editrix-search-progress" role="status" aria-live="polite">
+            <div class="editrix-search-progress__head">
+              <span class="editrix-search-progress__spinner" aria-hidden="true"></span>
+              <span class="editrix-search-progress__title">
+                {{ t('Searching for "{query}"', { query: searchParams.query }) }}
+              </span>
+            </div>
             <div class="editrix-search-progress__bar">
               <div
                 class="editrix-search-progress__fill"
-                :style="{ width: `${Math.round(progress * 100)}%` }"
+                :class="{ 'is-active': !queueStalled && !jobStalled }"
+                :style="{ width: totalCount > 0 ? `${Math.max(1, Math.round(progress * 100))}%` : '4%' }"
               ></div>
             </div>
             <p class="editrix-search-progress__label">
@@ -256,6 +254,9 @@
                     pct: Math.round(progress * 100),
                   })
                 : t('Starting search…') }}
+            </p>
+            <p v-if="matchCount > 0" class="editrix-search-progress__matches">
+              {{ t('{count} matches so far', { count: matchCount.toLocaleString() }) }}
             </p>
             <p v-if="jobStalled" class="editrix-form__warning">
               ⚠️ {{ t("This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.") }}
@@ -362,7 +363,6 @@ import EditionBadge from '../components/common/EditionBadge.vue';
 import AssignmentSearchForm from '../components/assignments/AssignmentSearchForm.vue';
 import AssignmentResultsList from '../components/assignments/AssignmentResultsList.vue';
 import RecentActivity from '../components/search/RecentActivity.vue';
-import ActiveSearches from '../components/search/ActiveSearches.vue';
 import ActivityChart from '../components/logs/ActivityChart.vue';
 
 const {
@@ -447,6 +447,9 @@ const handleAssignmentSearch = async () => {
 // from one tool kept showing its query/results/scope-filter sidebar as if
 // it were still active.
 watch(searchType, (newType, oldType) => {
+  if (newType === 'text') {
+    loadRecentSearches().then(attachToActiveSearch);
+  }
   if (oldType === 'category' || oldType === 'tag') {
     assignmentParams.query = '';
     assignmentParams.sections = [];
@@ -549,7 +552,6 @@ const {
   loadRecentSearches,
   openSearch,
   activeSearches,
-  cancelSearchById,
   selectedResults,
   hasSearched,
   searchParams,
@@ -559,6 +561,7 @@ const {
   allSelected,
   scannedCount,
   totalCount,
+  matchCount,
   progress,
   queueStalled,
   jobStalled,
@@ -644,7 +647,7 @@ onMounted(() => {
   searchParams.siteId = currentSiteId.value;
   assignmentParams.siteId = currentSiteId.value;
   if (!restoreFromHistory()) {
-    loadRecentSearches();
+    loadRecentSearches().then(attachToActiveSearch);
   }
   fetchRecentActivity();
   fetchDailyCounts();
@@ -675,6 +678,21 @@ const restoreFromHistory = () => {
   handleSearch();
 };
 
+// The search the user has running, if any. Only one runs per user.
+const activeSearch = computed(() => activeSearches.value[0] || null);
+const activePct = computed(() => {
+  const s = activeSearch.value;
+  if (!s || s.status === 'queued' || !s.totalCount) return null;
+  return Math.min(100, Math.round((s.scannedCount / s.totalCount) * 100));
+});
+
+// Leaving and coming back (a reload, or the menu and back) lands on the
+// search that is still running, with its progress, instead of an empty form.
+const attachToActiveSearch = () => {
+  if (loading.value || hasSearched.value || !activeSearch.value) return;
+  openRecentSearch(activeSearch.value.searchId);
+};
+
 // While a search is running somewhere (this tab, another tab, before a
 // reload), keep its progress in the list fresh.
 let activePoll = null;
@@ -682,7 +700,15 @@ watch(
   () => activeSearches.value.length > 0 && !loading.value,
   watching => {
     clearInterval(activePoll);
-    activePoll = watching ? setInterval(loadRecentSearches, 3000) : null;
+    activePoll = watching
+      ? setInterval(
+          () =>
+            loadRecentSearches().then(() => {
+              if (searchType.value === 'text') attachToActiveSearch();
+            }),
+          3000
+        )
+      : null;
   },
   { immediate: true }
 );
