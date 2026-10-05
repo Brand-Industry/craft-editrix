@@ -104,6 +104,10 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] **Dry Run Mode**: no cambia nada en las entradas ni crea cambios reales.
 - [ ] Reemplazo real: aparece "Successfully replaced N occurrence(s)." y la entrada, abierta en otra pestaña, tiene el texto nuevo.
 - [ ] **CKEditor con entradas anidadas** (en un sitio de pruebas grande: la entrada an entry, campo `articleBody`): reemplaza una palabra del texto, abre la entrada en el editor y comprueba que los bloques anidados siguen ahí. Revierte desde Logs & History y vuelve igual.
+- [ ] **Después de reemplazar no se vuelve a buscar**: las filas reemplazadas quedan visibles con la marca verde "Replaced", sin casilla, y arriba aparece "Replaced N matches." con el enlace a Logs & History y el botón **Search again**. No aparece la barra de progreso.
+- [ ] Reemplaza, y luego sal del plugin y reabre esa búsqueda desde **Recent searches**: las filas ya reemplazadas siguen marcadas.
+- [ ] **Edición posterior**: busca una palabra, edita a mano en otra pestaña una de las entradas del resultado y vuelve a reemplazar. Esa fila queda como "Changed since search", no se sobrescribe (comprueba que tu edición sigue) y el resumen avisa cuántas se omitieron.
+- [ ] En un sitio multi-sitio, reemplazar el mismo campo en dos sitios cambia los dos.
 - [ ] El reemplazo funciona en título, campo de texto, texto largo, CKEditor/Redactor, global, bloque Matrix y categoría.
 - [ ] Reemplazar por texto con `$1`, `$100`, `\` o `${1}` lo guarda **tal cual**, sin corromper el contenido.
 - [ ] Case insensitive y Whole words reemplazan solo lo que se ve en la vista previa.

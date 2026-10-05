@@ -78,13 +78,18 @@
           </tr>
 
           <tr
-            :class="{ 'is-selected': isSelected(row.result) }"
+            :class="{
+              'is-selected': isSelected(row.result),
+              'is-replaced': rowState(row.result) === 'replaced',
+              'is-stale': rowState(row.result) === 'stale',
+            }"
             @click="$emit('toggle', row.result)"
           >
             <td class="editrix-results__checkbox" @click.stop>
               <input
                 type="checkbox"
                 :checked="isSelected(row.result)"
+                :disabled="rowState(row.result) !== null"
                 @change="$emit('toggle', row.result)"
               />
             </td>
@@ -102,6 +107,8 @@
             <td class="editrix-results__field">
               {{ row.result.fieldName }}
               <span class="editrix-badge editrix-badge--neutral">{{ elementTypeLabel(row.result.elementType) }}</span>
+              <span v-if="rowState(row.result) === 'replaced'" class="editrix-badge editrix-badge--success">{{ t('Replaced') }}</span>
+              <span v-else-if="rowState(row.result) === 'stale'" class="editrix-badge editrix-badge--warning" :title="t('Its content changed after the search. Search again to see the current text.')">{{ t('Changed since search') }}</span>
             </td>
             <td class="editrix-results__preview" v-html="formatPreview(row.result.matchContext)"></td>
             <td>
@@ -163,6 +170,8 @@ const props = defineProps({
   selectedCount: { type: Number, required: true },
   allSelected: { type: Boolean, default: false },
   isSelected: { type: Function, required: true },
+  // 'replaced', 'stale' or null for a result.
+  rowState: { type: Function, default: () => null },
   actionMode: { type: String, default: 'replace' },
   searchQuery: { type: String, default: '' },
 });

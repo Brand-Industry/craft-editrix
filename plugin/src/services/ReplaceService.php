@@ -22,13 +22,14 @@ class ReplaceService extends Component
         string $replaceWith,
         bool $useRegex = false,
         bool $caseSensitive = true,
-        bool $wholeWords = false
+        bool $wholeWords = false,
+        array &$skipped = []
     ): array {
         $replacements = [];
         $processedElements = [];
 
         foreach ($results as $result) {
-            $key = "{$result["elementType"]}_{$result["elementId"]}_{$result["fieldHandle"]}";
+            $key = self::keyFor($result);
 
             if (!isset($processedElements[$key])) {
                 $processedElements[$key] = [
@@ -41,6 +42,21 @@ class ReplaceService extends Component
         foreach ($processedElements as $data) {
             $result = $data["result"];
             $oldValue = $data["oldValue"];
+
+            // The search results are a snapshot. If the field was edited
+            // since (by someone else, or by an earlier replace), writing a
+            // value computed from the snapshot would undo that edit.
+            $reason = $this->staleReason($result, $oldValue);
+            if ($reason !== null) {
+                $skipped[] = [
+                    "key" => self::keyFor($result),
+                    "elementId" => $result["elementId"],
+                    "elementTitle" => $result["elementTitle"] ?? "",
+                    "fieldHandle" => $result["fieldHandle"],
+                    "reason" => $reason,
+                ];
+                continue;
+            }
 
             $newValue = $this->computeNewValue(
                 $result,
@@ -75,6 +91,72 @@ class ReplaceService extends Component
         }
 
         return $replacements;
+    }
+
+    /**
+     * Identifies one field of one element on one site. Results, replaced
+     * marks and skipped items all use it, in the frontend too.
+     */
+    public static function keyFor(array $result): string
+    {
+        return "{$result["elementType"]}_{$result["elementId"]}_{$result["fieldHandle"]}_{$result["siteId"]}";
+    }
+
+    /**
+     * Why this result can't be replaced from its snapshot, or null if the
+     * stored value still equals what the search saw.
+     */
+    private function staleReason(array $result, string $searchedValue): ?string
+    {
+        $element = $this->getElement($result);
+
+        if (!$element) {
+            return "missing";
+        }
+
+        $current = FieldValue::toString(
+            $this->getElementValue($element, $result["fieldHandle"])
+        );
+
+        return FieldValue::withoutRefFallbacks($current) ===
+            FieldValue::withoutRefFallbacks($searchedValue)
+            ? null
+            : "changed";
+    }
+
+    /**
+     * Records replaced matches on the saved search they came from, so
+     * reopening it later shows them as done.
+     */
+    public function markReplaced(string $searchId, int $userId, array $keys): void
+    {
+        if ($searchId === "" || empty($keys)) {
+            return;
+        }
+
+        $table = "{{%editrix_searches}}";
+        $existing = (new \craft\db\Query())
+            ->select(["replacedJson"])
+            ->from($table)
+            ->where(["searchId" => $searchId, "userId" => $userId])
+            ->scalar();
+
+        if ($existing === false) {
+            return;
+        }
+
+        $merged = array_values(array_unique(array_merge(
+            $existing ? \craft\helpers\Json::decode($existing) : [],
+            $keys
+        )));
+
+        Craft::$app->getDb()->createCommand()
+            ->update(
+                $table,
+                ["replacedJson" => \craft\helpers\Json::encode($merged)],
+                ["searchId" => $searchId, "userId" => $userId]
+            )
+            ->execute();
     }
 
     /**

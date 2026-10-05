@@ -236,6 +236,7 @@ class SearchController extends Controller
                 "totalCount",
                 "resultCount",
                 "resultsJson",
+                "replacedJson",
                 "errorMessage",
                 "paramsJson",
                 "dateUpdated",
@@ -282,6 +283,9 @@ class SearchController extends Controller
             $response["groupedResults"] = $decoded["groupedResults"];
             $response["truncated"] = $decoded["truncated"] ?? false;
             $response["stopReason"] = $decoded["stopReason"] ?? null;
+            $response["replaced"] = $row["replacedJson"]
+                ? Json::decode($row["replacedJson"])
+                : [];
         }
 
         return $this->asJson($response);
@@ -804,6 +808,13 @@ class SearchController extends Controller
             "Scanning {scanned} of {total} entries ({pct}%)…",
             "Starting search…",
             "Cancel search",
+            "Replaced",
+            "Changed since search",
+            "Its content changed after the search. Search again to see the current text.",
+            "Replaced {count} matches.",
+            "View in Logs & History",
+            "{count} skipped because their content changed after the search. Search again to see the current text.",
+            "Search again",
             "You already have a search running. Open it, or cancel it before starting another.",
             "Other searches are using the server right now. Try again in a few minutes.",
             "Search in progress",

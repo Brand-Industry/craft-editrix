@@ -289,12 +289,26 @@
             </template>
           </div>
 
+          <div v-if="lastReplace" class="editrix-replace-summary">
+            <p v-if="lastReplace.replaced > 0" class="editrix-replace-summary__done">
+              ✓ {{ t('Replaced {count} matches.', { count: lastReplace.replaced.toLocaleString() }) }}
+              <a v-if="logsPageUrl" :href="logsPageUrl">{{ t('View in Logs & History') }}</a>
+            </p>
+            <p v-if="lastReplace.skipped > 0" class="editrix-form__warning">
+              ⚠️ {{ t('{count} skipped because their content changed after the search. Search again to see the current text.', { count: lastReplace.skipped.toLocaleString() }) }}
+            </p>
+            <button type="button" class="editrix-btn editrix-btn--secondary editrix-btn--sm" @click="handleSearch">
+              {{ t('Search again') }}
+            </button>
+          </div>
+
           <ResultsTable
             :results="visibleResults"
             :total-results="visibleTotalResults"
             :selected-count="selectedCount"
             :all-selected="allSelected"
             :is-selected="isSelected"
+            :row-state="rowState"
             :action-mode="actionMode"
             :search-query="searchParams.query"
             @toggle="toggleResult"
@@ -370,6 +384,7 @@ const {
   hasFeature,
   currentSiteId,
   logsUrl,
+  logsPageUrl,
   dailyCountsUrl,
   safety,
   isProduction,
@@ -458,6 +473,7 @@ watch(searchType, (newType, oldType) => {
   if (oldType === 'text') {
     setSearchMode('general');
     reset();
+    lastReplace.value = null;
   }
 });
 
@@ -549,6 +565,7 @@ const {
   truncated,
   stopReason,
   recentSearches,
+  rowState,
   loadRecentSearches,
   openSearch,
   activeSearches,
@@ -714,6 +731,7 @@ watch(
 );
 
 const handleSearch = async () => {
+  lastReplace.value = null;
   try {
     await search();
   } catch (err) {
@@ -771,6 +789,9 @@ const cancelReplaceConfirm = () => {
   singleReplaceTarget.value = null;
 };
 
+// Summary of the last replace, shown above the results until the next search.
+const lastReplace = ref(null);
+
 const handleReplace = async (confirmationCode) => {
   replacing.value = true;
 
@@ -787,8 +808,12 @@ const handleReplace = async (confirmationCode) => {
       window.Craft?.cp?.displayNotice?.(data.message);
       showReplaceConfirm.value = false;
 
-      // Re-run search to update results
-      await handleSearch();
+      // The rows are marked in place; searching again would rescan the
+      // whole scope just to show what we already know.
+      lastReplace.value = {
+        replaced: data.replacedCount || 0,
+        skipped: (data.skipped || []).length,
+      };
     } else {
       window.Craft?.cp?.displayError?.(data?.error || 'Replace failed');
     }

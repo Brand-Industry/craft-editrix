@@ -7,6 +7,7 @@ use craft\web\Controller;
 use yii\web\Response;
 use brandindustry\editrix\Editrix;
 use brandindustry\editrix\services\LicenseService;
+use brandindustry\editrix\services\ReplaceService;
 
 class ReplaceController extends Controller
 {
@@ -65,16 +66,28 @@ class ReplaceController extends Controller
         }
 
         try {
+            $skipped = [];
             $replacements = Editrix::$plugin->replace->replace(
                 $selectedResults,
                 $searchQuery,
                 $replaceWith,
                 $useRegex,
                 !$caseInsensitive,
-                $wholeWords
+                $wholeWords,
+                $skipped
             );
 
             $replacedCount = count($replacements);
+            $replacedKeys = array_map(
+                fn(array $r) => ReplaceService::keyFor($r),
+                $replacements
+            );
+
+            Editrix::$plugin->replace->markReplaced(
+                (string) $request->getBodyParam("searchId", ""),
+                (int) Craft::$app->getUser()->getId(),
+                $replacedKeys
+            );
 
             if ($replacedCount > 0) {
                 $logSiteId =
@@ -94,6 +107,8 @@ class ReplaceController extends Controller
             return $this->asJson([
                 "success" => true,
                 "replacedCount" => $replacedCount,
+                "replacedKeys" => $replacedKeys,
+                "skipped" => $skipped,
                 "message" => Craft::t(
                     "editrix",
                     "Successfully replaced {count} occurrence(s).",

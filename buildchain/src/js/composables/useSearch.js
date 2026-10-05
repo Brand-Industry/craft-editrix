@@ -13,6 +13,11 @@ export const JOB_IDLE_SECONDS = 120;
 // worker. It stops counting as in progress (the server uses the same limit).
 export const ACTIVE_MAX_IDLE_SECONDS = 600;
 
+// Identifies one field of one element on one site. The server builds the
+// same key (ReplaceService::keyFor), so replaced marks line up with rows.
+export const resultKey = r =>
+  `${r.elementType}_${r.elementId}_${r.fieldHandle}_${r.siteId}`;
+
 export const isActiveSearch = s =>
   (s.status === 'queued' || s.status === 'running') &&
   (s.idleSeconds || 0) < ACTIVE_MAX_IDLE_SECONDS;
@@ -65,6 +70,19 @@ export function useSearch(actionMode) {
   );
   const currentSearchId = ref(null);
   const recentSearches = ref([]);
+  // The saved search whose results are on screen, so a replace can be
+  // recorded against it.
+  const loadedSearchId = ref(null);
+  // Matches already replaced, and ones skipped because their content
+  // changed after the search. Both stay visible but can't be selected.
+  const replacedKeys = ref(new Set());
+  const staleKeys = ref(new Set());
+  const rowState = r => {
+    const key = resultKey(r);
+    if (replacedKeys.value.has(key)) return 'replaced';
+    if (staleKeys.value.has(key)) return 'stale';
+    return null;
+  };
   const queueStalled = ref(false);
   const jobStalled = ref(false);
 
@@ -97,7 +115,8 @@ export function useSearch(actionMode) {
   // it drives what gets written back (read-only matches must be excluded).
   const selectableResults = computed(() => {
     const all = getAllResults();
-    return actionMode?.value === 'replace' ? all.filter(r => !r.readOnly) : all;
+    if (actionMode?.value !== 'replace') return all;
+    return all.filter(r => !r.readOnly && !rowState(r));
   });
   const allSelected = computed(() => {
     if (selectableResults.value.length === 0) return false;
@@ -115,6 +134,8 @@ export function useSearch(actionMode) {
     scannedCount.value = 0;
     totalCount.value = 0;
     matchCount.value = 0;
+    replacedKeys.value = new Set();
+    staleKeys.value = new Set();
     truncated.value = false;
     stopReason.value = null;
     queueStalled.value = false;
@@ -150,6 +171,7 @@ export function useSearch(actionMode) {
       }
 
       currentSearchId.value = startData.searchId;
+      loadedSearchId.value = startData.searchId;
       kickQueue();
       const finished = await pollSearch(startData.searchId);
       loadRecentSearches();
@@ -216,6 +238,7 @@ export function useSearch(actionMode) {
             totalResults.value = data.totalResults || 0;
             truncated.value = data.truncated || false;
             stopReason.value = data.stopReason || null;
+            replacedKeys.value = new Set(data.replaced || []);
             queueStalled.value = false;
             jobStalled.value = false;
             loading.value = false;
@@ -268,11 +291,14 @@ export function useSearch(actionMode) {
     scannedCount.value = 0;
     totalCount.value = 0;
     matchCount.value = 0;
+    replacedKeys.value = new Set();
+    staleKeys.value = new Set();
     truncated.value = false;
     stopReason.value = null;
     queueStalled.value = false;
     jobStalled.value = false;
     currentSearchId.value = searchId;
+    loadedSearchId.value = searchId;
 
     try {
       const finished = await pollSearch(searchId, onParams);
@@ -324,7 +350,7 @@ export function useSearch(actionMode) {
 
   // Selection methods
   const toggleResult = (result) => {
-    if (actionMode?.value === 'replace' && result.readOnly) return;
+    if (actionMode?.value === 'replace' && (result.readOnly || rowState(result))) return;
 
     const index = selectedResults.value.findIndex(
       r => r.uniqueKey === result.uniqueKey
@@ -382,7 +408,21 @@ export function useSearch(actionMode) {
         caseInsensitive: searchParams.caseInsensitive,
         wholeWords: searchParams.wholeWords,
         confirmationCode: confirmationCode ?? '',
+        searchId: loadedSearchId.value ?? '',
       });
+
+      // Mark what was done on screen; no new search is needed.
+      if (data?.success) {
+        replacedKeys.value = new Set([
+          ...replacedKeys.value,
+          ...(data.replacedKeys || []),
+        ]);
+        staleKeys.value = new Set([
+          ...staleKeys.value,
+          ...(data.skipped || []).map(s => s.key),
+        ]);
+        selectedResults.value = selectedResults.value.filter(r => !rowState(r));
+      }
 
       return data;
     } catch (err) {
@@ -423,12 +463,15 @@ export function useSearch(actionMode) {
     scannedCount.value = 0;
     totalCount.value = 0;
     matchCount.value = 0;
+    replacedKeys.value = new Set();
+    staleKeys.value = new Set();
     queueStalled.value = false;
     jobStalled.value = false;
     // Lets any in-flight poll loop notice it's stale and stop on its next
     // tick instead of overwriting this reset with a late response. The job
     // itself keeps running on the server; coming back re-attaches to it.
     currentSearchId.value = null;
+    loadedSearchId.value = null;
     loading.value = false;
   };
 
@@ -455,6 +498,7 @@ export function useSearch(actionMode) {
     truncated,
     stopReason,
     recentSearches,
+    rowState,
     loadRecentSearches,
     openSearch,
     activeSearches,

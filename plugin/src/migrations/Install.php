@@ -81,6 +81,7 @@ class Install extends Migration
             'resultCount' => $this->integer(),
             'paramsJson' => $this->text(), // what was searched, to restore the form
             'resultsJson' => $this->longText(),
+            'replacedJson' => $this->longText(), // keys of matches already replaced
             'errorMessage' => $this->text(),
             'dateCreated' => $this->dateTime()->notNull(),
             'dateUpdated' => $this->dateTime()->notNull(),
