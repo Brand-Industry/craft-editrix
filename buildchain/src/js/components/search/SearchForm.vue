@@ -144,7 +144,7 @@
 
       <button
         class="editrix-btn editrix-btn--primary editrix-btn--lg"
-        :disabled="!query || loading"
+        :disabled="!query || loading || blocked"
         @click="$emit('search')"
       >
         <span v-if="loading">{{ t('Searching...') }}</span>
@@ -177,6 +177,8 @@ defineProps({
   searchMatrix: { type: Boolean, default: true },
   searchCategories: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
+  // Another search of this user is still running.
+  blocked: { type: Boolean, default: false },
   actionMode: { type: String, default: 'replace' },
 });
 

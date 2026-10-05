@@ -20,7 +20,7 @@ vi.mock('../src/js/composables/useConfig', () => ({
   }),
 }));
 
-const { useSearch, QUEUE_STALL_MS, POLL_INTERVAL_MS, JOB_IDLE_SECONDS, RESUME_MAX_IDLE_SECONDS } = await import(
+const { useSearch, QUEUE_STALL_MS, POLL_INTERVAL_MS, JOB_IDLE_SECONDS, ACTIVE_MAX_IDLE_SECONDS } = await import(
   '../src/js/composables/useSearch'
 );
 
@@ -336,42 +336,56 @@ describe('useSearch leaving and coming back', () => {
     vi.useRealTimers();
   });
 
-  it('re-attaches to a search that is still running when the page opens', async () => {
+  it('lists the searches still in progress, with their progress', async () => {
+    serve({
+      list: recent(
+        saved({ scannedCount: 500, totalCount: 1000 }),
+        saved({ searchId: 'done', status: 'completed' })
+      ),
+      poll: status(),
+    });
+
+    const s = useSearch();
+    await s.loadRecentSearches();
+
+    expect(s.recentSearches.value).toHaveLength(2);
+    expect(s.activeSearches.value.map(x => x.searchId)).toEqual(['old']);
+  });
+
+  it('does not count a search whose worker went quiet long ago', async () => {
+    serve({
+      list: recent(saved({ idleSeconds: ACTIVE_MAX_IDLE_SECONDS })),
+      poll: status(),
+    });
+
+    const s = useSearch();
+    await s.loadRecentSearches();
+
+    expect(s.activeSearches.value).toEqual([]);
+  });
+
+  it('does not open anything by itself when the page loads', async () => {
+    serve({ list: recent(saved()), poll: status() });
+
+    const s = useSearch();
+    await s.loadRecentSearches();
+
+    expect(s.loading.value).toBe(false);
+    expect(s.hasSearched.value).toBe(false);
+  });
+
+  it('opens a search that is still running and follows its progress', async () => {
     serve({
       list: recent(saved()),
       poll: status({ status: 'running', scannedCount: 500, totalCount: 1000 }),
     });
 
     const s = useSearch();
-    const resumed = await s.resumeActiveSearch();
+    s.openSearch('old');
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(resumed).toBe(true);
     expect(s.loading.value).toBe(true);
-    expect(s.hasSearched.value).toBe(true);
     expect(s.progress.value).toBe(0.5);
-    expect(get).toHaveBeenCalledWith('/search/status', { id: 'old' });
-  });
-
-  it('does nothing when no search is in progress', async () => {
-    serve({ list: recent(saved({ status: 'completed' })), poll: status() });
-
-    const s = useSearch();
-    const resumed = await s.resumeActiveSearch();
-
-    expect(resumed).toBe(false);
-    expect(s.loading.value).toBe(false);
-    expect(s.recentSearches.value).toHaveLength(1);
-  });
-
-  it('does not re-attach to a search whose worker went quiet long ago', async () => {
-    serve({
-      list: recent(saved({ idleSeconds: RESUME_MAX_IDLE_SECONDS })),
-      poll: status(),
-    });
-
-    const s = useSearch();
-    expect(await s.resumeActiveSearch()).toBe(false);
   });
 
   it('opens a finished search and puts its form back', async () => {
@@ -406,11 +420,36 @@ describe('useSearch leaving and coming back', () => {
     post.mockResolvedValue({ success: true });
 
     const s = useSearch();
-    await s.resumeActiveSearch();
+    s.openSearch('old');
     await vi.advanceTimersByTimeAsync(0);
     await s.cancelSearch();
 
     expect(post).toHaveBeenCalledWith('/search/cancel', { id: 'old' });
+  });
+
+  it('cancels a search from the list and refreshes it', async () => {
+    serve({ list: recent(saved({ status: 'cancelled' })), poll: status() });
+    post.mockResolvedValue({ success: true });
+
+    const s = useSearch();
+    await s.cancelSearchById('old');
+
+    expect(post).toHaveBeenCalledWith('/search/cancel', { id: 'old' });
+    expect(s.activeSearches.value).toEqual([]);
+  });
+
+  it('shows the server\'s refusal when a search is already running', async () => {
+    post.mockResolvedValue({
+      success: false,
+      code: 'searchInProgress',
+      error: 'You already have a search running.',
+    });
+
+    const s = useSearch();
+    await s.search();
+
+    expect(s.error.value).toBe('You already have a search running.');
+    expect(s.loading.value).toBe(false);
   });
 });
 

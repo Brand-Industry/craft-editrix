@@ -12,10 +12,10 @@ use PHPUnit\Framework\TestCase;
 
 abstract class EditrixTestCase extends TestCase
 {
-    private const TABLE = '{{%editrix_searches}}';
+    protected const TABLE = '{{%editrix_searches}}';
 
     /** @var string[] */
-    private array $searchIds = [];
+    protected array $searchIds = [];
 
     protected function tearDown(): void
     {

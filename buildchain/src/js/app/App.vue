@@ -74,6 +74,13 @@
           </button>
         </div>
 
+        <ActiveSearches
+          v-if="!searchType"
+          :searches="activeSearches"
+          @open="openRecentSearch"
+          @cancel="cancelSearchById"
+        />
+
         <RecentActivity
           v-if="!searchType"
           :logs="recentLogs"
@@ -193,8 +200,19 @@
             v-model:search-matrix="searchParams.searchMatrix"
             v-model:search-categories="searchParams.searchCategories"
             :loading="loading"
+            :blocked="activeSearches.length > 0 && !loading"
             :action-mode="actionMode"
             @search="handleSearch"
+          />
+
+          <div v-if="activeSearches.length > 0 && !loading" class="editrix-form__warning" style="margin-top: 16px;">
+            ⚠️ {{ t('You already have a search running. Open it, or cancel it before starting another.') }}
+          </div>
+          <ActiveSearches
+            v-if="!loading"
+            :searches="activeSearches"
+            @open="openRecentSearch"
+            @cancel="cancelSearchById"
           />
 
           <details v-if="recentSearches.length > 0 && !loading" class="editrix-recent-searches">
@@ -344,6 +362,7 @@ import EditionBadge from '../components/common/EditionBadge.vue';
 import AssignmentSearchForm from '../components/assignments/AssignmentSearchForm.vue';
 import AssignmentResultsList from '../components/assignments/AssignmentResultsList.vue';
 import RecentActivity from '../components/search/RecentActivity.vue';
+import ActiveSearches from '../components/search/ActiveSearches.vue';
 import ActivityChart from '../components/logs/ActivityChart.vue';
 
 const {
@@ -529,7 +548,8 @@ const {
   recentSearches,
   loadRecentSearches,
   openSearch,
-  resumeActiveSearch,
+  activeSearches,
+  cancelSearchById,
   selectedResults,
   hasSearched,
   searchParams,
@@ -624,9 +644,7 @@ onMounted(() => {
   searchParams.siteId = currentSiteId.value;
   assignmentParams.siteId = currentSiteId.value;
   if (!restoreFromHistory()) {
-    resumeActiveSearch(applySavedParams).then(resumed => {
-      if (!resumed) loadRecentSearches();
-    });
+    loadRecentSearches();
   }
   fetchRecentActivity();
   fetchDailyCounts();
@@ -656,6 +674,18 @@ const restoreFromHistory = () => {
 
   handleSearch();
 };
+
+// While a search is running somewhere (this tab, another tab, before a
+// reload), keep its progress in the list fresh.
+let activePoll = null;
+watch(
+  () => activeSearches.value.length > 0 && !loading.value,
+  watching => {
+    clearInterval(activePoll);
+    activePoll = watching ? setInterval(loadRecentSearches, 3000) : null;
+  },
+  { immediate: true }
+);
 
 const handleSearch = async () => {
   try {

@@ -19,6 +19,9 @@ use brandindustry\editrix\services\LicenseService;
 
 class SearchController extends Controller
 {
+    /** How long a queued or running search may be silent and still count as active. */
+    private const ACTIVE_WINDOW_SECONDS = 600;
+
     public function actionIndex(): Response
     {
         if (!Editrix::$plugin->userCan("editrix:search")) {
@@ -135,6 +138,36 @@ class SearchController extends Controller
         }
         $p = $parsed["params"];
 
+        // One search per user, and a ceiling across users: each search
+        // reads every entry in scope, which is heavy on a large site.
+        $userId = Craft::$app->getUser()->getId();
+        $mine = $this->activeSearches()->andWhere(["userId" => $userId])->one();
+        if ($mine) {
+            return $this->asJson([
+                "success" => false,
+                "code" => "searchInProgress",
+                "searchId" => $mine["searchId"],
+                "error" => Craft::t(
+                    "editrix",
+                    "You already have a search running. Open it, or cancel it before starting another."
+                ),
+            ]);
+        }
+
+        if (
+            (int) $this->activeSearches()->count() >=
+            Editrix::$plugin->getSettings()->maxConcurrentSearches
+        ) {
+            return $this->asJson([
+                "success" => false,
+                "code" => "serverBusy",
+                "error" => Craft::t(
+                    "editrix",
+                    "Other searches are using the server right now. Try again in a few minutes."
+                ),
+            ]);
+        }
+
         $searchId = StringHelper::UUID();
         $now = Db::prepareDateForDb(new \DateTime());
 
@@ -249,6 +282,25 @@ class SearchController extends Controller
         }
 
         return $this->asJson($response);
+    }
+
+    /**
+     * Searches that are queued or running and still showing signs of life.
+     * A worker that died leaves its row "running" forever, so a row that
+     * has been silent this long no longer counts and can't block anyone.
+     */
+    private function activeSearches(): Query
+    {
+        return (new Query())
+            ->from(SearchSessions::TABLE_SEARCHES)
+            ->where(["status" => ["queued", "running"]])
+            ->andWhere([
+                ">=",
+                "dateUpdated",
+                Db::prepareDateForDb(
+                    (new \DateTime())->modify("-" . self::ACTIVE_WINDOW_SECONDS . " seconds")
+                ),
+            ]);
     }
 
     /**
@@ -749,6 +801,9 @@ class SearchController extends Controller
             "Scanning {scanned} of {total} entries ({pct}%)…",
             "Starting search…",
             "Cancel search",
+            "You already have a search running. Open it, or cancel it before starting another.",
+            "Other searches are using the server right now. Try again in a few minutes.",
+            "Searches in progress",
             "Recent searches",
             "{count} results",
             "cancelled",

@@ -1623,3 +1623,72 @@
     color: $text-muted;
   }
 }
+
+.editrix-active-searches {
+  margin: 24px 0;
+  padding: $spacing-md $spacing-lg;
+  background: #fff;
+  border: 1px solid $gray-200;
+  border-radius: $radius-sm;
+
+  &__title {
+    margin: 0 0 8px;
+    font-size: 15px;
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-top: 1px solid $gray-200;
+
+    &:first-child {
+      border-top: 0;
+    }
+  }
+
+  &__query {
+    font-weight: 600;
+    max-width: 30%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__progress {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  &__bar {
+    flex: 1;
+    height: 6px;
+    background: $gray-200;
+    border-radius: $radius-sm;
+    overflow: hidden;
+  }
+
+  &__fill {
+    display: block;
+    height: 100%;
+    background: $secondary;
+    transition: width 0.3s ease;
+  }
+
+  &__pct {
+    min-width: 48px;
+    text-align: right;
+    font-size: 13px;
+    color: $text-muted;
+  }
+}

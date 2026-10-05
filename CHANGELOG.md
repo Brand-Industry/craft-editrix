@@ -10,7 +10,9 @@ All notable changes to Editrix will be documented in this file.
 - A warning appears when a running search stops reporting progress for two minutes, which usually means the server killed the worker; the search can be cancelled from the same screen
 - Searches stop at 5,000 matches and show a notice asking the user to narrow the search, so a broad query can't exhaust memory on a large site
 
-- A search keeps running when the user leaves the page: reopening Editrix picks up the search in progress, and a "Recent searches" list reopens any of the last ten (kept for a day) with its results and form as they were
+- Only one search per user runs at a time, and `maxConcurrentSearches` (default 2) caps searches across all users, so a few broad searches can't overload a large site
+- The Editrix home screen lists searches in progress with their percentage, with Open and Cancel
+- A search keeps running when the user leaves the page: the home screen shows it as in progress, and a "Recent searches" list reopens any of the last ten (kept for a day) with its results and form as they were
 - A search that reaches the server's memory limit now stops with the matches found so far and says why, instead of being killed
 
 ### Changed

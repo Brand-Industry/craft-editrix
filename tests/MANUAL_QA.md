@@ -70,7 +70,10 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] Al buscar aparece la barra de progreso con "Scanning X of Y entries (Z%)…" y el porcentaje sube.
 - [ ] El botón **Cancel search** detiene la búsqueda en pocos segundos y muestra lo encontrado hasta ese momento.
 - [ ] Cancelar y lanzar otra búsqueda enseguida muestra solo los resultados de la nueva.
-- [ ] **Salir y volver**: lanza una búsqueda grande, recarga la página (o abre otra sección del panel y regresa). La pantalla retoma la búsqueda en curso con su barra de progreso y su botón **Cancel search**, sin lanzar una nueva.
+- [ ] **Salir y volver**: lanza una búsqueda grande y recarga la página (o abre otra sección del panel y regresa). En la pantalla de inicio aparece **Searches in progress** con la consulta, una barra y el porcentaje, que sube solo cada pocos segundos. **Open** lleva a esa búsqueda con su progreso y su botón **Cancel search**; **Cancel search** de la lista la cancela sin abrirla.
+- [ ] **Una búsqueda a la vez**: con una búsqueda en curso, entra a Text. El botón de buscar está deshabilitado y aparece el aviso "You already have a search running…" con la lista para abrirla o cancelarla. Al cancelarla o terminar, el botón vuelve a funcionar.
+- [ ] Si el worker murió y la búsqueda lleva más de 10 minutos sin avance, deja de aparecer como en curso y ya no bloquea nuevas búsquedas.
+- [ ] Un segundo usuario puede buscar a la vez que el primero, hasta el límite del servidor (`maxConcurrentSearches`, 2 por defecto). Con el límite alcanzado ve "Other searches are using the server right now…".
 - [ ] Al terminar una búsqueda, sal del plugin y vuelve: en **Recent searches** aparece con su número de resultados. **Open** muestra los mismos resultados sin buscar de nuevo y restaura el formulario (texto, secciones, opciones).
 - [ ] Una búsqueda terminada abierta desde **Recent searches** se puede usar en Search & Replace (la selección y el preview funcionan).
 - [ ] Un segundo usuario no ve las búsquedas del primero.
