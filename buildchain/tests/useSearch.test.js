@@ -413,3 +413,50 @@ describe('useSearch leaving and coming back', () => {
     expect(post).toHaveBeenCalledWith('/search/cancel', { id: 'old' });
   });
 });
+
+describe('useSearch starting the queue', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    post.mockReset();
+    get.mockReset();
+    post.mockResolvedValue({ success: true, searchId: 'abc' });
+    get.mockResolvedValue(status({ status: 'queued' }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    delete globalThis.window;
+  });
+
+  it('asks Craft to run the queue as soon as the search is queued', async () => {
+    const runQueue = vi.fn();
+    globalThis.window = { Craft: { cp: { runQueue } } };
+
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(runQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask for the queue when the search could not be started', async () => {
+    const runQueue = vi.fn();
+    globalThis.window = { Craft: { cp: { runQueue } } };
+    post.mockResolvedValue({ success: false, error: 'nope' });
+
+    const s = useSearch();
+    await s.search();
+
+    expect(runQueue).not.toHaveBeenCalled();
+  });
+
+  it('still searches when Craft\'s panel script is not there', async () => {
+    globalThis.window = {};
+
+    const s = useSearch();
+    s.search();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(s.loading.value).toBe(true);
+  });
+});
