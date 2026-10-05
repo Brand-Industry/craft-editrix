@@ -9,9 +9,13 @@ export const POLL_INTERVAL_MS = 1500;
 // A running job reports progress every few hundred entries. This long
 // without a report means the worker most likely died.
 export const JOB_IDLE_SECONDS = 120;
-// A running search that has been silent this long is a leftover from a
-// dead worker; don't re-attach to it automatically when the page opens.
-export const RESUME_MAX_IDLE_SECONDS = 3600;
+// A queued or running search silent for this long is a leftover from a dead
+// worker. It stops counting as in progress (the server uses the same limit).
+export const ACTIVE_MAX_IDLE_SECONDS = 600;
+
+export const isActiveSearch = s =>
+  (s.status === 'queued' || s.status === 'running') &&
+  (s.idleSeconds || 0) < ACTIVE_MAX_IDLE_SECONDS;
 
 // Craft starts its web queue runner from the control panel's JavaScript,
 // and only when a panel page loads. A job pushed by an AJAX request, like
@@ -266,7 +270,9 @@ export function useSearch(actionMode) {
     currentSearchId.value = searchId;
 
     try {
-      return await pollSearch(searchId, onParams);
+      const finished = await pollSearch(searchId, onParams);
+      loadRecentSearches();
+      return finished;
     } catch (err) {
       error.value = err.message;
       loading.value = false;
@@ -274,19 +280,18 @@ export function useSearch(actionMode) {
     }
   };
 
-  // On page load: pick up a search still in progress, if there is one.
-  const resumeActiveSearch = async (onParams = null) => {
-    const recent = await loadRecentSearches();
-    const active = recent.find(
-      s =>
-        (s.status === 'queued' || s.status === 'running') &&
-        (s.idleSeconds || 0) < RESUME_MAX_IDLE_SECONDS
-    );
+  const activeSearches = computed(() =>
+    recentSearches.value.filter(isActiveSearch)
+  );
 
-    if (!active) return false;
-
-    openSearch(active.searchId, onParams).catch(() => {});
-    return true;
+  // Cancels any of the user's searches, not just the one on screen.
+  const cancelSearchById = async searchId => {
+    try {
+      await post(searchCancelUrl.value, { id: searchId });
+    } catch (err) {
+      // The next refresh of the list shows what actually happened.
+    }
+    await loadRecentSearches();
   };
 
   // Best-effort - the running job checks this flag on its own cadence
@@ -444,7 +449,8 @@ export function useSearch(actionMode) {
     recentSearches,
     loadRecentSearches,
     openSearch,
-    resumeActiveSearch,
+    activeSearches,
+    cancelSearchById,
     selectedResults,
     hasSearched,
     searchParams,

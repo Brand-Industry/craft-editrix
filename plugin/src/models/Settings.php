@@ -28,6 +28,13 @@ class Settings extends Model
 
     public int $bulkConfirmationThreshold = 100;
 
+    /**
+     * Searches that may run at once across all users. Each one reads every
+     * entry in scope, so on a large site a few at a time already load the
+     * database.
+     */
+    public int $maxConcurrentSearches = 2;
+
     public bool $showEnvironmentIndicator = true;
 
     public bool $productionSafeMode = false;
@@ -36,7 +43,7 @@ class Settings extends Model
     {
         return [
             [["logRetentionDays"], "integer", "min" => 1, "max" => 365],
-            [["bulkConfirmationThreshold"], "integer", "min" => 1],
+            [["bulkConfirmationThreshold", "maxConcurrentSearches"], "integer", "min" => 1],
             [
                 [
                     "searchEntries",
