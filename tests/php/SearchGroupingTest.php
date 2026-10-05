@@ -27,7 +27,7 @@ class SearchGroupingTest extends TestCase
         $result->siteId = $site->id;
         $result->siteHandle = $site->handle;
         $result->matchContext = 'a [[MATCH]]hotel[[/MATCH]] b';
-        $result->fieldValue = str_repeat('x', 100);
+        $result->valueHash = ReplaceService::hashValue(str_repeat('x', 100));
         $result->matchStart = 0;
         $result->matchEnd = 5;
         $result->isRichText = true;
@@ -78,8 +78,8 @@ class SearchGroupingTest extends TestCase
 
     public function testTheRowStaysSmallWhateverTheFieldLength(): void
     {
-        $short = $this->rows([$this->match(['fieldValue' => 'short'])])[0];
-        $long = $this->rows([$this->match(['fieldValue' => str_repeat('long ', 50000)])])[0];
+        $short = $this->rows([$this->match(['valueHash' => ReplaceService::hashValue('short')])])[0];
+        $long = $this->rows([$this->match(['valueHash' => ReplaceService::hashValue(str_repeat('long ', 50000))])])[0];
 
         $this->assertSame(strlen(json_encode($short)), strlen(json_encode($long)));
     }

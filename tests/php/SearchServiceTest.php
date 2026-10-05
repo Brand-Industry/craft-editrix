@@ -112,4 +112,30 @@ class SearchServiceTest extends EditrixTestCase
 
         $this->assertSame($total, $service->calls, 'Every entry should still be visited after earlier ones threw.');
     }
+
+    public function testResultsDoNotKeepTheFieldTextInMemory(): void
+    {
+        $section = $this->smallestSection(20);
+        if (!$section) {
+            $this->markTestSkipped('The site has no section with enough entries.');
+        }
+
+        $results = Editrix::$plugin->search->search(
+            'e',
+            $this->siteId(),
+            false,
+            false,
+            $this->sectionOptions($section[0], ['maxResults' => 50])
+        );
+
+        if (!$results) {
+            $this->markTestSkipped('No matches for "e".');
+        }
+
+        foreach ($results as $result) {
+            $this->assertSame('', $result->fieldValue, 'A result must not hold the whole field.');
+            $this->assertNotNull($result->valueHash);
+            $this->assertSame(32, strlen($result->valueHash));
+        }
+    }
 }

@@ -16,7 +16,16 @@ class SearchResult extends Model
     public int $siteId;
     public string $siteHandle;
     public string $matchContext;
-    public string $fieldValue;
+    /**
+     * The field's text. Only kept for tag matches, whose value is just the
+     * tag's title. For everything else a result holds a fingerprint of the
+     * text (see $valueHash) and the text is read again when needed: keeping
+     * it here cost ~15 KB of memory per match on a large search.
+     */
+    public string $fieldValue = '';
+
+    /** Fingerprint of the field's text when the search ran. */
+    public ?string $valueHash = null;
     public int $matchStart;
     public int $matchEnd;
     public ?int $parentId = null;
