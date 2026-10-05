@@ -156,10 +156,12 @@ class LicenseService extends Component
         Editrix::EDITION_STANDARD => [
             "logRetentionDays" => 30,
             "maxPresets" => 5,
+            "searchResultLimit" => 3000,
         ],
         Editrix::EDITION_PRO => [
             "logRetentionDays" => 90,
             "maxPresets" => -1, // Unlimited
+            "searchResultLimit" => 25000,
         ],
     ];
 
@@ -176,6 +178,14 @@ class LicenseService extends Component
     public function getLimit(string $limit): int
     {
         return $this->limits[Editrix::$plugin->edition][$limit] ?? 0;
+    }
+
+    /**
+     * A limit of another edition, to tell a user what upgrading would give.
+     */
+    public function getLimitFor(string $edition, string $limit): int
+    {
+        return $this->limits[$edition][$limit] ?? 0;
     }
 
     public function getFeaturesConfig(): array

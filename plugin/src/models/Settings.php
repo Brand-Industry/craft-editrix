@@ -35,6 +35,22 @@ class Settings extends Model
      */
     public int $maxConcurrentSearches = 2;
 
+    /**
+     * Lowers the number of result rows a search returns below what the
+     * edition allows (Standard 3,000, Pro 25,000). Null keeps the
+     * edition's limit; it can never raise it.
+     */
+    public ?int $maxSearchResults = null;
+
+    /**
+     * Rows one Replace may change in a single request. Saving an entry
+     * takes roughly half a second, and a request that runs longer than the
+     * server allows is cut off after changing some entries but before they
+     * are logged, which leaves them impossible to revert. Lifting this
+     * needs replacing in the queue.
+     */
+    public int $maxRowsPerReplace = 150;
+
     public bool $showEnvironmentIndicator = true;
 
     public bool $productionSafeMode = false;
@@ -43,7 +59,8 @@ class Settings extends Model
     {
         return [
             [["logRetentionDays"], "integer", "min" => 1, "max" => 365],
-            [["bulkConfirmationThreshold", "maxConcurrentSearches"], "integer", "min" => 1],
+            [["bulkConfirmationThreshold", "maxConcurrentSearches", "maxRowsPerReplace"], "integer", "min" => 1],
+            [["maxSearchResults"], "integer", "min" => 1, "skipOnEmpty" => true],
             [
                 [
                     "searchEntries",

@@ -40,12 +40,15 @@
         <button
           v-else
           class="editrix-btn editrix-btn--primary"
-          :disabled="selectedCount === 0"
+          :disabled="selectedCount === 0 || overReplaceLimit"
           @click="$emit('replace')"
         >
           {{ t('Replace Selected') }}
           <span v-if="selectedCount > 0">({{ selectedCount }})</span>
         </button>
+        <span v-if="overReplaceLimit" class="editrix-results__limit-note">
+          {{ t('Select at most {limit} rows to replace at once.', { limit: replaceLimit.toLocaleString() }) }}
+        </span>
       </div>
     </header>
 
@@ -199,6 +202,8 @@ const props = defineProps({
   selectedCount: { type: Number, required: true },
   allSelected: { type: Boolean, default: false },
   isSelected: { type: Function, required: true },
+  // Most rows one replace may change; 0 means no limit.
+  replaceLimit: { type: Number, default: 0 },
   // 'replaced', 'stale' or null for a result.
   rowState: { type: Function, default: () => null },
   actionMode: { type: String, default: 'replace' },
@@ -236,6 +241,10 @@ const toggleExpanded = result => {
   if (!next.delete(result.uniqueKey)) next.add(result.uniqueKey);
   expanded.value = next;
 };
+
+const overReplaceLimit = computed(
+  () => props.replaceLimit > 0 && props.selectedCount > props.replaceLimit
+);
 
 const occurrenceCount = computed(() =>
   flatRows.value.reduce((sum, row) => sum + (row.result.matchCount || 1), 0)

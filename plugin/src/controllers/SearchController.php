@@ -101,6 +101,8 @@ class SearchController extends Controller
                 "dryRun" => $p["dryRun"],
                 "truncated" => $meta["truncated"] ?? false,
                 "stopReason" => $meta["stopReason"] ?? null,
+                "resultLimit" => $meta["resultLimit"] ?? null,
+                "upgradeLimit" => $meta["upgradeLimit"] ?? null,
             ]);
         } catch (\Throwable $e) {
             Craft::error(
@@ -294,6 +296,8 @@ class SearchController extends Controller
             $response["groupedResults"] = $decoded["groupedResults"];
             $response["truncated"] = $decoded["truncated"] ?? false;
             $response["stopReason"] = $decoded["stopReason"] ?? null;
+            $response["resultLimit"] = $decoded["resultLimit"] ?? null;
+            $response["upgradeLimit"] = $decoded["upgradeLimit"] ?? null;
             $response["replaced"] = $row["replacedJson"]
                 ? Json::decode($row["replacedJson"])
                 : [];
@@ -709,6 +713,9 @@ class SearchController extends Controller
                 $sites
             ),
             "currentSiteId" => $currentSite->id,
+            "resultLimit" => Editrix::$plugin->search->currentResultLimit(),
+            "upgradeResultLimit" => Editrix::$plugin->search->upgradeResultLimit(),
+            "replaceRowLimit" => Editrix::$plugin->getSettings()->maxRowsPerReplace,
 
             "apiUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/search"
@@ -877,6 +884,9 @@ class SearchController extends Controller
             "Scanning {scanned} of {total} entries ({pct}%)…",
             "Starting search…",
             "Cancel search",
+            "Your edition shows up to {limit} results; Pro shows up to {proLimit}.",
+            "Select at most {limit} rows per replace; you selected {count}.",
+            "Select at most {limit} rows to replace at once.",
             "{count} matches",
             "Hide matches",
             "Show all {count} matches",
@@ -889,7 +899,7 @@ class SearchController extends Controller
             "Up to about {time} left",
             "You can leave this page. The search keeps running on the server, and you will find it here when you come back.",
             "Limit the search to a section or field in Segmented Search to finish much faster.",
-            "A search stops at 5,000 matches. A more specific phrase gives you a complete list.",
+            "A search stops at {limit} results. A more specific phrase gives you a complete list.",
             "Finished searches stay under Recent searches for a day.",
             "Dry Run Mode shows what a replace would do without saving anything.",
             "Every replace is logged, and you can revert it from Logs & History.",

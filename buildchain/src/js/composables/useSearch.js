@@ -55,6 +55,9 @@ export function useSearch(actionMode) {
   const totalResults = ref(0);
   const truncated = ref(false);
   const stopReason = ref(null);
+  // The row limit in force and, on Standard, what Pro would allow.
+  const resultLimit = ref(null);
+  const upgradeLimit = ref(null);
   const selectedResults = ref([]);
   const hasSearched = ref(false);
 
@@ -148,6 +151,8 @@ export function useSearch(actionMode) {
     staleKeys.value = new Set();
     truncated.value = false;
     stopReason.value = null;
+    resultLimit.value = null;
+    upgradeLimit.value = null;
     queueStalled.value = false;
     jobStalled.value = false;
 
@@ -259,6 +264,8 @@ export function useSearch(actionMode) {
             totalResults.value = data.totalResults || 0;
             truncated.value = data.truncated || false;
             stopReason.value = data.stopReason || null;
+            resultLimit.value = data.resultLimit || null;
+            upgradeLimit.value = data.upgradeLimit || null;
             replacedKeys.value = new Set(data.replaced || []);
             queueStalled.value = false;
             jobStalled.value = false;
@@ -319,6 +326,8 @@ export function useSearch(actionMode) {
     staleKeys.value = new Set();
     truncated.value = false;
     stopReason.value = null;
+    resultLimit.value = null;
+    upgradeLimit.value = null;
     queueStalled.value = false;
     jobStalled.value = false;
     currentSearchId.value = searchId;
@@ -481,6 +490,8 @@ export function useSearch(actionMode) {
     totalResults.value = 0;
     truncated.value = false;
     stopReason.value = null;
+    resultLimit.value = null;
+    upgradeLimit.value = null;
     selectedResults.value = [];
     hasSearched.value = false;
     error.value = null;
@@ -524,6 +535,8 @@ export function useSearch(actionMode) {
     totalResults,
     truncated,
     stopReason,
+    resultLimit,
+    upgradeLimit,
     recentSearches,
     rowState,
     loadRecentSearches,

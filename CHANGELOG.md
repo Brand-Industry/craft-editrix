@@ -8,7 +8,8 @@ All notable changes to Editrix will be documented in this file.
 - Searches now run as background jobs on Craft's queue, with a progress bar and a "Cancel search" button, so large sites no longer time out or tie up PHP workers
 - A warning appears when a search is still waiting to start after about 15 seconds, since Craft's queue may not be running (see "Searches and the Craft queue" in the README)
 - A warning appears when a running search stops reporting progress for two minutes, which usually means the server killed the worker; the search can be cancelled from the same screen
-- Searches stop at 5,000 matches and show a notice asking the user to narrow the search, so a broad query can't exhaust memory on a large site
+- Searches stop at a limit by edition (Standard 3,000 results, Pro 25,000) and show a notice asking the user to narrow the search, so a broad query can't exhaust memory on a large site; on Standard the notice says what Pro allows. The `maxSearchResults` setting can lower the limit
+- One Replace is limited to 150 rows (`maxRowsPerReplace`), because a request cut off by the server's time limit leaves changes that were never logged and so can't be reverted
 
 - Only one search per user runs at a time, and `maxConcurrentSearches` (default 2) caps searches across all users, so a few broad searches can't overload a large site
 - While a search runs, the search screen shows a moving progress bar and the matches found so far; reloading or leaving and coming back lands on that same search, and the Text card on the home screen shows that a search is in progress

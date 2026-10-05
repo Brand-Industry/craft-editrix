@@ -55,7 +55,7 @@ export function waitingTips({ hasScopeFilters }) {
     ...(hasScopeFilters
       ? ['Limit the search to a section or field in Segmented Search to finish much faster.']
       : []),
-    'A search stops at 5,000 matches. A more specific phrase gives you a complete list.',
+    'A search stops at {limit} results. A more specific phrase gives you a complete list.',
     'Finished searches stay under Recent searches for a day.',
     'Dry Run Mode shows what a replace would do without saving anything.',
     'Every replace is logged, and you can revert it from Logs & History.',

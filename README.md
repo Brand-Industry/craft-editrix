@@ -31,6 +31,7 @@ Editrix is an advanced search & replace plugin that lets you find and update con
 | Multi-Site               |        -        |     ✅     |
 | Scope Filters            |        -        |    Full    |
 | Export Logs              |        -        | CSV + JSON |
+| Results per search       |      3,000      |   25,000   |
 | Presets                  |        5        | Unlimited  |
 | Protected Fields         |        -        |     ✅     |
 | CLI Commands             |        -        |     ✅     |
@@ -56,7 +57,9 @@ Editrix runs each search as a background job on Craft's queue, so a large site c
 
 If a search is still waiting after about 15 seconds, Editrix shows a warning that the queue may not be running. You can cancel it from the same screen.
 
-Searches stop at 5,000 matches and say so in the results. Narrow the search (a section, an entry type, specific fields) to see the rest.
+A search returns up to 3,000 results on Standard and 25,000 on Pro (one result is one field of one entry, however many times it matches), and says so when it stops. Narrow the search (a section, an entry type, specific fields) to see the rest. To return fewer than your edition allows, set `maxSearchResults` in `config/editrix.php`; it can lower the limit but not raise it.
+
+One Replace changes at most 150 rows (`maxRowsPerReplace`). Saving an entry takes about half a second, and a request that outlasts the server's time limit is cut off after changing some entries but before they are logged. Select fewer rows, or replace in several rounds.
 
 ## Installation
 
