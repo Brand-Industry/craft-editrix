@@ -15,6 +15,7 @@ use craft\fields\Tags;
 use brandindustry\editrix\helpers\FieldValue;
 use brandindustry\editrix\helpers\HtmlText;
 use brandindustry\editrix\models\SearchResult;
+use brandindustry\editrix\services\ReplaceService;
 use brandindustry\editrix\Editrix;
 
 class SearchService extends Component
@@ -104,7 +105,7 @@ class SearchService extends Component
                     )
                 );
 
-                if (count($results) >= $maxResults) {
+                if ($this->countRows($results) >= $maxResults) {
                     $truncated = true;
                     $this->stopReason ??= "results";
                 } elseif ($this->stopReason !== null) {
@@ -125,7 +126,7 @@ class SearchService extends Component
                     )
                 );
 
-                if (count($results) >= $maxResults) {
+                if ($this->countRows($results) >= $maxResults) {
                     $truncated = true;
                     $this->stopReason ??= "results";
                 }
@@ -150,7 +151,7 @@ class SearchService extends Component
                     )
                 );
 
-                if (count($results) >= $maxResults) {
+                if ($this->countRows($results) >= $maxResults) {
                     $truncated = true;
                     $this->stopReason ??= "results";
                 }
@@ -162,25 +163,88 @@ class SearchService extends Component
         }
 
         if ($truncated) {
-            $results = array_slice($results, 0, $maxResults);
+            $results = $this->capRows($results, $maxResults);
         }
 
         $meta["truncated"] = $truncated;
         $meta["stopReason"] = $truncated ? $this->stopReason ?? "results" : null;
-        $meta["resultCount"] = count($results);
+        $meta["resultCount"] = $this->countRows($results);
+        $meta["matchCount"] = count($results);
 
         return $results;
     }
 
     /**
-     * Groups a flat list of SearchResult objects by site, in the exact
-     * shape the frontend expects - shared by the synchronous search
-     * endpoint and SearchJob's background results, so both produce
-     * identical output for the same query.
+     * The most contexts kept per row. A field can match thousands of times;
+     * the row still reports the true count in "matchCount".
+     */
+    public const MAX_CONTEXTS_PER_ROW = 50;
+
+    /**
+     * What a row of results stands for: one field of one element on one
+     * site, however many times it matches. Tag matches are the exception,
+     * because each tag is its own value and can't be replaced anyway.
+     */
+    private function rowKey(SearchResult $result): string
+    {
+        if ($result->readOnlyReason === "tag") {
+            return $result->getUniqueKey();
+        }
+
+        return ReplaceService::keyFor([
+            "elementType" => $result->elementType,
+            "elementId" => $result->elementId,
+            "fieldHandle" => $result->fieldHandle,
+            "siteId" => $result->siteId,
+        ]);
+    }
+
+    private function countRows(array $results): int
+    {
+        $keys = [];
+        foreach ($results as $result) {
+            $keys[$this->rowKey($result)] = true;
+        }
+
+        return count($keys);
+    }
+
+    /** Keeps every match of the first $max rows, in order. */
+    private function capRows(array $results, int $max): array
+    {
+        $keys = [];
+        $kept = [];
+
+        foreach ($results as $result) {
+            $key = $this->rowKey($result);
+
+            if (!isset($keys[$key])) {
+                if (count($keys) >= $max) {
+                    continue;
+                }
+                $keys[$key] = true;
+            }
+
+            $kept[] = $result;
+        }
+
+        return $kept;
+    }
+
+    /**
+     * Groups a flat list of SearchResult objects by site and then by row
+     * (see rowKey), in the exact shape the frontend expects - shared by the
+     * synchronous search endpoint and SearchJob's background results, so
+     * both produce identical output for the same query.
+     *
+     * One row per field means the field's value is stored once, however
+     * many times it matches, and what the user selects is what Replace
+     * actually acts on (it rewrites every occurrence in the field).
      */
     public function groupResultsBySite(array $results): array
     {
         $grouped = [];
+        $rowIndex = [];
 
         foreach ($results as $result) {
             $siteHandle = $result->siteHandle;
@@ -194,8 +258,35 @@ class SearchService extends Component
                 ];
             }
 
+            $key = $this->rowKey($result);
+            $match = [
+                "start" => $result->matchStart,
+                "end" => $result->matchEnd,
+                "context" => $result->matchContext,
+                "readOnly" => $result->readOnly,
+                "readOnlyReason" => $result->readOnlyReason,
+            ];
+
+            if (isset($rowIndex[$siteHandle][$key])) {
+                $row = &$grouped[$siteHandle]["results"][$rowIndex[$siteHandle][$key]];
+                $row["matchCount"]++;
+                if (count($row["matches"]) < self::MAX_CONTEXTS_PER_ROW) {
+                    $row["matches"][] = $match;
+                }
+                // A row can be replaced as long as one match in it can.
+                if (!$result->readOnly) {
+                    $row["readOnly"] = false;
+                    $row["readOnlyReason"] = null;
+                }
+                unset($row);
+                continue;
+            }
+
+            $rowIndex[$siteHandle][$key] = count($grouped[$siteHandle]["results"]);
             $grouped[$siteHandle]["results"][] = [
-                "uniqueKey" => $result->getUniqueKey(),
+                "uniqueKey" => $key,
+                "matches" => [$match],
+                "matchCount" => 1,
                 "elementType" => $result->elementType,
                 "elementId" => $result->elementId,
                 "elementTitle" => $result->elementTitle,
@@ -275,6 +366,7 @@ class SearchService extends Component
 
         $total = $onProgress ? (clone $entryQuery)->count() : 0;
         $scanned = 0;
+        $rows = [];
 
         foreach ($this->eachEntry($entryQuery) as $entry) {
             $scanned++;
@@ -291,6 +383,8 @@ class SearchService extends Component
                     break;
                 }
             }
+
+            $before = count($results);
 
             try {
                 $this->searchOneEntry(
@@ -317,7 +411,13 @@ class SearchService extends Component
                 );
             }
 
-            if (count($results) >= $maxResults) {
+            // The cap is on rows (fields), counted as they appear, so a field
+            // that matches many times doesn't use it up.
+            for ($i = $before, $n = count($results); $i < $n; $i++) {
+                $rows[$this->rowKey($results[$i])] = true;
+            }
+
+            if (count($rows) >= $maxResults) {
                 break;
             }
         }

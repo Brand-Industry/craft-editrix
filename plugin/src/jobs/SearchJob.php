@@ -54,6 +54,10 @@ class SearchJob extends BaseJob
             );
 
             $grouped = Editrix::$plugin->search->groupResultsBySite($results);
+            $rows = 0;
+            foreach ($grouped as $site) {
+                $rows += count($site["results"]);
+            }
 
             if (!$this->isCancelled() && $this->userId) {
                 $logSiteId = $this->siteId ?? Craft::$app
@@ -74,13 +78,14 @@ class SearchJob extends BaseJob
             $this->finalizeRow(
                 $this->isCancelled() ? "cancelled" : "completed",
                 Json::encode([
-                    "totalResults" => count($results),
+                    "totalResults" => $rows,
+                    "totalMatches" => count($results),
                     "groupedResults" => $grouped,
                     "truncated" => $meta["truncated"] ?? false,
                     "stopReason" => $meta["stopReason"] ?? null,
                 ]),
                 null,
-                count($results)
+                $rows
             );
         } catch (\Throwable $e) {
             Craft::error(

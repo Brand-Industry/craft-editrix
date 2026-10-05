@@ -93,7 +93,10 @@ class SearchController extends Controller
 
             return $this->asJson([
                 "success" => true,
-                "totalResults" => count($results),
+                "totalResults" => array_sum(
+                    array_map(fn($site) => count($site["results"]), $groupedResults)
+                ),
+                "totalMatches" => count($results),
                 "groupedResults" => $groupedResults,
                 "dryRun" => $p["dryRun"],
                 "truncated" => $meta["truncated"] ?? false,
@@ -287,6 +290,7 @@ class SearchController extends Controller
                 ? Json::decode($row["resultsJson"])
                 : ["totalResults" => 0, "groupedResults" => []];
             $response["totalResults"] = $decoded["totalResults"];
+            $response["totalMatches"] = $decoded["totalMatches"] ?? $decoded["totalResults"];
             $response["groupedResults"] = $decoded["groupedResults"];
             $response["truncated"] = $decoded["truncated"] ?? false;
             $response["stopReason"] = $decoded["stopReason"] ?? null;
@@ -815,6 +819,10 @@ class SearchController extends Controller
             "Scanning {scanned} of {total} entries ({pct}%)…",
             "Starting search…",
             "Cancel search",
+            "{count} matches",
+            "Hide matches",
+            "Show all {count} matches",
+            "and {count} more",
             "Sending your search…",
             "Waiting for the server to pick up your search…",
             "Counting the entries to search. On a large site this takes a few seconds.",
@@ -847,7 +855,7 @@ class SearchController extends Controller
             "Open",
             "This search is still waiting to start. Craft's queue may not be running on this server. Ask your host or developer to set up a queue worker or cron job, as described in the Editrix README.",
             "This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.",
-            "Showing the first {count} matches. Narrow your search for more precise results.",
+            "Showing the first {count} results. Narrow your search for more precise results.",
             "Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.",
             "Replacing...",
             "Loading...",

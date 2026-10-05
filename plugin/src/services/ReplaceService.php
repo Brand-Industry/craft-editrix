@@ -103,6 +103,34 @@ class ReplaceService extends Component
     }
 
     /**
+     * How many occurrences a replace changed. A row stands for a whole
+     * field, so this adds up the occurrences in the fields that were
+     * rewritten, minus the ones left alone because they cross formatting.
+     *
+     * @param array[] $selected the rows the user selected
+     * @param string[] $replacedKeys keys of the rows that were saved
+     */
+    public static function countOccurrences(array $selected, array $replacedKeys): int
+    {
+        $byKey = [];
+        foreach ($selected as $row) {
+            $byKey[self::keyFor($row)] = $row;
+        }
+
+        $total = 0;
+        foreach ($replacedKeys as $key) {
+            $row = $byKey[$key] ?? [];
+            $skipped = count(array_filter(
+                $row["matches"] ?? [],
+                fn($m) => !empty($m["readOnly"])
+            ));
+            $total += max(1, (int) ($row["matchCount"] ?? 1) - $skipped);
+        }
+
+        return $total;
+    }
+
+    /**
      * Why this result can't be replaced from its snapshot, or null if the
      * stored value still equals what the search saw.
      */

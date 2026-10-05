@@ -58,7 +58,9 @@ class SearchServiceTest extends EditrixTestCase
             $this->markTestSkipped('Fewer than 2 matches for "e"; cannot exercise the cap on this data.');
         }
 
-        $this->assertCount(2, $results);
+        // The cap is on rows (fields); a field that matches twice is one row.
+        $this->assertSame(2, $meta['resultCount']);
+        $this->assertGreaterThanOrEqual(2, count($results));
         $this->assertTrue($meta['truncated']);
         $this->assertLessThan($section[1], $scanned, 'The scan should stop once the cap is hit.');
     }

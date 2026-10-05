@@ -83,6 +83,11 @@ class ReplaceController extends Controller
                 $replacements
             );
 
+            $replacedMatches = ReplaceService::countOccurrences(
+                $selectedResults,
+                $replacedKeys
+            );
+
             Editrix::$plugin->replace->markReplaced(
                 (string) $request->getBodyParam("searchId", ""),
                 (int) Craft::$app->getUser()->getId(),
@@ -107,13 +112,14 @@ class ReplaceController extends Controller
             return $this->asJson([
                 "success" => true,
                 "replacedCount" => $replacedCount,
+                "replacedMatches" => $replacedMatches,
                 "replacedKeys" => $replacedKeys,
                 "skipped" => $skipped,
                 "message" => Craft::t(
                     "editrix",
                     "Successfully replaced {count} occurrence(s).",
                     [
-                        "count" => $replacedCount,
+                        "count" => $replacedMatches,
                     ]
                 ),
             ]);

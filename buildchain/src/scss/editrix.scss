@@ -579,12 +579,13 @@
   }
   
   &__preview {
-    max-width: 300px;
+    max-width: 360px;
     font-family: monospace;
     font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    // Wraps instead of cutting at the cell edge: the match sits in the
+    // middle of its context, and an ellipsis used to hide it.
+    white-space: normal;
+    overflow-wrap: anywhere;
     color: $text-secondary;
     
     .match {
@@ -1909,5 +1910,56 @@
 
   .editrix-search-art__check {
     stroke-dashoffset: 0;
+  }
+}
+
+.editrix-results {
+  &__matches-total {
+    margin-left: 8px;
+    font-size: 12px;
+    font-weight: 400;
+    color: $text-muted;
+  }
+
+  &__expand {
+    display: block;
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: $secondary;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  &__matches-row td {
+    background: $gray-50;
+    cursor: default;
+  }
+
+  &__matches {
+    margin: 0;
+    padding-left: 20px;
+    font-family: monospace;
+    font-size: 12px;
+    color: $text-secondary;
+
+    li {
+      margin: 4px 0;
+      overflow-wrap: anywhere;
+    }
+
+    .match {
+      background: $diff-highlight;
+      padding: 1px 3px;
+      border-radius: 2px;
+      color: $text-primary;
+    }
+  }
+
+  &__matches-more {
+    margin: 6px 0 0 20px;
+    font-size: 12px;
+    color: $text-muted;
   }
 }

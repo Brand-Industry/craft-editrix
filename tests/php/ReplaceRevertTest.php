@@ -212,4 +212,42 @@ class ReplaceRevertTest extends EditrixTestCase
 
         $this->assertNull($this->row($searchId)['replacedJson']);
     }
+
+    public function testReplacedOccurrencesAreCountedPerMatchNotPerField(): void
+    {
+        $row = fn(int $id, int $count, array $matches = []) => [
+            'elementType' => 'entry',
+            'elementId' => $id,
+            'fieldHandle' => 'body',
+            'siteId' => 1,
+            'matchCount' => $count,
+            'matches' => $matches,
+        ];
+
+        $selected = [$row(1, 4), $row(2, 3), $row(3, 5)];
+        $replaced = array_map(fn($r) => ReplaceService::keyFor($r), [$selected[0], $selected[1]]);
+
+        $this->assertSame(7, ReplaceService::countOccurrences($selected, $replaced));
+    }
+
+    public function testMatchesLeftAloneBecauseOfFormattingAreNotCounted(): void
+    {
+        $row = [
+            'elementType' => 'entry',
+            'elementId' => 1,
+            'fieldHandle' => 'body',
+            'siteId' => 1,
+            'matchCount' => 3,
+            'matches' => [['readOnly' => false], ['readOnly' => true], ['readOnly' => false]],
+        ];
+
+        $this->assertSame(2, ReplaceService::countOccurrences([$row], [ReplaceService::keyFor($row)]));
+    }
+
+    public function testARowWithNoCountIsOneOccurrence(): void
+    {
+        $row = ['elementType' => 'entry', 'elementId' => 1, 'fieldHandle' => 'title', 'siteId' => 1];
+
+        $this->assertSame(1, ReplaceService::countOccurrences([$row], [ReplaceService::keyFor($row)]));
+    }
 }

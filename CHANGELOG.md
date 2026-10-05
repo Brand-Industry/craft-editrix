@@ -20,6 +20,9 @@ All notable changes to Editrix will be documented in this file.
 - A match whose field was edited after the search is skipped and marked "Changed since search" instead of being overwritten with the older content
 
 ### Changed
+- Results show one row per field instead of one per match: a word that appears four times in an article body is one row marked "4 matches", with a list of each occurrence, and selecting the row replaces every occurrence in that field, as Replace always did. The 5,000 limit now counts rows, so a field with many matches no longer uses it up, and the field's text is stored once per row
+- The match preview wraps instead of being cut at the edge of the cell, which used to hide the highlighted word
+- The success message after a replace counts occurrences, not fields
 - Rich text fields are now searched, replaced and reverted using their stored HTML, and entries embedded in a CKEditor field are searched as their own results
 - Switching between General and Segmented Search now clears the previous results
 
