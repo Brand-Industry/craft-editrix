@@ -239,6 +239,7 @@ class SearchController extends Controller
                 "replacedJson",
                 "errorMessage",
                 "paramsJson",
+                "dateCreated",
                 "dateUpdated",
             ])
             ->from(SearchSessions::TABLE_SEARCHES)
@@ -257,6 +258,12 @@ class SearchController extends Controller
             "status" => $row["status"],
             "scannedCount" => (int) $row["scannedCount"],
             "totalCount" => (int) $row["totalCount"],
+            // Seconds since the search was started, from the server's clock,
+            // so a reopened search shows the real elapsed time.
+            "elapsedSeconds" => max(
+                0,
+                time() - DateTimeHelper::toDateTime($row["dateCreated"])->getTimestamp()
+            ),
             // Matches found so far while the search is still running.
             "resultCount" => (int) $row["resultCount"],
             "params" => $row["paramsJson"]
@@ -808,6 +815,18 @@ class SearchController extends Controller
             "Scanning {scanned} of {total} entries ({pct}%)…",
             "Starting search…",
             "Cancel search",
+            "Sending your search…",
+            "Waiting for the server to pick up your search…",
+            "Counting the entries to search. On a large site this takes a few seconds.",
+            "Preparing your results…",
+            "Elapsed {time}",
+            "Up to about {time} left",
+            "You can leave this page. The search keeps running on the server, and you will find it here when you come back.",
+            "Limit the search to a section or field in Segmented Search to finish much faster.",
+            "A search stops at 5,000 matches. A more specific phrase gives you a complete list.",
+            "Finished searches stay under Recent searches for a day.",
+            "Dry Run Mode shows what a replace would do without saving anything.",
+            "Every replace is logged, and you can revert it from Logs & History.",
             "Replaced",
             "Changed since search",
             "Its content changed after the search. Search again to see the current text.",

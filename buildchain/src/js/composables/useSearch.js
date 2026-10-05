@@ -73,6 +73,12 @@ export function useSearch(actionMode) {
   // The saved search whose results are on screen, so a replace can be
   // recorded against it.
   const loadedSearchId = ref(null);
+  // For the waiting screen: the job's state, when the search started
+  // (server clock, so a reopened search shows real elapsed time) and the
+  // first scan reading, which the time estimate measures pace against.
+  const jobStatus = ref(null);
+  const startedAtMs = ref(null);
+  const scanSample = ref(null);
   // Matches already replaced, and ones skipped because their content
   // changed after the search. Both stay visible but can't be selected.
   const replacedKeys = ref(new Set());
@@ -134,6 +140,9 @@ export function useSearch(actionMode) {
     scannedCount.value = 0;
     totalCount.value = 0;
     matchCount.value = 0;
+    jobStatus.value = null;
+    scanSample.value = null;
+    startedAtMs.value = Date.now();
     replacedKeys.value = new Set();
     staleKeys.value = new Set();
     truncated.value = false;
@@ -226,6 +235,17 @@ export function useSearch(actionMode) {
           scannedCount.value = data.scannedCount || 0;
           totalCount.value = data.totalCount || 0;
           matchCount.value = data.resultCount || 0;
+          jobStatus.value = data.status;
+          if (data.elapsedSeconds != null) {
+            startedAtMs.value = Date.now() - data.elapsedSeconds * 1000;
+          }
+          if (
+            !scanSample.value &&
+            data.status === 'running' &&
+            (data.scannedCount || 0) > 0
+          ) {
+            scanSample.value = { atMs: Date.now(), scanned: data.scannedCount };
+          }
           queueStalled.value =
             data.status === 'queued' &&
             Date.now() - startedAt >= QUEUE_STALL_MS;
@@ -291,6 +311,9 @@ export function useSearch(actionMode) {
     scannedCount.value = 0;
     totalCount.value = 0;
     matchCount.value = 0;
+    jobStatus.value = null;
+    scanSample.value = null;
+    startedAtMs.value = Date.now();
     replacedKeys.value = new Set();
     staleKeys.value = new Set();
     truncated.value = false;
@@ -463,6 +486,9 @@ export function useSearch(actionMode) {
     scannedCount.value = 0;
     totalCount.value = 0;
     matchCount.value = 0;
+    jobStatus.value = null;
+    scanSample.value = null;
+    startedAtMs.value = null;
     replacedKeys.value = new Set();
     staleKeys.value = new Set();
     queueStalled.value = false;
@@ -508,8 +534,11 @@ export function useSearch(actionMode) {
     searchParams,
     scannedCount,
     matchCount,
-    totalCount,
+    jobStatus,
+    startedAtMs,
+    scanSample,
     currentSearchId,
+    totalCount,
     queueStalled,
     jobStalled,
 
