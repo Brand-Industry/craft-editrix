@@ -11,9 +11,11 @@ use craft\elements\Category;
 use craft\fields\Matrix;
 use craft\db\Query;
 use craft\db\Table;
+use yii\db\Expression;
 use craft\fields\Tags;
 use brandindustry\editrix\helpers\FieldValue;
 use brandindustry\editrix\helpers\HtmlText;
+use brandindustry\editrix\helpers\Prefilter;
 use brandindustry\editrix\models\SearchResult;
 use brandindustry\editrix\services\ReplaceService;
 use brandindustry\editrix\Editrix;
@@ -122,7 +124,23 @@ class SearchService extends Component
         $fieldFilter = $options["fields"] ?? [];
         $entryTypeFilter = $options["entryTypes"] ?? [];
 
+        // Specific entries (a list from a spreadsheet, say). Only entries
+        // are searched then, and the scan goes straight to those ids.
+        $elementIds = array_values(array_unique(array_filter(
+            array_map("intval", (array) ($options["elementIds"] ?? [])),
+            fn($id) => $id > 0
+        )));
+        if ($elementIds !== []) {
+            $searchGlobals = false;
+            $searchCategories = false;
+        }
+
         $sites = $this->getSitesToSearch($siteId, $options["siteIds"] ?? []);
+
+        $tokens = ($options["sqlPrefilter"] ?? $settings->sqlPrefilter)
+            ? $this->prefilterTokens($query, $useRegex)
+            : null;
+        $meta["prefiltered"] = $tokens !== null;
 
         foreach ($sites as $site) {
             if ($isCancelled && $isCancelled()) {
@@ -145,7 +163,9 @@ class SearchService extends Component
                         $entryTypeFilter,
                         $onProgress,
                         $isCancelled,
-                        $maxResults
+                        $maxResults,
+                        $tokens,
+                        $elementIds
                     )
                 );
 
@@ -359,6 +379,14 @@ class SearchService extends Component
             // fingerprint is enough to know later whether it changed, and
             // the text is read again when it is needed. A tag's value is
             // just its title, so that stays.
+            if (
+                !$row["readOnly"] &&
+                ReplaceService::isProtected($result->fieldHandle, $result->sectionHandle)
+            ) {
+                $row["readOnly"] = true;
+                $row["readOnlyReason"] = "protected";
+            }
+
             if ($result->readOnlyReason === "tag") {
                 $row["fieldValue"] = $result->fieldValue;
             } else {
@@ -403,8 +431,15 @@ class SearchService extends Component
         array $entryTypeFilter,
         ?callable $onProgress = null,
         ?callable $isCancelled = null,
-        int $maxResults = self::HARD_CEILING
+        int $maxResults = self::HARD_CEILING,
+        ?array $tokens = null,
+        array $elementIds = []
     ): array {
+        // A short list needs no prefilter and no scan of the id range.
+        if ($elementIds !== []) {
+            $tokens = null;
+        }
+
         $results = [];
         $site = Craft::$app->getSites()->getSiteById($siteId);
 
@@ -422,15 +457,47 @@ class SearchService extends Component
             $entryQuery->type($entryTypeFilter);
         }
 
-        $total = $onProgress ? (clone $entryQuery)->count() : 0;
+        $total = !$onProgress ? 0 : ($elementIds !== [] ? count($elementIds) : (clone $entryQuery)->count());
         $scanned = 0;
         $rows = [];
 
-        foreach ($this->eachEntry($entryQuery) as $entry) {
+        // With the prefilter most windows hold no candidate at all, so the
+        // per-entry checks below would almost never run. After each window
+        // this reports progress by how much of the id range is behind us,
+        // and honours cancel and the memory guard.
+        $covered = 0.0;
+        $checkpoint = function (float $fraction) use (&$results, &$covered, $total, $onProgress, $isCancelled): bool {
+            $covered = $fraction;
+
+            if ($onProgress) {
+                $onProgress(
+                    (int) round($total * $fraction),
+                    $total,
+                    $this->matchesBase + count($results)
+                );
+            }
+            if ($isCancelled && $isCancelled()) {
+                return false;
+            }
+            if ($this->memoryLow()) {
+                $this->stopReason = "memory";
+                return false;
+            }
+
+            return true;
+        };
+
+        $scoped = !empty($sectionFilter) || !empty($entryTypeFilter);
+
+        $entries = $elementIds !== []
+            ? $this->entriesById($entryQuery, $elementIds)
+            : $this->eachEntry($entryQuery, $tokens, $siteId, $tokens !== null ? $checkpoint : null, $scoped);
+
+        foreach ($entries as $entry) {
             $scanned++;
 
             if ($scanned % 250 === 0) {
-                if ($onProgress) {
+                if ($onProgress && $tokens === null) {
                     $onProgress($scanned, $total, $this->matchesBase + count($results));
                 }
                 if ($isCancelled && $isCancelled()) {
@@ -481,7 +548,11 @@ class SearchService extends Component
         }
 
         if ($onProgress) {
-            $onProgress($scanned, $total, $this->matchesBase + count($results));
+            $onProgress(
+                $tokens !== null ? (int) round($total * $covered) : $scanned,
+                $total,
+                $this->matchesBase + count($results)
+            );
         }
 
         return $results;
@@ -499,8 +570,13 @@ class SearchService extends Component
      * retried one entry at a time so only the entries that actually fail
      * are skipped.
      */
-    protected function eachEntry($entryQuery): \Generator
-    {
+    protected function eachEntry(
+        $entryQuery,
+        ?array $tokens = null,
+        int $siteId = 0,
+        ?callable $afterWindow = null,
+        bool $scoped = false
+    ): \Generator {
         $bounds = (new Query())
             ->select(["min" => "MIN([[id]])", "max" => "MAX([[id]])"])
             ->from(Table::ENTRIES)
@@ -511,28 +587,362 @@ class SearchService extends Component
         }
 
         $min = (int) $bounds["min"];
+        $top = (int) $bounds["max"] + 1;
+        $span = max(1, $top - $min);
 
-        for ($hi = (int) $bounds["max"] + 1; $hi > $min; $hi -= self::ID_WINDOW) {
-            $lo = max($min, $hi - self::ID_WINDOW);
-
+        // Entries that match only through something they own (a Matrix
+        // block, an embedded entry) or a tag they carry are found from the
+        // owned row, so an owner can turn up in a window other than its
+        // own. Each is loaded once.
+        $seen = [];
+        $tagOwners = [];
+        if ($tokens !== null) {
             try {
-                $ids = (clone $entryQuery)
-                    ->id("and, >= {$lo}, < {$hi}")
-                    ->orderBy("elements.id DESC")
-                    ->ids();
+                $tagOwners = $this->tagOwnerIds($tokens, $siteId);
             } catch (\Throwable $e) {
-                Craft::error(
-                    "Editrix: could not list entries {$lo}-{$hi}, skipping that range - " .
-                        $e->getMessage(),
-                    __METHOD__
-                );
-                continue;
+                // Without knowing which entries carry a matching tag the
+                // prefilter could miss some, so scan everything instead.
+                $tokens = null;
+            }
+        }
+
+        for ($hi = $top; $hi > $min; $hi -= self::ID_WINDOW) {
+            $lo = max($min, $hi - self::ID_WINDOW);
+            $ids = null;
+
+            if ($tokens !== null && $scoped) {
+                // A section or entry type is chosen: listing its ids is
+                // cheap, and the text check then only has to look at those
+                // rows instead of the whole table.
+                try {
+                    $listed = (clone $entryQuery)
+                        ->id("and, >= {$lo}, < {$hi}")
+                        ->orderBy("elements.id DESC")
+                        ->ids();
+                    $ids = $this->candidateIdsAmong($tokens, $listed, $siteId, $tagOwners) ?? $listed;
+                } catch (\Throwable $e) {
+                    $ids = null;
+                }
+            } elseif ($tokens !== null) {
+                $ids = $this->candidateIds($tokens, $lo, $hi, $siteId, $tagOwners);
+            }
+
+            if ($ids === null) {
+                // No prefilter, or it failed for this window: list every id.
+                // Never skip a window because the shortcut broke.
+                try {
+                    $ids = (clone $entryQuery)
+                        ->id("and, >= {$lo}, < {$hi}")
+                        ->orderBy("elements.id DESC")
+                        ->ids();
+                } catch (\Throwable $e) {
+                    Craft::error(
+                        "Editrix: could not list entries {$lo}-{$hi}, skipping that range - " .
+                            $e->getMessage(),
+                        __METHOD__
+                    );
+                    continue;
+                }
+            }
+
+            if ($tokens !== null) {
+                $ids = array_values(array_filter($ids, fn($id) => !isset($seen[$id])));
+                foreach ($ids as $id) {
+                    $seen[$id] = true;
+                }
+                rsort($ids);
             }
 
             foreach (array_chunk($ids, 100) as $chunk) {
                 yield from $this->loadEntries($entryQuery, $chunk);
             }
+
+            if ($afterWindow !== null && $afterWindow(($top - $lo) / $span) === false) {
+                return;
+            }
         }
+    }
+
+    /** The entries with these ids that fit the scope, newest first. */
+    private function entriesById($entryQuery, array $ids): \Generator
+    {
+        rsort($ids);
+
+        foreach (array_chunk($ids, 100) as $chunk) {
+            yield from $this->loadEntries($entryQuery, $chunk);
+        }
+    }
+
+    /**
+     * The words to prefilter on, or null to scan everything. A site that
+     * has a field whose text lives outside the entry's own row and is not
+     * covered by candidateIds() must not use the prefilter; at present
+     * every searched kind is covered.
+     */
+    protected function prefilterTokens(string $query, bool $useRegex): ?array
+    {
+        return $useRegex ? Prefilter::forRegex($query) : Prefilter::forText($query);
+    }
+
+    /** A column as text that compares ignoring case, on either database. */
+    private function textColumn(string $column): Expression
+    {
+        $db = Craft::$app->getDb();
+        $quoted = $db->quoteColumnName($column);
+
+        return new Expression(
+            $db->getIsPgsql()
+                ? "CAST({$quoted} AS TEXT)"
+                : "CAST({$quoted} AS CHAR) COLLATE utf8mb4_unicode_ci"
+        );
+    }
+
+    /** Every word must appear in the column; ignores case on either database. */
+    private function likeAll(Expression|string $column, array $tokens): array
+    {
+        $operator = Craft::$app->getDb()->getIsPgsql() ? "ilike" : "like";
+        $condition = ["and"];
+
+        foreach ($tokens as $token) {
+            $condition[] = [$operator, $column, $token];
+        }
+
+        return $condition;
+    }
+
+    /**
+     * Ids of the entries in [$lo, $hi) that could contain a match, plus
+     * those among $tagOwners. Null when the database could not answer, so
+     * the caller scans the window instead.
+     *
+     * A row is a candidate when its title, or its content, contains every
+     * word. Content is the field values of that one element; text inside a
+     * nested entry is in the nested entry's own row, so those rows are
+     * mapped up to the entry that owns them.
+     */
+    protected function candidateIds(
+        array $tokens,
+        int $lo,
+        int $hi,
+        int $siteId,
+        array $tagOwners
+    ): ?array {
+        try {
+            $matched = (new Query())
+                ->select(["elements_sites.elementId"])
+                ->distinct()
+                ->from(["elements_sites" => Table::ELEMENTS_SITES])
+                ->where(["elements_sites.siteId" => $siteId])
+                ->andWhere(["between", "elements_sites.elementId", $lo, $hi - 1])
+                ->andWhere([
+                    "or",
+                    $this->likeAll($this->textColumn("elements_sites.title"), $tokens),
+                    $this->likeAll($this->textColumn("elements_sites.content"), $tokens),
+                ])
+                ->column();
+
+            $ids = array_keys($this->topLevelIds(array_map("intval", $matched)));
+
+            foreach ($tagOwners as $id) {
+                if ($id >= $lo && $id < $hi) {
+                    $ids[] = $id;
+                }
+            }
+
+            return array_values(array_unique(array_map("intval", $ids)));
+        } catch (\Throwable $e) {
+            Craft::error(
+                "Editrix: prefilter failed for {$lo}-{$hi}, scanning it instead - " . $e->getMessage(),
+                __METHOD__
+            );
+
+            return null;
+        }
+    }
+
+    /**
+     * Of these entry ids (already limited to the chosen sections and types),
+     * those that could contain a match: their own row contains every word,
+     * or something they own does (a Matrix block, an embedded entry), or
+     * they carry a matching tag. Null when the database could not answer.
+     *
+     * @param int[] $ids
+     * @return int[]|null
+     */
+    protected function candidateIdsAmong(
+        array $tokens,
+        array $ids,
+        int $siteId,
+        array $tagOwners
+    ): ?array {
+        if ($ids === []) {
+            return [];
+        }
+
+        try {
+            $hasNeo = Craft::$app->getDb()->tableExists("{{%neoblocks}}");
+            $matched = [];
+            $level = $ids;
+
+            // The entries' own rows, then the rows of what they own, level
+            // by level (a block inside a block).
+            for ($depth = 0; $depth < 6 && $level !== []; $depth++) {
+                foreach (array_chunk($level, 5000) as $chunk) {
+                    foreach (
+                        (new Query())
+                            ->select(["elements_sites.elementId"])
+                            ->from(["elements_sites" => Table::ELEMENTS_SITES])
+                            ->where(["elements_sites.siteId" => $siteId])
+                            ->andWhere(["elements_sites.elementId" => $chunk])
+                            ->andWhere([
+                                "or",
+                                $this->likeAll($this->textColumn("elements_sites.title"), $tokens),
+                                $this->likeAll($this->textColumn("elements_sites.content"), $tokens),
+                            ])
+                            ->column() as $id
+                    ) {
+                        $matched[(int) $id] = true;
+                    }
+                }
+
+                $children = [];
+                foreach (array_chunk($level, 5000) as $chunk) {
+                    $children = array_merge(
+                        $children,
+                        (new Query())
+                            ->select(["id"])
+                            ->from(Table::ENTRIES)
+                            ->where(["primaryOwnerId" => $chunk])
+                            ->column()
+                    );
+
+                    if ($hasNeo) {
+                        $children = array_merge(
+                            $children,
+                            (new Query())
+                                ->select(["id"])
+                                ->from("{{%neoblocks}}")
+                                ->where(["ownerId" => $chunk])
+                                ->column()
+                        );
+                    }
+                }
+
+                $level = array_map("intval", array_unique($children));
+            }
+
+            $hits = array_keys($matched);
+            $keep = $this->topLevelIds(array_map("intval", $hits));
+            foreach ($tagOwners as $id) {
+                $keep[$id] = true;
+            }
+
+            return array_values(array_filter($ids, fn($id) => isset($keep[$id])));
+        } catch (\Throwable $e) {
+            Craft::error(
+                "Editrix: scoped prefilter failed, scanning the window instead - " . $e->getMessage(),
+                __METHOD__
+            );
+
+            return null;
+        }
+    }
+
+    /**
+     * The entries that carry a tag whose title contains the words. A tag's
+     * text is in the tag's row, not the entry's, so entries are found
+     * through the relations that point at matching tags.
+     *
+     * @return int[]
+     */
+    private function tagOwnerIds(array $tokens, int $siteId): array
+    {
+        try {
+            $tagIds = (new Query())
+                ->select(["elements_sites.elementId"])
+                ->from(["elements_sites" => Table::ELEMENTS_SITES])
+                ->innerJoin(["tags" => Table::TAGS], "[[tags.id]] = [[elements_sites.elementId]]")
+                ->where(["elements_sites.siteId" => $siteId])
+                ->andWhere($this->likeAll($this->textColumn("elements_sites.title"), $tokens))
+                ->column();
+
+            if ($tagIds === []) {
+                return [];
+            }
+
+            $sources = [];
+            foreach (array_chunk($tagIds, 2000) as $chunk) {
+                $sources = array_merge(
+                    $sources,
+                    (new Query())
+                        ->select(["sourceId"])
+                        ->distinct()
+                        ->from(Table::RELATIONS)
+                        ->where(["targetId" => $chunk])
+                        ->column()
+                );
+            }
+
+            return array_keys($this->topLevelIds(array_map("intval", $sources)));
+        } catch (\Throwable $e) {
+            Craft::error("Editrix: tag prefilter failed - " . $e->getMessage(), __METHOD__);
+
+            // Unknown, so say "everything": the caller's windows then run
+            // unfiltered because the exception also reaches candidateIds.
+            throw $e;
+        }
+    }
+
+    /**
+     * Maps element ids to the top-level entries that hold them: an entry
+     * that is not nested stands for itself, a nested one (Matrix block,
+     * embedded entry, Neo block) stands for its owner, followed up to the
+     * top. Ids that are not entries are dropped.
+     *
+     * @param int[] $ids
+     * @return array<int, true>
+     */
+    private function topLevelIds(array $ids): array
+    {
+        $top = [];
+        $db = Craft::$app->getDb();
+        $hasNeo = $db->tableExists("{{%neoblocks}}");
+
+        for ($depth = 0; $depth < 6 && $ids !== []; $depth++) {
+            $next = [];
+
+            foreach (array_chunk($ids, 5000) as $chunk) {
+                $rows = (new Query())
+                    ->select(["id", "primaryOwnerId"])
+                    ->from(Table::ENTRIES)
+                    ->where(["id" => $chunk])
+                    ->all();
+
+                foreach ($rows as $row) {
+                    if ($row["primaryOwnerId"] === null) {
+                        $top[(int) $row["id"]] = true;
+                    } else {
+                        $next[(int) $row["primaryOwnerId"]] = true;
+                    }
+                }
+
+                if ($hasNeo) {
+                    foreach (
+                        (new Query())
+                            ->select(["ownerId"])
+                            ->from("{{%neoblocks}}")
+                            ->where(["id" => $chunk])
+                            ->column() as $owner
+                    ) {
+                        $next[(int) $owner] = true;
+                    }
+                }
+            }
+
+            $ids = array_keys($next);
+        }
+
+        return $top;
     }
 
     /**

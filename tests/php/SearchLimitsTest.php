@@ -85,16 +85,17 @@ class SearchLimitsTest extends EditrixTestCase
         $this->assertNull($meta['upgradeLimit'], 'Nothing to upsell when the search was not cut off.');
     }
 
-    public function testTheReplaceLimitIsConservativeByDefault(): void
+    public function testReplaceSettingsDefaultToTheEditionsOwnLimitsAndTheQueue(): void
     {
         $settings = new Settings();
 
-        $this->assertSame(150, $settings->maxRowsPerReplace);
+        $this->assertNull($settings->maxRowsPerReplace, 'Null keeps the edition limit.');
         $this->assertNull($settings->maxSearchResults);
-        $this->assertTrue($settings->validate(['maxRowsPerReplace', 'maxSearchResults']));
+        $this->assertSame(25, $settings->replaceQueueThreshold);
+        $this->assertTrue($settings->validate(['maxRowsPerReplace', 'maxSearchResults', 'replaceQueueThreshold']));
 
-        $settings->maxRowsPerReplace = 0;
-        $this->assertFalse($settings->validate(['maxRowsPerReplace']));
+        $settings->replaceQueueThreshold = 0;
+        $this->assertFalse($settings->validate(['replaceQueueThreshold']));
     }
 
     /**

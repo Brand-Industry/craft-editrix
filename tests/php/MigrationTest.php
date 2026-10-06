@@ -54,6 +54,10 @@ class MigrationTest extends TestCase
         $install->createTables();
 
         $this->assertArrayHasKey('{{%editrix_searches}}', $install->created);
+        $this->assertArrayHasKey('{{%editrix_log_items}}', $install->created, 'Replace logs are written value by value into this table.');
+        foreach (['logId', 'oldValue', 'newValue', 'state', 'matches'] as $column) {
+            $this->assertContains($column, $install->created['{{%editrix_log_items}}']);
+        }
         foreach (['searchId', 'userId', 'status', 'resultCount', 'paramsJson', 'resultsJson', 'replacedJson'] as $column) {
             $this->assertContains($column, $install->created['{{%editrix_searches}}']);
         }

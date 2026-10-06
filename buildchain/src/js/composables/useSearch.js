@@ -44,6 +44,8 @@ export function useSearch(actionMode) {
     searchRecentUrl,
     searchCancelUrl,
     replaceUrl,
+    replaceStatusUrl,
+    replaceCancelUrl,
     previewUrl,
     hasFeature,
   } = useConfig();
@@ -77,6 +79,8 @@ export function useSearch(actionMode) {
   // The saved search whose results are on screen, so a replace can be
   // recorded against it.
   const loadedSearchId = ref(null);
+  // A replace running in the queue: how far it is, and which log it writes to.
+  const replaceProgress = ref(null);
   // For the waiting screen: the job's state, when the search started
   // (server clock, so a reopened search shows real elapsed time) and the
   // first scan reading, which the time estimate measures pace against.
@@ -87,10 +91,12 @@ export function useSearch(actionMode) {
   // changed after the search. Both stay visible but can't be selected.
   const replacedKeys = ref(new Set());
   const staleKeys = ref(new Set());
+  const failedKeys = ref(new Set());
   const rowState = r => {
     const key = resultKey(r);
     if (replacedKeys.value.has(key)) return 'replaced';
     if (staleKeys.value.has(key)) return 'stale';
+    if (failedKeys.value.has(key)) return 'failed';
     return null;
   };
   const queueStalled = ref(false);
@@ -106,6 +112,7 @@ export function useSearch(actionMode) {
     useRegex: false,
     caseInsensitive: false,
     wholeWords: false,
+    preserveCase: false,
     dryRun: false,
     searchEntries: true,
     searchGlobals: true,
@@ -149,6 +156,7 @@ export function useSearch(actionMode) {
     startedAtMs.value = Date.now();
     replacedKeys.value = new Set();
     staleKeys.value = new Set();
+    failedKeys.value = new Set();
     truncated.value = false;
     stopReason.value = null;
     resultLimit.value = null;
@@ -324,6 +332,7 @@ export function useSearch(actionMode) {
     startedAtMs.value = Date.now();
     replacedKeys.value = new Set();
     staleKeys.value = new Set();
+    failedKeys.value = new Set();
     truncated.value = false;
     stopReason.value = null;
     resultLimit.value = null;
@@ -432,7 +441,7 @@ export function useSearch(actionMode) {
     error.value = null;
 
     try {
-      const data = await post(replaceUrl.value, {
+      let data = await post(replaceUrl.value, {
         searchQuery: searchParams.query,
         replaceWith: replaceWith ?? searchParams.replaceWith,
         selectedResults: toReplace.map(slimRow),
@@ -440,9 +449,17 @@ export function useSearch(actionMode) {
         useRegex: searchParams.useRegex,
         caseInsensitive: searchParams.caseInsensitive,
         wholeWords: searchParams.wholeWords,
+        preserveCase: searchParams.preserveCase,
         confirmationCode: confirmationCode ?? '',
         searchId: loadedSearchId.value ?? '',
       });
+
+      // Too many rows to save inside one request: the server queued it.
+      // Follow it until it is done, then treat it like any other replace.
+      if (data?.success && data.queued) {
+        kickQueue();
+        data = await followReplace(data.logId, data.total);
+      }
 
       // Mark what was done on screen; no new search is needed.
       if (data?.success) {
@@ -453,6 +470,10 @@ export function useSearch(actionMode) {
         staleKeys.value = new Set([
           ...staleKeys.value,
           ...(data.skipped || []).map(s => s.key),
+        ]);
+        failedKeys.value = new Set([
+          ...failedKeys.value,
+          ...(data.failed || []).map(s => s.key),
         ]);
         selectedResults.value = selectedResults.value.filter(r => !rowState(r));
       }
@@ -467,6 +488,58 @@ export function useSearch(actionMode) {
   };
 
   // Preview single result
+  const REPLACE_POLL_MS = 1500;
+
+  // Polls a queued replace. Its status, once it stops running, has the
+  // same shape as an inline replace's response.
+  const followReplace = logId =>
+    new Promise((resolve, reject) => {
+      const tick = async () => {
+        try {
+          const data = await get(replaceStatusUrl.value, { logId });
+
+          if (!data.success) {
+            replaceProgress.value = null;
+            resolve(data);
+            return;
+          }
+
+          replaceProgress.value = {
+            logId,
+            status: data.status,
+            total: data.total,
+            done: data.done,
+            replaced: data.replaced,
+            idleSeconds: data.idleSeconds,
+          };
+
+          if (data.status === 'running' || data.status === 'cancelling') {
+            setTimeout(tick, REPLACE_POLL_MS);
+            return;
+          }
+
+          replaceProgress.value = null;
+          resolve(data);
+        } catch (err) {
+          replaceProgress.value = null;
+          reject(err);
+        }
+      };
+
+      tick();
+    });
+
+  // Stops a queued replace after the entry it is on. What it already
+  // changed stays in the log and can be reverted.
+  const cancelReplace = async () => {
+    if (!replaceProgress.value) return;
+    try {
+      await post(replaceCancelUrl.value, { logId: replaceProgress.value.logId });
+    } catch (err) {
+      // The next poll shows what actually happened.
+    }
+  };
+
   const getPreview = async (result) => {
     try {
       const data = await post(previewUrl.value, {
@@ -476,6 +549,7 @@ export function useSearch(actionMode) {
         useRegex: searchParams.useRegex,
         caseInsensitive: searchParams.caseInsensitive,
         wholeWords: searchParams.wholeWords,
+        preserveCase: searchParams.preserveCase,
       });
       return data;
     } catch (err) {
@@ -503,6 +577,7 @@ export function useSearch(actionMode) {
     startedAtMs.value = null;
     replacedKeys.value = new Set();
     staleKeys.value = new Set();
+    failedKeys.value = new Set();
     queueStalled.value = false;
     jobStalled.value = false;
     // Lets any in-flight poll loop notice it's stale and stop on its next
@@ -520,6 +595,7 @@ export function useSearch(actionMode) {
     searchParams.useRegex = false;
     searchParams.caseInsensitive = false;
     searchParams.wholeWords = false;
+    searchParams.preserveCase = false;
     searchParams.dryRun = false;
     searchParams.sections = [];
     searchParams.fields = [];
@@ -538,6 +614,8 @@ export function useSearch(actionMode) {
     resultLimit,
     upgradeLimit,
     recentSearches,
+    replaceProgress,
+    cancelReplace,
     rowState,
     loadRecentSearches,
     openSearch,

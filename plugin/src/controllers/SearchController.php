@@ -715,7 +715,8 @@ class SearchController extends Controller
             "currentSiteId" => $currentSite->id,
             "resultLimit" => Editrix::$plugin->search->currentResultLimit(),
             "upgradeResultLimit" => Editrix::$plugin->search->upgradeResultLimit(),
-            "replaceRowLimit" => Editrix::$plugin->getSettings()->maxRowsPerReplace,
+            "replaceRowLimit" => Editrix::$plugin->replace->currentRowLimit(),
+            "replaceQueueThreshold" => Editrix::$plugin->getSettings()->replaceQueueThreshold,
 
             "apiUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/search"
@@ -728,6 +729,12 @@ class SearchController extends Controller
             ),
             "searchRecentUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/search-recent"
+            ),
+            "replaceStatusUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/replace/status"
+            ),
+            "replaceCancelUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/replace/cancel"
             ),
             "fieldValueUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/field-value"
@@ -884,6 +891,19 @@ class SearchController extends Controller
             "Scanning {scanned} of {total} entries ({pct}%)…",
             "Starting search…",
             "Cancel search",
+            "This field or section is protected in Editrix settings and can't be replaced.",
+            "Preserve case",
+            "Widget becomes Gadget and WIDGET becomes GADGET",
+            "Replacing {done} of {total} rows…",
+            "{count} changed so far",
+            "Stopping…",
+            "Every change is already in Logs & History, so it can be reverted even if this stops.",
+            "Cancel replace",
+            "Not saved",
+            "{count} could not be saved and were left unchanged.",
+            "Show why",
+            "There is nothing to find.",
+            "The replacement is the same as the search, so nothing would change.",
             "Your edition shows up to {limit} results; Pro shows up to {proLimit}.",
             "Select at most {limit} rows per replace; you selected {count}.",
             "Select at most {limit} rows to replace at once.",

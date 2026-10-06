@@ -28,6 +28,7 @@ class LicenseService extends Component
     public const FEATURE_REGEX_ADVANCED = "regex.advanced";
     public const FEATURE_CASE_INSENSITIVE = "caseInsensitive";
     public const FEATURE_WHOLE_WORDS = "wholeWords";
+    public const FEATURE_PRESERVE_CASE = "preserveCase";
 
     public const FEATURE_MULTISITE = "multisite";
     public const FEATURE_SCOPE_FILTERS = "scopeFilters";
@@ -76,6 +77,7 @@ class LicenseService extends Component
             self::FEATURE_REGEX_ADVANCED => false,
             self::FEATURE_CASE_INSENSITIVE => true,
             self::FEATURE_WHOLE_WORDS => true,
+            self::FEATURE_PRESERVE_CASE => false,
 
             self::FEATURE_MULTISITE => false,
             self::FEATURE_SCOPE_FILTERS => false,
@@ -119,6 +121,7 @@ class LicenseService extends Component
             self::FEATURE_REGEX_ADVANCED => true,
             self::FEATURE_CASE_INSENSITIVE => true,
             self::FEATURE_WHOLE_WORDS => true,
+            self::FEATURE_PRESERVE_CASE => true,
 
             self::FEATURE_MULTISITE => true,
             self::FEATURE_SCOPE_FILTERS => true,
@@ -157,11 +160,13 @@ class LicenseService extends Component
             "logRetentionDays" => 30,
             "maxPresets" => 5,
             "searchResultLimit" => 3000,
+            "replaceRowLimit" => 200,
         ],
         Editrix::EDITION_PRO => [
             "logRetentionDays" => 90,
             "maxPresets" => -1, // Unlimited
             "searchResultLimit" => 25000,
+            "replaceRowLimit" => 5000,
         ],
     ];
 

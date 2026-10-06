@@ -129,6 +129,29 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] Una entrada deshabilitada y una categoría deshabilitada se reemplazan igual que una activa.
 - [ ] Un usuario sin permiso "Search and replace content" no ve Search & Replace, y una llamada directa a `editrix/api/replace` responde "Permission denied".
 
+
+### 6.1 Reemplazos grandes, cola y seguridad
+
+- [ ] **Más de 25 filas**: seleccionar 30 o más filas y reemplazar. Aparece el panel "Replacing X of Y rows…" con barra, "N changed so far" y **Cancel replace**; la ventana de confirmación se cierra. Al terminar, las filas quedan marcadas como Replaced y el resumen avisa de las omitidas o no guardadas.
+- [ ] **Cancel replace** detiene el trabajo tras la entrada en curso. En Logs & History, esa operación aparece como `cancelled` con lo que alcanzó a cambiar, y se puede revertir.
+- [ ] **Matar el worker** a mitad de un reemplazo en cola (o reiniciar ddev): el registro en Logs & History queda en `running` y tiene los valores ya cambiados; revertirlo restaura lo que se alcanzó a guardar y deja intacto lo demás.
+- [ ] **Límite por edición**: en Standard, más de 200 filas no se pueden reemplazar (el botón se deshabilita y el servidor lo rechaza); en Pro, más de 5,000.
+- [ ] **Entradas que no se pudieron guardar** aparecen en una lista "Show why" con el motivo, y sus filas salen con "Not saved".
+- [ ] Un reemplazo que dejaría **vacío un campo obligatorio** (por ejemplo, el título completo por nada) se rechaza para esa entrada y el título no cambia.
+- [ ] Una búsqueda vacía, o con el reemplazo igual a lo buscado, se rechaza con un mensaje claro antes de leer nada.
+- [ ] **Preserve case** (Pro, solo en modo reemplazo y sin regex): "widget"→"gadget" convierte "Widget" en "Gadget" y "WIDGET" en "GADGET". Activarlo marca Case Insensitive. En Standard la casilla sale deshabilitada con la insignia Pro.
+- [ ] **Campos y secciones protegidos** (`protectedFields`, `protectedSections` en `config/editrix.php`): sus coincidencias salen en la búsqueda pero sin casilla (solo lectura, "protected"), y no aparecen en modo reemplazo.
+- [ ] **Revert** de un reemplazo donde editaste una de las entradas después: se restauran las demás, esa se deja como está y se informa; luego se ofrece "Overwrite later edits?" como paso aparte. Revertir dos veces no hace daño.
+- [ ] **Revert grande** (más de 25 valores) corre en la cola y avisa al terminar.
+- [ ] Cada reemplazo y revert escribe líneas en `storage/logs/editrix-*.log`.
+
+### 6.2 Línea de comandos (Pro)
+
+- [ ] `php craft editrix/run/search --find=... --sections=...` lista coincidencias y el total.
+- [ ] `php craft editrix/run/replace ...` sin `--dry-run=0` no cambia nada y lo dice.
+- [ ] Con `--dry-run=0` cambia, imprime el id del log, y `php craft editrix/run/revert <id>` lo deshace.
+- [ ] En Standard, los comandos responden "The command line needs Editrix Pro."
+
 ## 7. Logs & History
 
 - [ ] Cada reemplazo y cada búsqueda aparece en la lista con fecha, usuario, texto y número de ocurrencias.
@@ -185,7 +208,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 ## 13. Pendientes y diferencias conocidas
 
 - **Tope de resultados por edición** (Standard 3,000, Pro 25,000, techo absoluto 50,000): sale de `LicenseService::$limits['searchResultLimit']`; `maxSearchResults` solo puede bajarlo.
-- **Tope de 150 filas por reemplazo** (`maxRowsPerReplace`): es provisional hasta que exista el reemplazo en cola.
+- **Tope de filas por reemplazo** (Standard 200, Pro 5,000, `replaceRowLimit` en `LicenseService`); `maxRowsPerReplace` solo puede bajarlo. Por encima de 25 filas (`replaceQueueThreshold`) el reemplazo corre en la cola.
 - **Cola en producción**: confirmar con quien administra el servidor de Frommers que corre un worker o cron (o Craft Cloud).
 - **Frommers**: el error de Twig en `articleBookstore.twig` (línea 8, `is defined` en vez de comprobar null) es de su template. El plugin ya lo omite, pero conviene que lo corrijan.
 - **No cubierto por pruebas automáticas**: los endpoints del controlador y toda la interfaz. Por eso existe esta lista.

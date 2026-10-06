@@ -194,6 +194,7 @@
             v-model:use-regex="searchParams.useRegex"
             v-model:case-insensitive="searchParams.caseInsensitive"
             v-model:whole-words="searchParams.wholeWords"
+            v-model:preserve-case="searchParams.preserveCase"
             v-model:dry-run="searchParams.dryRun"
             v-model:search-entries="searchParams.searchEntries"
             v-model:search-globals="searchParams.searchGlobals"
@@ -271,6 +272,36 @@
             </template>
           </div>
 
+          <div v-if="replaceProgress" class="editrix-search-progress" role="status" aria-live="polite">
+            <p class="editrix-search-progress__title">
+              {{ t('Replacing {done} of {total} rows…', {
+                done: replaceProgress.done.toLocaleString(),
+                total: replaceProgress.total.toLocaleString(),
+              }) }}
+            </p>
+            <div class="editrix-search-progress__bar">
+              <div
+                class="editrix-search-progress__fill is-active"
+                :style="{ width: `${replaceProgress.total > 0 ? Math.max(1, Math.round((replaceProgress.done / replaceProgress.total) * 100)) : 4}%` }"
+              ></div>
+            </div>
+            <p class="editrix-search-progress__label">
+              {{ t('{count} changed so far', { count: replaceProgress.replaced.toLocaleString() }) }}
+              <template v-if="replaceProgress.status === 'cancelling'"> · {{ t('Stopping…') }}</template>
+            </p>
+            <p class="editrix-search-progress__tip">
+              {{ t('Every change is already in Logs & History, so it can be reverted even if this stops.') }}
+            </p>
+            <button
+              type="button"
+              class="editrix-btn editrix-btn--secondary editrix-btn--sm"
+              :disabled="replaceProgress.status === 'cancelling'"
+              @click="cancelReplace"
+            >
+              {{ t('Cancel replace') }}
+            </button>
+          </div>
+
           <div v-if="lastReplace" class="editrix-replace-summary">
             <p v-if="lastReplace.replaced > 0" class="editrix-replace-summary__done">
               ✓ {{ t('Replaced {count} matches.', { count: lastReplace.replaced.toLocaleString() }) }}
@@ -279,6 +310,18 @@
             <p v-if="lastReplace.skipped > 0" class="editrix-form__warning">
               ⚠️ {{ t('{count} skipped because their content changed after the search. Search again to see the current text.', { count: lastReplace.skipped.toLocaleString() }) }}
             </p>
+            <div v-if="lastReplace.failed.length > 0" class="editrix-form__warning">
+              ⚠️ {{ t('{count} could not be saved and were left unchanged.', { count: lastReplace.failed.length.toLocaleString() }) }}
+              <details>
+                <summary>{{ t('Show why') }}</summary>
+                <ul>
+                  <li v-for="f in lastReplace.failed.slice(0, 20)" :key="f.key">
+                    {{ f.elementTitle || ('#' + f.elementId) }} ({{ f.fieldHandle }}): {{ f.reason }}
+                  </li>
+                </ul>
+                <p v-if="lastReplace.failed.length > 20">{{ t('and {count} more', { count: lastReplace.failed.length - 20 }) }}</p>
+              </details>
+            </div>
             <button type="button" class="editrix-btn editrix-btn--secondary editrix-btn--sm" @click="handleSearch">
               {{ t('Search again') }}
             </button>
@@ -553,6 +596,8 @@ const {
   resultLimit,
   upgradeLimit,
   recentSearches,
+  replaceProgress,
+  cancelReplace,
   rowState,
   loadRecentSearches,
   openSearch,
@@ -586,7 +631,20 @@ const {
   reset,
 } = useSearch(actionMode);
 
+// Preserving case only has something to preserve when the search finds
+// every capitalisation, so it turns Case Insensitive on with it.
+watch(
+  () => searchParams.preserveCase,
+  (on) => {
+    if (on) searchParams.caseInsensitive = true;
+  }
+);
+
 const showReplaceConfirm = ref(false);
+// A queued replace has its own progress panel; the modal gets out of the way.
+watch(replaceProgress, (progress) => {
+  if (progress) showReplaceConfirm.value = false;
+});
 const replacing = ref(false);
 const previewResult = ref(null);
 const detailResult = ref(null);
@@ -820,6 +878,7 @@ const handleReplace = async (confirmationCode) => {
       lastReplace.value = {
         replaced: data.replacedMatches ?? data.replacedCount ?? 0,
         skipped: (data.skipped || []).length,
+        failed: data.failed || [],
       };
     } else {
       window.Craft?.cp?.displayError?.(data?.error || 'Replace failed');
