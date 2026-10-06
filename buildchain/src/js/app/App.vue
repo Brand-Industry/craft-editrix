@@ -233,45 +233,6 @@
             </ul>
           </details>
 
-          <SearchProgress
-            v-if="loading"
-            :query="searchParams.query"
-            :has-id="currentSearchId !== null"
-            :job-status="jobStatus"
-            :scanned="scannedCount"
-            :total="totalCount"
-            :progress="progress"
-            :matches="matchCount"
-            :started-at-ms="startedAtMs"
-            :scan-sample="scanSample"
-            :queue-stalled="queueStalled"
-            :job-stalled="jobStalled"
-            @cancel="cancelSearch"
-          />
-
-          <div v-else-if="error" class="editrix-form__warning" style="margin-top: 16px;">
-            ⚠️ {{ error }}
-          </div>
-
-          <template v-else-if="hasSearched">
-          <div v-if="truncated" class="editrix-form__warning" style="margin-top: 16px;">
-            <template v-if="stopReason === 'memory'">
-              ⚠️ {{ t('Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.') }}
-            </template>
-            <template v-else>
-              ⚠️ {{ t('Showing the first {count} results. Narrow your search for more precise results.', {
-                count: totalResults.toLocaleString(),
-              }) }}
-              <template v-if="upgradeLimit">
-                {{ t('Your edition shows up to {limit} results; Pro shows up to {proLimit}.', {
-                  limit: (resultLimit || totalResults).toLocaleString(),
-                  proLimit: upgradeLimit.toLocaleString(),
-                }) }}
-                <span class="editrix-badge editrix-badge--info">Pro</span>
-              </template>
-            </template>
-          </div>
-
           <div v-if="replaceProgress" class="editrix-search-progress" role="status" aria-live="polite">
             <p class="editrix-search-progress__title">
               {{ t('Replacing {done} of {total} rows…', {
@@ -322,9 +283,48 @@
                 <p v-if="lastReplace.failed.length > 20">{{ t('and {count} more', { count: lastReplace.failed.length - 20 }) }}</p>
               </details>
             </div>
-            <button type="button" class="editrix-btn editrix-btn--secondary editrix-btn--sm" @click="handleSearch">
+            <button v-if="searchParams.query" type="button" class="editrix-btn editrix-btn--secondary editrix-btn--sm" @click="handleSearch">
               {{ t('Search again') }}
             </button>
+          </div>
+
+          <SearchProgress
+            v-if="loading"
+            :query="searchParams.query"
+            :has-id="currentSearchId !== null"
+            :job-status="jobStatus"
+            :scanned="scannedCount"
+            :total="totalCount"
+            :progress="progress"
+            :matches="matchCount"
+            :started-at-ms="startedAtMs"
+            :scan-sample="scanSample"
+            :queue-stalled="queueStalled"
+            :job-stalled="jobStalled"
+            @cancel="cancelSearch"
+          />
+
+          <div v-else-if="error" class="editrix-form__warning" style="margin-top: 16px;">
+            ⚠️ {{ error }}
+          </div>
+
+          <template v-else-if="hasSearched">
+          <div v-if="truncated" class="editrix-form__warning" style="margin-top: 16px;">
+            <template v-if="stopReason === 'memory'">
+              ⚠️ {{ t('Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.') }}
+            </template>
+            <template v-else>
+              ⚠️ {{ t('Showing the first {count} results. Narrow your search for more precise results.', {
+                count: totalResults.toLocaleString(),
+              }) }}
+              <template v-if="upgradeLimit">
+                {{ t('Your edition shows up to {limit} results; Pro shows up to {proLimit}.', {
+                  limit: (resultLimit || totalResults).toLocaleString(),
+                  proLimit: upgradeLimit.toLocaleString(),
+                }) }}
+                <span class="editrix-badge editrix-badge--info">Pro</span>
+              </template>
+            </template>
           </div>
 
           <ResultsTable
@@ -598,6 +598,7 @@ const {
   recentSearches,
   replaceProgress,
   cancelReplace,
+  resumeReplace,
   rowState,
   loadRecentSearches,
   openSearch,
@@ -718,7 +719,18 @@ onMounted(() => {
   }
   fetchRecentActivity();
   fetchDailyCounts();
+  followLeftoverReplace();
 });
+
+// A replace queued before a reload is still running on the server.
+const followLeftoverReplace = async () => {
+  try {
+    const data = await resumeReplace();
+    if (data?.success) showReplaceSummary(data);
+  } catch (err) {
+    window.Craft?.cp?.displayError?.(err.message || 'Replace failed');
+  }
+};
 
 // "Re-run" from Logs & History links here with the original query/scope in
 // the URL. Always lands in Search mode - re-running a past search should
@@ -857,6 +869,16 @@ const cancelReplaceConfirm = () => {
 // Summary of the last replace, shown above the results until the next search.
 const lastReplace = ref(null);
 
+// The rows are marked in place; searching again would rescan the whole
+// scope just to show what we already know.
+const showReplaceSummary = (data) => {
+  lastReplace.value = {
+    replaced: data.replacedMatches ?? data.replacedCount ?? 0,
+    skipped: (data.skipped || []).length,
+    failed: data.failed || [],
+  };
+};
+
 const handleReplace = async (confirmationCode) => {
   replacing.value = true;
 
@@ -872,14 +894,7 @@ const handleReplace = async (confirmationCode) => {
     if (data?.success) {
       window.Craft?.cp?.displayNotice?.(data.message);
       showReplaceConfirm.value = false;
-
-      // The rows are marked in place; searching again would rescan the
-      // whole scope just to show what we already know.
-      lastReplace.value = {
-        replaced: data.replacedMatches ?? data.replacedCount ?? 0,
-        skipped: (data.skipped || []).length,
-        failed: data.failed || [],
-      };
+      showReplaceSummary(data);
     } else {
       window.Craft?.cp?.displayError?.(data?.error || 'Replace failed');
     }

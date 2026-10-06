@@ -12,6 +12,8 @@ use brandindustry\editrix\services\ReplaceService;
 
 class ReplaceController extends Controller
 {
+    private const ACTIVE_WINDOW_SECONDS = 600;
+
     public function actionExecute(): Response
     {
         $this->requirePostRequest();
@@ -431,6 +433,29 @@ class ReplaceController extends Controller
         }
 
         return $this->asJson($response);
+    }
+
+    /**
+     * The replace this user left running, so a reloaded page can pick its
+     * progress back up.
+     */
+    public function actionActive(): Response
+    {
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:replace")) {
+            return $this->asJson(["success" => false, "error" => "Permission denied"]);
+        }
+
+        $log = Editrix::$plugin->log->activeReplaceFor(
+            (int) Craft::$app->getUser()->getId(),
+            self::ACTIVE_WINDOW_SECONDS
+        );
+
+        return $this->asJson([
+            "success" => true,
+            "logId" => $log ? (int) $log["id"] : null,
+        ]);
     }
 
     public function actionCancel(): Response

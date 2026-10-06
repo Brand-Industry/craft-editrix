@@ -17,6 +17,7 @@ vi.mock('../src/js/composables/useConfig', () => ({
     replaceUrl: ref('/replace'),
     replaceStatusUrl: ref('/replace/status'),
     replaceCancelUrl: ref('/replace/cancel'),
+    replaceActiveUrl: ref('/replace/active'),
     previewUrl: ref('/preview'),
     hasFeature: () => true,
   }),
@@ -891,5 +892,69 @@ describe('useSearch replace in the queue', () => {
 
     expect(data.success).toBe(false);
     expect(s.replaceProgress.value).toBe(null);
+  });
+
+  it('picks a replace back up after a reload and ends with its summary', async () => {
+    get
+      .mockResolvedValueOnce({ success: true, logId: 12 })
+      .mockResolvedValueOnce({ success: true, status: 'running', total: 40, done: 10, replaced: 9 })
+      .mockResolvedValueOnce({
+        success: true,
+        status: 'success',
+        total: 40,
+        done: 40,
+        replaced: 38,
+        replacedKeys: ['entry_1_body_1'],
+        skipped: [],
+        failed: [],
+      });
+
+    const resumed = s.resumeReplace();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(get).toHaveBeenNthCalledWith(1, '/replace/active');
+    expect(get).toHaveBeenNthCalledWith(2, '/replace/status', { logId: 12 });
+    expect(s.replaceProgress.value).toMatchObject({ logId: 12, total: 40, done: 10 });
+
+    await tickPoll();
+    const data = await resumed;
+
+    expect(data.replaced).toBe(38);
+    expect(s.replaceProgress.value).toBe(null);
+    expect(s.rowState(row(1))).toBe('replaced');
+  });
+
+  it('does nothing on load when no replace is running', async () => {
+    get.mockResolvedValueOnce({ success: true, logId: null });
+
+    expect(await s.resumeReplace()).toBe(null);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(s.replaceProgress.value).toBe(null);
+  });
+
+  it('does not follow the same replace twice', async () => {
+    post.mockResolvedValueOnce({ success: true, queued: true, logId: 3, total: 3 });
+    get.mockResolvedValue({ success: true, status: 'running', total: 3, done: 1, replaced: 1 });
+
+    s.replace({ results: [row(1)], replaceWith: 'x' });
+    await vi.advanceTimersByTimeAsync(0);
+    get.mockClear();
+
+    expect(await s.resumeReplace()).toBe(null);
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it('can cancel a replace it picked back up', async () => {
+    get
+      .mockResolvedValueOnce({ success: true, logId: 21 })
+      .mockResolvedValue({ success: true, status: 'running', total: 5, done: 1, replaced: 1 });
+
+    s.resumeReplace();
+    await vi.advanceTimersByTimeAsync(0);
+
+    post.mockResolvedValue({ success: true });
+    await s.cancelReplace();
+
+    expect(post).toHaveBeenLastCalledWith('/replace/cancel', { logId: 21 });
   });
 });

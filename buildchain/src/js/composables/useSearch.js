@@ -46,6 +46,7 @@ export function useSearch(actionMode) {
     replaceUrl,
     replaceStatusUrl,
     replaceCancelUrl,
+    replaceActiveUrl,
     previewUrl,
     hasFeature,
   } = useConfig();
@@ -461,22 +462,7 @@ export function useSearch(actionMode) {
         data = await followReplace(data.logId, data.total);
       }
 
-      // Mark what was done on screen; no new search is needed.
-      if (data?.success) {
-        replacedKeys.value = new Set([
-          ...replacedKeys.value,
-          ...(data.replacedKeys || []),
-        ]);
-        staleKeys.value = new Set([
-          ...staleKeys.value,
-          ...(data.skipped || []).map(s => s.key),
-        ]);
-        failedKeys.value = new Set([
-          ...failedKeys.value,
-          ...(data.failed || []).map(s => s.key),
-        ]);
-        selectedResults.value = selectedResults.value.filter(r => !rowState(r));
-      }
+      markReplaced(data);
 
       return data;
     } catch (err) {
@@ -485,6 +471,41 @@ export function useSearch(actionMode) {
     } finally {
       loading.value = false;
     }
+  };
+
+  // Marks what a replace did on the rows on screen; no new search is needed.
+  const markReplaced = data => {
+    if (!data?.success) return;
+
+    replacedKeys.value = new Set([
+      ...replacedKeys.value,
+      ...(data.replacedKeys || []),
+    ]);
+    staleKeys.value = new Set([
+      ...staleKeys.value,
+      ...(data.skipped || []).map(s => s.key),
+    ]);
+    failedKeys.value = new Set([
+      ...failedKeys.value,
+      ...(data.failed || []).map(s => s.key),
+    ]);
+    selectedResults.value = selectedResults.value.filter(r => !rowState(r));
+  };
+
+  // A reload drops the page but not the queued replace. If this user left
+  // one running, follow it again; resolves with its final summary, or null
+  // when there is nothing to follow.
+  const resumeReplace = async () => {
+    if (replaceProgress.value || !replaceActiveUrl.value) return null;
+
+    const active = await get(replaceActiveUrl.value);
+    if (!active.success || !active.logId) return null;
+
+    kickQueue();
+    const data = await followReplace(active.logId);
+    markReplaced(data);
+
+    return data;
   };
 
   // Preview single result
@@ -616,6 +637,7 @@ export function useSearch(actionMode) {
     recentSearches,
     replaceProgress,
     cancelReplace,
+    resumeReplace,
     rowState,
     loadRecentSearches,
     openSearch,

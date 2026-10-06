@@ -391,6 +391,27 @@ class LogService extends Component
         return (int) Craft::$app->getDb()->getLastInsertID();
     }
 
+    /**
+     * The newest replace of this user that is still running. One silent for
+     * longer than $window seconds is a leftover from a dead worker.
+     */
+    public function activeReplaceFor(int $userId, int $window): ?array
+    {
+        $row = (new Query())
+            ->select("*")
+            ->from(Install::TABLE_LOGS)
+            ->where(["userId" => $userId, "status" => ["running", "cancelling"]])
+            ->andWhere([
+                ">=",
+                "dateUpdated",
+                Db::prepareDateForDb((new DateTime())->modify("-{$window} seconds")),
+            ])
+            ->orderBy(["id" => SORT_DESC])
+            ->one();
+
+        return $row ?: null;
+    }
+
     public function getLogById(int $id): ?array
     {
         $row = (new Query())
