@@ -133,6 +133,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 ### 6.1 Reemplazos grandes, cola y seguridad
 
 - [ ] **Más de 25 filas**: seleccionar 30 o más filas y reemplazar. Aparece el panel "Replacing X of Y rows…" con barra, "N changed so far" y **Cancel replace**; la ventana de confirmación se cierra. Al terminar, las filas quedan marcadas como Replaced y el resumen avisa de las omitidas o no guardadas.
+- [ ] **Recargar a mitad de un reemplazo en cola**: el panel "Replacing X of Y rows…" vuelve a aparecer solo, con el avance real y **Cancel replace** funcionando; al terminar sale el resumen (sin botón "Search again" si no hay búsqueda cargada). Salir a otra sección del CP y volver hace lo mismo.
 - [ ] **Cancel replace** detiene el trabajo tras la entrada en curso. En Logs & History, esa operación aparece como `cancelled` con lo que alcanzó a cambiar, y se puede revertir.
 - [ ] **Matar el worker** a mitad de un reemplazo en cola (o reiniciar ddev): el registro en Logs & History queda en `running` y tiene los valores ya cambiados; revertirlo restaura lo que se alcanzó a guardar y deja intacto lo demás.
 - [ ] **Límite por edición**: en Standard, más de 200 filas no se pueden reemplazar (el botón se deshabilita y el servidor lo rechaza); en Pro, más de 5,000.

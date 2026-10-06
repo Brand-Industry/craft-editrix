@@ -23,6 +23,7 @@ All notable changes to Editrix will be documented in this file.
 - Replace runs in the queue above 25 rows, with progress and Cancel; the limit per replace is 200 rows on Standard and 5,000 on Pro, and a replace over the limit is refused rather than cut short
 - Every value of a replace is written to its log before its entry is saved, so a replace that is cancelled or killed can still be reverted
 - Revert restores values one by one and never overwrites an edit made since: those are left alone and reported, with an explicit second step to overwrite them; reverting twice is safe. A log file in `storage/logs/editrix-*.log` records every replace and revert
+- Reloading the page, or leaving and coming back, during a queued replace brings its progress panel back, with Cancel, and ends with the usual summary
 - Entries that could not be saved are listed with the reason instead of being skipped silently, and a replace that would leave a required field empty is refused
 - An empty search, or a replacement identical to the search, is refused before anything is read
 - Preserve case (Pro): "widget" to "gadget" also turns "Widget" into "Gadget" and "WIDGET" into "GADGET"

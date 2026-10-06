@@ -179,6 +179,26 @@ class ReplaceLogTest extends EditrixTestCase
         $this->assertNotNull(Editrix::$plugin->log->getLogById($logId), 'The status endpoint needs it to report the result.');
     }
 
+    public function testAReloadedPageCanFindTheReplaceStillRunning(): void
+    {
+        $logs = Editrix::$plugin->log;
+        $logId = $this->beginLog();
+
+        $this->assertSame($logId, (int) $logs->activeReplaceFor($this->userId(), 600)['id']);
+        $this->assertNull($logs->activeReplaceFor($this->userId() + 1000000, 600), 'Another user never sees it.');
+
+        $logs->finishReplaceLog($logId, 'success', 0);
+        $this->assertNotSame($logId, (int) ($logs->activeReplaceFor($this->userId(), 600)['id'] ?? 0), 'A finished replace is not running.');
+
+        $logs->finishReplaceLog($logId, 'cancelling', 0);
+        $this->assertSame($logId, (int) $logs->activeReplaceFor($this->userId(), 600)['id'], 'One being stopped still is.');
+
+        Craft::$app->getDb()->createCommand()
+            ->update(Install::TABLE_LOGS, ['dateUpdated' => gmdate('Y-m-d H:i:s', time() - 1200)], ['id' => $logId])
+            ->execute();
+        $this->assertNotSame($logId, (int) ($logs->activeReplaceFor($this->userId(), 600)['id'] ?? 0), 'Silent for too long means a dead worker.');
+    }
+
     public function testSkippedRowsAreKeptOnTheLogWithTheirReason(): void
     {
         [$row, $word] = $this->pickRow();

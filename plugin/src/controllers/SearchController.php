@@ -736,6 +736,9 @@ class SearchController extends Controller
             "replaceCancelUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/replace/cancel"
             ),
+            "replaceActiveUrl" => \craft\helpers\UrlHelper::actionUrl(
+                "editrix/replace/active"
+            ),
             "fieldValueUrl" => \craft\helpers\UrlHelper::actionUrl(
                 "editrix/search/field-value"
             ),
