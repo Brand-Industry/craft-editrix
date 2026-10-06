@@ -88,6 +88,7 @@
               'is-selected': isSelected(row.result),
               'is-replaced': rowState(row.result) === 'replaced',
               'is-stale': rowState(row.result) === 'stale',
+              'is-failed': rowState(row.result) === 'failed',
             }"
             @click="$emit('toggle', row.result)"
           >
@@ -116,6 +117,7 @@
               <span v-if="(row.result.matchCount || 1) > 1" class="editrix-badge editrix-badge--info">{{ t('{count} matches', { count: row.result.matchCount }) }}</span>
               <span v-if="rowState(row.result) === 'replaced'" class="editrix-badge editrix-badge--success">{{ t('Replaced') }}</span>
               <span v-else-if="rowState(row.result) === 'stale'" class="editrix-badge editrix-badge--warning" :title="t('Its content changed after the search. Search again to see the current text.')">{{ t('Changed since search') }}</span>
+              <span v-else-if="rowState(row.result) === 'failed'" class="editrix-badge editrix-badge--warning">{{ t('Not saved') }}</span>
             </td>
             <td class="editrix-results__preview">
               <span v-html="formatPreview(row.result.matchContext)"></span>

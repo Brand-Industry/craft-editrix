@@ -11,6 +11,7 @@ use craft\elements\MatrixBlock;
 use benf\neo\elements\Block as NeoBlock;
 use brandindustry\editrix\helpers\FieldValue;
 use brandindustry\editrix\helpers\HtmlText;
+use brandindustry\editrix\migrations\Install;
 use brandindustry\editrix\models\SearchResult;
 use brandindustry\editrix\Editrix;
 
@@ -23,8 +24,17 @@ class ReplaceService extends Component
         bool $useRegex = false,
         bool $caseSensitive = true,
         bool $wholeWords = false,
-        array &$skipped = []
+        array &$skipped = [],
+        array &$failed = [],
+        array $hooks = []
     ): array {
+        // $hooks: "logId" writes every value to that log before its entry
+        // is saved; "onRow" is called as fn(int $done, int $total);
+        // "isCancelled" is polled between rows.
+        $logId = $hooks["logId"] ?? null;
+        $log = Editrix::$plugin->log;
+        $position = 0;
+        $done = 0;
         $replacements = [];
         $processedElements = [];
 
@@ -36,7 +46,17 @@ class ReplaceService extends Component
             }
         }
 
+        $total = count($processedElements);
+
         foreach ($processedElements as $data) {
+            if (isset($hooks["isCancelled"]) && $hooks["isCancelled"]()) {
+                break;
+            }
+
+            if (isset($hooks["onRow"])) {
+                $hooks["onRow"]($done++, $total);
+            }
+
             $result = $data["result"];
 
             // Rows don't carry the field's text, only a fingerprint of it
@@ -44,7 +64,25 @@ class ReplaceService extends Component
             // if it still matches that fingerprint: if the field was edited
             // since (by someone else, or by an earlier replace), the user
             // never saw this content and rewriting it would be a guess.
-            $oldValue = $this->currentValueFor($result);
+            if (self::isProtected($result["fieldHandle"], $result["sectionHandle"] ?? null)) {
+                $skipped[] = [
+                    "key" => self::keyFor($result),
+                    "elementId" => $result["elementId"],
+                    "elementTitle" => $result["elementTitle"] ?? "",
+                    "fieldHandle" => $result["fieldHandle"],
+                    "reason" => "protected",
+                ];
+
+                if ($logId) {
+                    $log->addItem($logId, $this->entryFor($result, null, null, "protected"), $position++, "skipped");
+                }
+
+                continue;
+            }
+
+            $current = $this->readCurrent($result);
+            $element = $current[0] ?? null;
+            $oldValue = $current[1] ?? null;
             $reason = $oldValue === null
                 ? "missing"
                 : ($this->matchesSearchSnapshot($result, $oldValue) ? null : "changed");
@@ -56,6 +94,11 @@ class ReplaceService extends Component
                     "fieldHandle" => $result["fieldHandle"],
                     "reason" => $reason,
                 ];
+
+                if ($logId) {
+                    $log->addItem($logId, $this->entryFor($result, null, null, $reason), $position++, "skipped");
+                }
+
                 continue;
             }
 
@@ -66,32 +109,272 @@ class ReplaceService extends Component
                 $replaceWith,
                 $useRegex,
                 $caseSensitive,
-                $wholeWords
+                $wholeWords,
+                (bool) ($hooks["preserveCase"] ?? false)
             );
 
             if ($newValue === $oldValue) {
                 continue;
             }
 
-            $saved = $this->saveElementField($result, $newValue);
+            // Write-ahead: the value is in the log before the entry is
+            // saved, so a request cut off in the middle of the save still
+            // leaves something to revert from. Revert reads "pending" as
+            // "may or may not have been saved" and checks which.
+            $itemId = $logId
+                ? $log->addItem($logId, $this->entryFor($result, $oldValue, $newValue), $position++, "pending")
+                : null;
+
+            $error = null;
+            $saved = $this->saveElementField($result, $newValue, $element, $error);
+
+            if ($itemId) {
+                $log->setItemState($itemId, $saved ? "applied" : "failed", $saved ? null : $error);
+            }
+
+            if (!$saved) {
+                // Said out loud, with the reason: a replace that quietly
+                // leaves some entries unchanged looks like a bug.
+                $failed[] = [
+                    "key" => self::keyFor($result),
+                    "elementId" => $result["elementId"],
+                    "elementTitle" => $result["elementTitle"] ?? "",
+                    "fieldHandle" => $result["fieldHandle"],
+                    "reason" => $error ?? "could not be saved",
+                ];
+            }
 
             if ($saved) {
-                $replacements[] = [
-                    "elementType" => $result["elementType"],
-                    "elementId" => $result["elementId"],
-                    "elementTitle" => $result["elementTitle"],
-                    "sectionHandle" => $result["sectionHandle"],
-                    "fieldHandle" => $result["fieldHandle"],
-                    "fieldName" => $result["fieldName"] ?? "",
-                    "oldValue" => $oldValue,
-                    "newValue" => $newValue,
-                    "siteId" => $result["siteId"],
-                    "parentId" => $result["parentId"] ?? null,
-                ];
+                $replacements[] = $this->entryFor($result, $oldValue, $newValue) + ["itemId" => $itemId];
+
+                if ($logId && count($replacements) % 10 === 0) {
+                    $log->touchReplaceLog($logId, count($replacements));
+                }
             }
         }
 
+        if (isset($hooks["onRow"])) {
+            $hooks["onRow"]($total, $total);
+        }
+
         return $replacements;
+    }
+
+    /**
+     * Runs a replace into an open log, whether inline or from the queue.
+     * Every value is written to the log before its entry is saved; at the
+     * end the log is closed with what happened, or removed if nothing
+     * changed.
+     *
+     * @param array[] $rows the selected rows
+     * @return array summary, as summaryFromLog() reads it back
+     */
+    public function run(
+        int $logId,
+        array $rows,
+        string $query,
+        string $replaceWith,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $wholeWords,
+        ?int $userId = null,
+        string $searchId = "",
+        ?callable $onRow = null,
+        ?callable $isCancelled = null,
+        bool $keepEmptyLog = false,
+        bool $preserveCase = false
+    ): array {
+        $log = Editrix::$plugin->log;
+        $cancelled = false;
+        $skipped = [];
+        $failed = [];
+
+        try {
+            $replacements = $this->replace(
+                $rows,
+                $query,
+                $replaceWith,
+                $useRegex,
+                $caseSensitive,
+                $wholeWords,
+                $skipped,
+                $failed,
+                [
+                    "logId" => $logId,
+                    "preserveCase" => $preserveCase,
+                    "onRow" => $onRow,
+                    "isCancelled" => function () use ($isCancelled, &$cancelled) {
+                        return $cancelled = (bool) ($isCancelled && $isCancelled());
+                    },
+                ]
+            );
+        } catch (\Throwable $e) {
+            $count = (int) ($log->itemCounts($logId)["applied"] ?? 0);
+            $log->finishReplaceLog($logId, $count > 0 ? "partial" : "failed", $count);
+            throw $e;
+        }
+
+        $count = count($replacements);
+
+        $dropped = $count === 0 && !$cancelled && !$keepEmptyLog;
+
+        if ($dropped) {
+            // Nothing changed: no log worth keeping.
+            $log->deleteLog($logId);
+        } else {
+            $log->finishReplaceLog($logId, $cancelled ? "cancelled" : "success", $count);
+        }
+
+        $this->writeRunLog($logId, $query, $replaceWith, $userId, $count, count($skipped), count($failed), $cancelled);
+
+        if ($userId !== null && $searchId !== "") {
+            $this->markReplaced(
+                $searchId,
+                $userId,
+                array_map(fn(array $r) => self::keyFor($r), $replacements)
+            );
+        }
+
+        return [
+            "logId" => $dropped ? null : $logId,
+            "cancelled" => $cancelled,
+            "replacedCount" => $count,
+            "replacedMatches" => array_sum(array_map(fn(array $r) => (int) ($r["matches"] ?? 1), $replacements)),
+            "replacedKeys" => array_map(fn(array $r) => self::keyFor($r), $replacements),
+            "skipped" => $skipped,
+            "failed" => $failed,
+        ];
+    }
+
+    /**
+     * One line per run, and one per value changed, in the plugin's log
+     * file. Ids and field handles, not the text: enough to know what was
+     * touched even if the database is restored from a backup.
+     */
+    private function writeRunLog(int $logId, string $query, string $replaceWith, ?int $userId, int $replaced, int $skipped, int $failed, bool $cancelled): void
+    {
+        $clip = fn(string $s) => mb_strimwidth(preg_replace('/\s+/', ' ', $s), 0, 80, "…");
+
+        Craft::info(
+            sprintf(
+                'Replace #%d by user %s: "%s" -> "%s": %d changed, %d skipped, %d failed%s',
+                $logId,
+                $userId ?? "?",
+                $clip($query),
+                $clip($replaceWith),
+                $replaced,
+                $skipped,
+                $failed,
+                $cancelled ? " (cancelled)" : ""
+            ),
+            Editrix::LOG_CATEGORY
+        );
+
+        foreach (
+            (new \craft\db\Query())
+                ->select(["elementType", "elementId", "siteId", "fieldHandle", "state"])
+                ->from(Install::TABLE_LOG_ITEMS)
+                ->where(["logId" => $logId])
+                ->orderBy(["id" => SORT_ASC])
+                ->each(200) as $item
+        ) {
+            Craft::info(
+                sprintf(
+                    "Replace #%d %s %s #%d site %d field %s",
+                    $logId,
+                    $item["state"],
+                    $item["elementType"],
+                    $item["elementId"],
+                    $item["siteId"],
+                    $item["fieldHandle"]
+                ),
+                Editrix::LOG_CATEGORY
+            );
+        }
+    }
+
+    /**
+     * What a replace did, read back from its log: the same summary run()
+     * returns, for a replace that ran in the queue.
+     */
+    public function summaryFromLog(int $logId): array
+    {
+        $table = Install::TABLE_LOG_ITEMS;
+        $key = fn(array $row) => self::keyFor($row);
+        $rows = fn(string $state) => (new \craft\db\Query())
+            ->select(["elementType", "elementId", "fieldHandle", "siteId", "elementTitle", "message", "matches"])
+            ->from($table)
+            ->where(["logId" => $logId, "state" => $state])
+            ->orderBy(["id" => SORT_ASC])
+            ->all();
+
+        $applied = $rows("applied");
+        $detail = fn(array $row) => [
+            "key" => $key($row),
+            "elementId" => (int) $row["elementId"],
+            "elementTitle" => $row["elementTitle"] ?? "",
+            "fieldHandle" => $row["fieldHandle"],
+            "reason" => $row["message"],
+        ];
+
+        return [
+            "replacedCount" => count($applied),
+            "replacedMatches" => array_sum(array_map(fn($r) => (int) ($r["matches"] ?? 1), $applied)),
+            "replacedKeys" => array_map($key, $applied),
+            "skipped" => array_map($detail, $rows("skipped")),
+            "failed" => array_map($detail, $rows("failed")),
+        ];
+    }
+
+    /** The shape a log keeps for one changed value. */
+    private function entryFor(array $result, ?string $old, ?string $new, ?string $message = null): array
+    {
+        return [
+            "elementType" => $result["elementType"],
+            "elementId" => $result["elementId"],
+            "elementTitle" => $result["elementTitle"] ?? "",
+            "sectionHandle" => $result["sectionHandle"] ?? null,
+            "fieldHandle" => $result["fieldHandle"],
+            "fieldName" => $result["fieldName"] ?? "",
+            "oldValue" => $old,
+            "newValue" => $new,
+            "siteId" => $result["siteId"],
+            "parentId" => $result["parentId"] ?? null,
+            "message" => $message,
+            // Occurrences in the field minus any left alone for crossing formatting
+            "matches" => max(1, (int) ($result["matchCount"] ?? 1) - (int) ($result["readOnlyMatchCount"] ?? 0)),
+        ];
+    }
+
+    /**
+     * Whether a row is in a protected field or section (see Settings).
+     * Checked when a search is shown and again when a replace runs.
+     */
+    public static function isProtected(string $fieldHandle, ?string $sectionHandle): bool
+    {
+        $settings = Editrix::$plugin->getSettings();
+
+        return in_array($fieldHandle, $settings->protectedFields, true) ||
+            ($sectionHandle !== null && in_array($sectionHandle, $settings->protectedSections, true));
+    }
+
+    /**
+     * How many rows one replace may change: the edition's limit, lowered by
+     * the optional setting, never raised by it.
+     */
+    public static function rowLimit(int $editionLimit, ?int $setting = null): int
+    {
+        $limit = $editionLimit > 0 ? $editionLimit : 1;
+
+        return $setting !== null && $setting > 0 ? min($limit, $setting) : $limit;
+    }
+
+    public function currentRowLimit(): int
+    {
+        return self::rowLimit(
+            Editrix::$plugin->license->getLimit("replaceRowLimit"),
+            Editrix::$plugin->getSettings()->maxRowsPerReplace
+        );
     }
 
     /**
@@ -148,15 +431,24 @@ class ReplaceService extends Component
      */
     public function currentValueFor(array $result): ?string
     {
+        return $this->readCurrent($result)[1] ?? null;
+    }
+
+    /** @return array{0: mixed, 1: string}|null the element and the field's text */
+    private function readCurrent(array $result): ?array
+    {
         $element = $this->getElement($result);
 
         if (!$element) {
             return null;
         }
 
-        return FieldValue::toString(
-            $this->getElementValue($element, $result["fieldHandle"])
-        );
+        return [
+            $element,
+            FieldValue::toString(
+                $this->getElementValue($element, $result["fieldHandle"])
+            ),
+        ];
     }
 
     /**
@@ -175,6 +467,51 @@ class ReplaceService extends Component
         }
 
         return self::hashValue($current) === $expected;
+    }
+
+    /**
+     * Gives the replacement the capitalisation of the text it replaces:
+     * ALL CAPS stays all caps, Title Case stays title case, anything else
+     * (lowercase or mixed) takes the replacement as it was typed.
+     */
+    public static function wearCase(string $matched, string $replacement): string
+    {
+        $letters = preg_replace('/[^\p{L}]/u', '', $matched) ?? '';
+
+        if ($letters === '') {
+            return $replacement;
+        }
+
+        if (mb_strlen($letters) > 1 && $letters === mb_strtoupper($letters)) {
+            return mb_strtoupper($replacement);
+        }
+
+        if ($letters === mb_strtolower($letters)) {
+            return $replacement;
+        }
+
+        // Title case: every word starts with a capital and has none after it.
+        foreach (preg_split('/\s+/u', trim($matched), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+            // Punctuation around a word ("(Widget)") is not part of its case.
+            $wordLetters = preg_replace('/[^\p{L}]/u', '', $word) ?? '';
+
+            if ($wordLetters === '') {
+                continue;
+            }
+
+            $first = mb_substr($wordLetters, 0, 1);
+            $rest = mb_substr($wordLetters, 1);
+
+            if ($first === mb_strtolower($first) || $rest !== mb_strtolower($rest)) {
+                return $replacement;
+            }
+        }
+
+        return preg_replace_callback(
+            '/(?<![\p{L}\p{N}])\p{Ll}/u',
+            fn(array $m) => mb_strtoupper($m[0]),
+            $replacement
+        ) ?? $replacement;
     }
 
     /**
@@ -227,7 +564,8 @@ class ReplaceService extends Component
         string $replaceWith,
         bool $useRegex = false,
         bool $caseSensitive = true,
-        bool $wholeWords = false
+        bool $wholeWords = false,
+        bool $preserveCase = false
     ): string {
         return !empty($result["isRichText"])
             ? $this->performReplacementInHtml(
@@ -236,7 +574,8 @@ class ReplaceService extends Component
                 $replaceWith,
                 $useRegex,
                 $caseSensitive,
-                $wholeWords
+                $wholeWords,
+                $preserveCase
             )
             : $this->performReplacement(
                 $value,
@@ -244,7 +583,8 @@ class ReplaceService extends Component
                 $replaceWith,
                 $useRegex,
                 $caseSensitive,
-                $wholeWords
+                $wholeWords,
+                $preserveCase
             );
     }
 
@@ -254,8 +594,25 @@ class ReplaceService extends Component
         string $replaceWith,
         bool $useRegex,
         bool $caseSensitive,
-        bool $wholeWords
+        bool $wholeWords,
+        bool $preserveCase = false
     ): string {
+        // "widget" -> "gadget" also turns "Widget" into "Gadget" and
+        // "WIDGET" into "GADGET". Only for plain and whole-word searches:
+        // a regex says exactly what it wants.
+        if ($preserveCase && !$useRegex) {
+            $quoted = preg_quote($query, "/");
+            $pattern = $wholeWords
+                ? "/\\b{$quoted}\\b/iu"
+                : "/{$quoted}/iu";
+
+            return preg_replace_callback(
+                $pattern,
+                fn(array $m) => self::wearCase($m[0], $replaceWith),
+                $value
+            ) ?? $value;
+        }
+
         if ($useRegex) {
             $flags = $caseSensitive ? "u" : "iu";
             $pattern = "/{$query}/{$flags}";
@@ -303,7 +660,8 @@ class ReplaceService extends Component
         string $replaceWith,
         bool $useRegex,
         bool $caseSensitive,
-        bool $wholeWords
+        bool $wholeWords,
+        bool $preserveCase = false
     ): string {
         [$plain, $charMap] = HtmlText::stripTagsWithCharMap($value);
 
@@ -351,7 +709,8 @@ class ReplaceService extends Component
                 $replaceWith,
                 $useRegex,
                 $caseSensitive,
-                $wholeWords
+                $wholeWords,
+                $preserveCase
             );
 
             if ($newPlainMatch === $oldPlainMatch) {
@@ -519,20 +878,46 @@ class ReplaceService extends Component
         return in_array(get_class($field), $settings->searchableFieldTypes);
     }
 
-    private function saveElementField(array $result, string $newValue): bool
-    {
+    /**
+     * Writes one field and saves the element.
+     *
+     * Validation and propagation are off on purpose. Validation, because
+     * content that predates a field's "required" flag would otherwise
+     * refuse a typo fix (the validateOnReplace setting turns it on).
+     * Propagation, because every site's row is its own result and is
+     * replaced on its own: propagating would copy this site's text over
+     * the next site's row and make that row look edited.
+     *
+     * @param string|null $error set to why it could not be saved
+     */
+    private function saveElementField(
+        array $result,
+        string $newValue,
+        mixed $element = null,
+        ?string &$error = null,
+        bool $guardRequired = true
+    ): bool {
         if (!$this->isReplaceableField($result)) {
             Craft::warning(
                 "Editrix: Refused to replace non-replaceable field '{$result["fieldHandle"]}'",
                 __METHOD__
             );
+            $error = "this field cannot be replaced";
             return false;
         }
 
         try {
-            $element = $this->getElement($result);
+            $element ??= $this->getElement($result);
 
             if (!$element) {
+                $error = "it no longer exists";
+                return false;
+            }
+
+            // With validation off, nothing else would stop a replace from
+            // blanking a field that must not be empty.
+            if ($guardRequired && trim($newValue) === "" && $this->isRequired($element, $result["fieldHandle"])) {
+                $error = "it would leave a required field empty";
                 return false;
             }
 
@@ -542,18 +927,80 @@ class ReplaceService extends Component
                 $element->setFieldValue($result["fieldHandle"], $newValue);
             }
 
-            // A MatrixBlock is a first-class element - save it directly.
-            // (Re-fetching and saving the owner entry here would silently
-            // discard this change, since that's a separate, unmodified
-            // instance of the same content.)
-            return Craft::$app->getElements()->saveElement($element);
+            $settings = Editrix::$plugin->getSettings();
+            // A revision is how an editor sees, in the screen they already
+            // use, that an entry changed and what it changed from.
+            $element->resaving = !$settings->createRevisionsOnReplace;
+
+            // A nested entry or block is a first-class element: save it
+            // directly. (Re-fetching and saving its owner would discard
+            // this change, since that is a separate, unmodified instance.)
+            if (
+                Craft::$app->getElements()->saveElement(
+                    $element,
+                    runValidation: $settings->validateOnReplace,
+                    propagate: false,
+                    updateSearchIndex: true
+                )
+            ) {
+                return true;
+            }
+
+            $errors = [];
+            foreach ($element->getErrors() as $messages) {
+                $errors = array_merge($errors, (array) $messages);
+            }
+            $error = $errors ? implode("; ", $errors) : "Craft refused to save it";
+
+            return false;
         } catch (\Throwable $e) {
             Craft::error(
                 "Editrix: Failed to save element - " . $e->getMessage(),
                 __METHOD__
             );
+            $error = $e->getMessage();
             return false;
         }
+    }
+
+    /** Whether a field must not be left empty on this element. */
+    private function isRequired(mixed $element, string $handle): bool
+    {
+        if ($handle === "title") {
+            return true;
+        }
+
+        foreach ($element->getFieldLayout()?->getCustomFieldElements() ?? [] as $layoutElement) {
+            if ($layoutElement->getField()->handle === $handle) {
+                return (bool) $layoutElement->required;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Things wrong with a replace that can be known before reading a row.
+     * They turn "nothing happened" into a sentence saying why.
+     *
+     * @return string[]
+     */
+    public static function objections(
+        string $find,
+        string $replace
+    ): array {
+        $objections = [];
+
+        if (trim($find) === "") {
+            $objections[] = Craft::t("editrix", "There is nothing to find.");
+        } elseif ($find === $replace) {
+            $objections[] = Craft::t(
+                "editrix",
+                "The replacement is the same as the search, so nothing would change."
+            );
+        }
+
+        return $objections;
     }
 
     private function getElement(array $result): mixed
@@ -605,66 +1052,153 @@ class ReplaceService extends Component
     }
 
     /**
-     * Validate whether a revert is safe (content hasn't changed since replacement)
+     * Validate whether a revert is safe (content hasn't changed since the replacement)
      *
      * Returns an array of discrepancies for each replacement:
      * - 'safe' = current value matches newValue, revert is clean
+     * - 'unchanged' = it already holds the original text (a replace cut
+     *   off before this entry was saved, or already reverted): nothing to do
      * - 'modified' = current value was changed after the replacement
      * - 'missing' = element no longer exists
+     *
+     * @param iterable $replacements entries as logs keep them
      */
-    public function validateRevert(array $replacements): array
+    public function validateRevert(iterable $replacements): array
     {
         $results = [];
 
         foreach ($replacements as $i => $replacement) {
-            $element = $this->getElement($replacement);
+            $base = [
+                "index" => $i,
+                "elementId" => $replacement["elementId"],
+                "elementTitle" => $replacement["elementTitle"] ?? "(unknown)",
+                "fieldHandle" => $replacement["fieldHandle"],
+            ];
 
-            if (!$element) {
-                $results[] = [
-                    "index" => $i,
-                    "status" => "missing",
-                    "elementId" => $replacement["elementId"],
-                    "elementTitle" =>
-                        $replacement["elementTitle"] ?? "(unknown)",
-                    "fieldHandle" => $replacement["fieldHandle"],
-                ];
-                continue;
+            $status = $this->revertStatus($replacement, $current);
+
+            if ($status === "modified") {
+                $expected = (string) ($replacement["newValue"] ?? "");
+                $base["expectedValue"] = mb_substr($expected, 0, 100);
+                $base["currentValue"] = mb_substr((string) $current, 0, 100);
             }
 
-            $currentValue = FieldValue::toString(
-                $this->getElementValue($element, $replacement["fieldHandle"])
-            );
-            $expectedValue = (string) ($replacement["newValue"] ?? "");
-
-            if (
-                FieldValue::withoutRefFallbacks($currentValue) ===
-                FieldValue::withoutRefFallbacks($expectedValue)
-            ) {
-                $results[] = [
-                    "index" => $i,
-                    "status" => "safe",
-                    "elementId" => $replacement["elementId"],
-                    "elementTitle" =>
-                        $replacement["elementTitle"] ??
-                        ($element->title ?? "(unknown)"),
-                    "fieldHandle" => $replacement["fieldHandle"],
-                ];
-            } else {
-                $results[] = [
-                    "index" => $i,
-                    "status" => "modified",
-                    "elementId" => $replacement["elementId"],
-                    "elementTitle" =>
-                        $replacement["elementTitle"] ??
-                        ($element->title ?? "(unknown)"),
-                    "fieldHandle" => $replacement["fieldHandle"],
-                    "expectedValue" => mb_substr($expectedValue, 0, 100),
-                    "currentValue" => mb_substr($currentValue, 0, 100),
-                ];
-            }
+            $results[] = ["status" => $status] + $base;
         }
 
         return $results;
+    }
+
+    /**
+     * Where one logged value stands now: safe, unchanged, modified or
+     * missing. $current is set to the text it holds, if it exists.
+     */
+    private function revertStatus(array $replacement, ?string &$current = null, mixed &$element = null): string
+    {
+        $read = $this->readCurrent($replacement);
+
+        if ($read === null) {
+            $current = null;
+            return "missing";
+        }
+
+        [$element, $current] = $read;
+
+        $same = fn(string $a, string $b) => FieldValue::withoutRefFallbacks($a)
+            === FieldValue::withoutRefFallbacks($b);
+
+        if ($same($current, (string) ($replacement["newValue"] ?? ""))) {
+            return "safe";
+        }
+
+        if ($same($current, (string) ($replacement["oldValue"] ?? ""))) {
+            return "unchanged";
+        }
+
+        return "modified";
+    }
+
+    /**
+     * Puts logged values back, one by one, and says what happened to each.
+     *
+     * A value is restored only if it still holds exactly what the replace
+     * wrote. One that was edited since is left alone and reported, because
+     * putting the old text back would silently destroy that edit; $force
+     * overrides this for the user who has decided to. A value that already
+     * holds the original text counts as done, so reverting twice, or after
+     * a replace that was cut off, is safe.
+     *
+     * @param iterable $entries entries as logs keep them (from LogService::replacementsFor)
+     * @return array{reverted: int, unchanged: int, conflicts: array, missing: array, failed: array}
+     */
+    public function revertEntries(iterable $entries, bool $force = false, ?callable $onEach = null): array
+    {
+        $out = ["reverted" => 0, "unchanged" => 0, "conflicts" => [], "missing" => [], "failed" => []];
+        $log = Editrix::$plugin->log;
+
+        foreach ($entries as $entry) {
+            $status = $this->revertStatus($entry, $current, $element);
+            $itemId = $entry["itemId"] ?? null;
+            $about = [
+                "elementId" => $entry["elementId"],
+                "elementTitle" => $entry["elementTitle"] ?? "",
+                "fieldHandle" => $entry["fieldHandle"],
+            ];
+
+            if ($status === "missing") {
+                $out["missing"][] = $about;
+            } elseif ($status === "unchanged") {
+                $out["unchanged"]++;
+                $itemId && $log->setItemState($itemId, "reverted", "already held the original text");
+            } elseif ($status === "modified" && !$force) {
+                $out["conflicts"][] = $about;
+            } else {
+                $error = null;
+
+                // The text being restored was valid before, so the guard
+                // against emptying a required field does not apply.
+                if ($this->saveElementField($entry, (string) $entry["oldValue"], $element, $error, false)) {
+                    $out["reverted"]++;
+                    $itemId && $log->setItemState($itemId, "reverted");
+                } else {
+                    $out["failed"][] = $about + ["reason" => $error];
+                }
+            }
+
+            $onEach && $onEach($out);
+        }
+
+        return $out;
+    }
+
+    /** Closes a revert: reverted when nothing was left alone, otherwise partial. */
+    public function finishRevert(int $logId, array $result, ?int $userId = null): void
+    {
+        Craft::info(
+            sprintf(
+                "Revert of replace #%d by user %s: %d restored, %d already original, %d left edited, %d missing, %d failed",
+                $logId,
+                $userId ?? "?",
+                $result["reverted"],
+                $result["unchanged"],
+                count($result["conflicts"]),
+                count($result["missing"]),
+                count($result["failed"])
+            ),
+            Editrix::LOG_CATEGORY
+        );
+
+        $left = count($result["conflicts"]) + count($result["missing"]) + count($result["failed"]);
+        $log = Editrix::$plugin->log;
+
+        if ($left === 0) {
+            $log->markAsReverted($logId, $userId);
+        } elseif ($result["reverted"] + $result["unchanged"] > 0) {
+            $log->markAsPartial($logId);
+        } else {
+            // Nothing could be restored: back to what it was before the attempt.
+            $log->finishReplaceLog($logId, "success", (int) ($log->itemCounts($logId)["applied"] ?? 0));
+        }
     }
 
     public function revert(array $replacement): bool
@@ -680,18 +1214,7 @@ class ReplaceService extends Component
                 return false;
             }
 
-            if ($replacement["fieldHandle"] === "title") {
-                $element->title = $replacement["oldValue"];
-            } else {
-                $element->setFieldValue(
-                    $replacement["fieldHandle"],
-                    $replacement["oldValue"]
-                );
-            }
-
-            // See saveElementField() - a MatrixBlock saves directly, not via
-            // a freshly-queried (and therefore unmodified) owner entry.
-            return Craft::$app->getElements()->saveElement($element);
+            return $this->saveElementField($replacement, (string) $replacement["oldValue"], $element, $error, false);
         } catch (\Throwable $e) {
             Craft::error(
                 "Editrix: Failed to revert - " . $e->getMessage(),

@@ -57,6 +57,291 @@ class LogService extends Component
     }
 
     /**
+     * The older way: one log row holding every replacement as JSON, written
+     * after the replace. Kept so logs made before items existed stay
+     * readable, and so a log can be made for a given user in tests.
+     */
+    public function createLogForUser(int $userId, int $siteId, string $searchQuery, string $replaceWith, array $replacements): int
+    {
+        $now = Db::prepareDateForDb(new DateTime());
+
+        Craft::$app->getDb()->createCommand()->insert(Install::TABLE_LOGS, [
+            "siteId" => $siteId,
+            "userId" => $userId,
+            "type" => "replace",
+            "searchQuery" => $searchQuery,
+            "replaceWith" => $replaceWith,
+            "useRegex" => false,
+            "caseSensitive" => true,
+            "wholeWords" => false,
+            "replacementCount" => count($replacements),
+            "replacements" => json_encode($replacements),
+            "status" => "success",
+            "dateCreated" => $now,
+            "dateUpdated" => $now,
+            "uid" => Craft::$app->getSecurity()->generateRandomString(),
+        ])->execute();
+
+        return (int) Craft::$app->getDb()->getLastInsertID();
+    }
+
+    /**
+     * Opens the log of a replace before anything is changed. Its values are
+     * then written one by one with addItem(), each before the entry is
+     * saved, so a request that is cut off partway still leaves a log that
+     * can be reverted. $userId is for the queue, which has no session.
+     */
+    public function beginReplaceLog(
+        int $siteId,
+        string $searchQuery,
+        string $replaceWith,
+        bool $useRegex = false,
+        bool $caseSensitive = true,
+        bool $wholeWords = false,
+        ?int $userId = null
+    ): ?int {
+        $userId ??= Craft::$app->getUser()->getId();
+
+        if (!$userId) {
+            return null;
+        }
+
+        $now = Db::prepareDateForDb(new DateTime());
+
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->insert(Install::TABLE_LOGS, [
+                "siteId" => $siteId,
+                "userId" => $userId,
+                "type" => "replace",
+                "searchQuery" => $searchQuery,
+                "replaceWith" => $replaceWith,
+                "useRegex" => $useRegex,
+                "caseSensitive" => $caseSensitive,
+                "wholeWords" => $wholeWords,
+                "replacementCount" => 0,
+                "replacements" => null,
+                "status" => "running",
+                "dateCreated" => $now,
+                "dateUpdated" => $now,
+                "uid" => Craft::$app->getSecurity()->generateRandomString(),
+            ])
+            ->execute();
+
+        return (int) Craft::$app->getDb()->getLastInsertID();
+    }
+
+    /**
+     * Records one value of a replace. Called with state "pending" just
+     * before the entry is saved.
+     *
+     * @param array $entry elementType, elementId, siteId, fieldHandle,
+     *                     fieldName, elementTitle, sectionHandle,
+     *                     parentId, oldValue, newValue
+     */
+    public function addItem(int $logId, array $entry, int $position, string $state = "pending"): int
+    {
+        $now = Db::prepareDateForDb(new DateTime());
+
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->insert(Install::TABLE_LOG_ITEMS, [
+                "logId" => $logId,
+                "position" => $position,
+                "elementType" => $entry["elementType"],
+                "elementId" => $entry["elementId"],
+                "siteId" => $entry["siteId"],
+                "fieldHandle" => $entry["fieldHandle"],
+                "fieldName" => $entry["fieldName"] ?? "",
+                "elementTitle" => $entry["elementTitle"] ?? "",
+                "sectionHandle" => $entry["sectionHandle"] ?? null,
+                "parentId" => $entry["parentId"] ?? null,
+                "oldValue" => $entry["oldValue"] ?? null,
+                "newValue" => $entry["newValue"] ?? null,
+                "matches" => $entry["matches"] ?? null,
+                "state" => $state,
+                "message" => $entry["message"] ?? null,
+                "dateCreated" => $now,
+                "dateUpdated" => $now,
+                "uid" => Craft::$app->getSecurity()->generateRandomString(),
+            ])
+            ->execute();
+
+        return (int) Craft::$app->getDb()->getLastInsertID();
+    }
+
+    public function setItemState(int $itemId, string $state, ?string $message = null): void
+    {
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->update(
+                Install::TABLE_LOG_ITEMS,
+                [
+                    "state" => $state,
+                    "message" => $message,
+                    "dateUpdated" => Db::prepareDateForDb(new DateTime()),
+                ],
+                ["id" => $itemId]
+            )
+            ->execute();
+    }
+
+    /** How many items a log has in each state. @return array<string, int> */
+    public function itemCounts(int $logId): array
+    {
+        $rows = (new Query())
+            ->select(["state", "n" => "COUNT(*)"])
+            ->from(Install::TABLE_LOG_ITEMS)
+            ->where(["logId" => $logId])
+            ->groupBy(["state"])
+            ->all();
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[$row["state"]] = (int) $row["n"];
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Closes a replace's log. The count is what was actually changed.
+     */
+    public function finishReplaceLog(int $logId, string $status, int $count): void
+    {
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->update(
+                Install::TABLE_LOGS,
+                [
+                    "status" => $status,
+                    "replacementCount" => $count,
+                    "dateUpdated" => Db::prepareDateForDb(new DateTime()),
+                ],
+                ["id" => $logId]
+            )
+            ->execute();
+    }
+
+    /** How many rows a queued replace is working through, kept in the log's scope column. */
+    public function setTotal(int $logId, int $total): void
+    {
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->update(Install::TABLE_LOGS, ["scope" => json_encode(["total" => $total])], ["id" => $logId])
+            ->execute();
+    }
+
+    public function getTotal(int $logId): int
+    {
+        $scope = (new Query())
+            ->select(["scope"])
+            ->from(Install::TABLE_LOGS)
+            ->where(["id" => $logId])
+            ->scalar();
+
+        return (int) (json_decode((string) $scope, true)["total"] ?? 0);
+    }
+
+    /** Updates the running count and the "still alive" timestamp. */
+    public function touchReplaceLog(int $logId, int $count): void
+    {
+        Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->update(
+                Install::TABLE_LOGS,
+                [
+                    "replacementCount" => $count,
+                    "dateUpdated" => Db::prepareDateForDb(new DateTime()),
+                ],
+                ["id" => $logId]
+            )
+            ->execute();
+    }
+
+    /** How many values a revert of this log would still look at. */
+    public function revertableCount(array $log): int
+    {
+        $counts = $this->itemCounts((int) $log["id"]);
+
+        if ($counts === []) {
+            return count(json_decode($log["replacements"] ?? "[]", true) ?? []);
+        }
+
+        return (int) (($counts["applied"] ?? 0) + ($counts["pending"] ?? 0));
+    }
+
+    /**
+     * The values a replace changed, in the shape revert and export read:
+     * from the items table for logs written value by value, from the JSON
+     * column for older logs. A generator, because a large replace holds
+     * far more text than should sit in memory at once.
+     *
+     * Items that were skipped or failed changed nothing and are left out;
+     * "pending" ones are included, since the entry may or may not have been
+     * saved before the request ended.
+     *
+     * @return \Generator<array>
+     */
+    public function replacementsFor(array $log, bool $includeReverted = false): \Generator
+    {
+        $hasItems = (new Query())
+            ->from(Install::TABLE_LOG_ITEMS)
+            ->where(["logId" => $log["id"]])
+            ->exists();
+
+        if (!$hasItems) {
+            foreach (json_decode($log["replacements"] ?? "[]", true) ?? [] as $entry) {
+                yield $entry;
+            }
+
+            return;
+        }
+
+        $states = $includeReverted ? ["pending", "applied", "reverted"] : ["pending", "applied"];
+        $after = 0;
+
+        while (true) {
+            $rows = (new Query())
+                ->from(Install::TABLE_LOG_ITEMS)
+                ->where(["logId" => $log["id"], "state" => $states])
+                ->andWhere([">", "id", $after])
+                ->orderBy(["id" => SORT_ASC])
+                ->limit(100)
+                ->all();
+
+            if ($rows === []) {
+                return;
+            }
+
+            foreach ($rows as $row) {
+                $after = (int) $row["id"];
+
+                yield [
+                    "itemId" => $after,
+                    "state" => $row["state"],
+                    "elementType" => $row["elementType"],
+                    "elementId" => (int) $row["elementId"],
+                    "elementTitle" => $row["elementTitle"],
+                    "sectionHandle" => $row["sectionHandle"],
+                    "fieldHandle" => $row["fieldHandle"],
+                    "fieldName" => $row["fieldName"],
+                    "oldValue" => $row["oldValue"],
+                    "newValue" => $row["newValue"],
+                    "siteId" => (int) $row["siteId"],
+                    "parentId" => $row["parentId"] === null ? null : (int) $row["parentId"],
+                ];
+            }
+        }
+    }
+
+    /**
      * Log a plain search - no field content is touched, so we only keep
      * enough to show it in History and let the user re-run the same
      * query/scope later, not a snapshot of the results themselves.
@@ -246,9 +531,10 @@ class LogService extends Component
         return (int) $query->count();
     }
 
-    public function markAsReverted(int $logId): bool
+    public function markAsReverted(int $logId, ?int $userId = null): bool
     {
-        $userId = Craft::$app->getUser()->getId();
+        // A queued revert has no session, so it passes the user it started with.
+        $userId ??= Craft::$app->getUser()->getId();
 
         $affected = Craft::$app
             ->getDb()
@@ -266,6 +552,22 @@ class LogService extends Component
             ->execute();
 
         return $affected > 0;
+    }
+
+    /**
+     * Some values are back and the rest were left alone (edited since).
+     */
+    public function markAsPartial(int $logId): bool
+    {
+        return Craft::$app
+            ->getDb()
+            ->createCommand()
+            ->update(
+                Install::TABLE_LOGS,
+                ["status" => "partial", "dateUpdated" => Db::prepareDateForDb(new DateTime())],
+                ["id" => $logId]
+            )
+            ->execute() > 0;
     }
 
     public function deleteLog(int $logId): bool
@@ -354,7 +656,7 @@ class LogService extends Component
                 "count" => (int) $log["replacementCount"],
                 "status" => $log["status"],
                 "scope" => json_decode($log["scope"] ?? "", true),
-                "replacements" => json_decode($log["replacements"], true),
+                "replacements" => iterator_to_array($this->replacementsFor($log), false),
             ];
         }, $logs);
 

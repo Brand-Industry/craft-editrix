@@ -7,6 +7,7 @@ use craft\web\Controller;
 use yii\web\Response;
 use brandindustry\editrix\Editrix;
 use brandindustry\editrix\services\LicenseService;
+use brandindustry\editrix\jobs\ReplaceJob;
 use brandindustry\editrix\services\ReplaceService;
 
 class ReplaceController extends Controller
@@ -37,10 +38,17 @@ class ReplaceController extends Controller
         $wholeWords = $this->parseBoolean(
             $request->getBodyParam("wholeWords", false)
         );
+        $preserveCase = $this->parseBoolean(
+            $request->getBodyParam("preserveCase", false)
+        );
+        // Variants of different case can only be found, and so kept, when
+        // the search ignores case.
+        $caseInsensitive = $caseInsensitive || $preserveCase;
 
         $licenseError = $this->checkRegexWholeWordsLicense(
             $useRegex,
-            $wholeWords
+            $wholeWords,
+            $preserveCase
         );
         if ($licenseError !== null) {
             return $this->asJson($licenseError);
@@ -57,13 +65,24 @@ class ReplaceController extends Controller
             ]);
         }
 
-        $rowLimit = Editrix::$plugin->getSettings()->maxRowsPerReplace;
+        $objections = ReplaceService::objections(
+            $searchQuery,
+            $replaceWith
+        );
+        if ($objections !== []) {
+            return $this->asJson([
+                "success" => false,
+                "error" => implode(" ", $objections),
+            ]);
+        }
+
+        $rowLimit = Editrix::$plugin->replace->currentRowLimit();
         if (count($selectedResults) > $rowLimit) {
             return $this->asJson([
                 "success" => false,
                 "error" => Craft::t(
                     "editrix",
-                    "Select at most {limit} rows per replace; you selected {count}. Replacing more in one request can run past the server's time limit and leave changes that are not logged.",
+                    "A replace can change at most {limit} rows; you selected {count}. Select fewer, or narrow the search.",
                     ["limit" => $rowLimit, "count" => count($selectedResults)]
                 ),
             ]);
@@ -78,63 +97,72 @@ class ReplaceController extends Controller
         }
 
         try {
-            $skipped = [];
-            $replacements = Editrix::$plugin->replace->replace(
-                $selectedResults,
+            $userId = (int) Craft::$app->getUser()->getId();
+            $logSiteId = (int) ($siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
+            $searchId = (string) $request->getBodyParam("searchId", "");
+
+            // The log exists before anything is changed; every value is
+            // written to it before its entry is saved.
+            $logId = Editrix::$plugin->log->beginReplaceLog(
+                $logSiteId,
+                $searchQuery,
+                $replaceWith,
+                $useRegex,
+                !$caseInsensitive,
+                $wholeWords
+            );
+
+            if (!$logId) {
+                return $this->asJson([
+                    "success" => false,
+                    "error" => "Permission denied",
+                ]);
+            }
+
+            $threshold = Editrix::$plugin->getSettings()->replaceQueueThreshold;
+
+            if (count($selectedResults) > $threshold) {
+                // Too many to save inside one request: do it in the queue.
+                Editrix::$plugin->log->setTotal($logId, count($selectedResults));
+
+                Craft::$app->getQueue()->push(new ReplaceJob([
+                    "logId" => $logId,
+                    "rows" => array_values($selectedResults),
+                    "query" => $searchQuery,
+                    "replaceWith" => $replaceWith,
+                    "useRegex" => $useRegex,
+                    "caseSensitive" => !$caseInsensitive,
+                    "wholeWords" => $wholeWords,
+                    "preserveCase" => $preserveCase,
+                    "userId" => $userId,
+                    "searchId" => $searchId,
+                ]));
+
+                return $this->asJson([
+                    "success" => true,
+                    "queued" => true,
+                    "logId" => $logId,
+                    "total" => count($selectedResults),
+                ]);
+            }
+
+            $summary = Editrix::$plugin->replace->run(
+                $logId,
+                array_values($selectedResults),
                 $searchQuery,
                 $replaceWith,
                 $useRegex,
                 !$caseInsensitive,
                 $wholeWords,
-                $skipped
+                $userId,
+                $searchId,
+                null,
+                null,
+                false,
+                $preserveCase
             );
 
-            $replacedCount = count($replacements);
-            $replacedKeys = array_map(
-                fn(array $r) => ReplaceService::keyFor($r),
-                $replacements
-            );
-
-            $replacedMatches = ReplaceService::countOccurrences(
-                $selectedResults,
-                $replacedKeys
-            );
-
-            Editrix::$plugin->replace->markReplaced(
-                (string) $request->getBodyParam("searchId", ""),
-                (int) Craft::$app->getUser()->getId(),
-                $replacedKeys
-            );
-
-            if ($replacedCount > 0) {
-                $logSiteId =
-                    $siteId ?? Craft::$app->getSites()->getCurrentSite()->id;
-
-                Editrix::$plugin->log->createLog(
-                    (int) $logSiteId,
-                    $searchQuery,
-                    $replaceWith,
-                    $replacements,
-                    $useRegex,
-                    !$caseInsensitive,
-                    $wholeWords
-                );
-            }
-
-            return $this->asJson([
-                "success" => true,
-                "replacedCount" => $replacedCount,
-                "replacedMatches" => $replacedMatches,
-                "replacedKeys" => $replacedKeys,
-                "skipped" => $skipped,
-                "message" => Craft::t(
-                    "editrix",
-                    "Successfully replaced {count} occurrence(s).",
-                    [
-                        "count" => $replacedMatches,
-                    ]
-                ),
-            ]);
+            return $this->asJson($this->replaceResponse($summary));
         } catch (\Throwable $e) {
             Craft::error(
                 "Editrix replace error: " . $e->getMessage(),
@@ -175,10 +203,17 @@ class ReplaceController extends Controller
         $wholeWords = $this->parseBoolean(
             $request->getBodyParam("wholeWords", false)
         );
+        $preserveCase = $this->parseBoolean(
+            $request->getBodyParam("preserveCase", false)
+        );
+        // Variants of different case can only be found, and so kept, when
+        // the search ignores case.
+        $caseInsensitive = $caseInsensitive || $preserveCase;
 
         $licenseError = $this->checkRegexWholeWordsLicense(
             $useRegex,
-            $wholeWords
+            $wholeWords,
+            $preserveCase
         );
         if ($licenseError !== null) {
             return $this->asJson($licenseError);
@@ -225,7 +260,8 @@ class ReplaceController extends Controller
             $replaceWith,
             $useRegex,
             !$caseInsensitive,
-            $wholeWords
+            $wholeWords,
+            $preserveCase
         );
 
         return $this->asJson([
@@ -246,9 +282,21 @@ class ReplaceController extends Controller
      */
     private function checkRegexWholeWordsLicense(
         bool $useRegex,
-        bool $wholeWords
+        bool $wholeWords,
+        bool $preserveCase = false
     ): ?array {
         $license = Editrix::$plugin->license;
+
+        if ($preserveCase && !$license->hasFeature(LicenseService::FEATURE_PRESERVE_CASE)) {
+            return [
+                "success" => false,
+                "error" => Craft::t(
+                    "editrix",
+                    "Preserving case is only available in Pro edition"
+                ),
+                "upgradeRequired" => true,
+            ];
+        }
 
         if ($useRegex && !$license->hasFeature(LicenseService::FEATURE_REGEX)) {
             return [
@@ -323,5 +371,84 @@ class ReplaceController extends Controller
             return filter_var($value, FILTER_VALIDATE_BOOLEAN);
         }
         return (bool) $value;
+    }
+
+    /** The JSON a finished replace sends back, inline or from the queue. */
+    private function replaceResponse(array $summary): array
+    {
+        return [
+            "success" => true,
+            "logId" => $summary["logId"] ?? null,
+            "cancelled" => $summary["cancelled"] ?? false,
+            "replacedCount" => $summary["replacedCount"],
+            "replacedMatches" => $summary["replacedMatches"],
+            "replacedKeys" => $summary["replacedKeys"],
+            "skipped" => $summary["skipped"],
+            "failed" => $summary["failed"],
+            "message" => Craft::t(
+                "editrix",
+                "Successfully replaced {count} occurrence(s).",
+                ["count" => $summary["replacedMatches"]]
+            ),
+        ];
+    }
+
+    /**
+     * Progress of a replace that runs in the queue, and its summary once it
+     * has finished.
+     */
+    public function actionStatus(int $logId): Response
+    {
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:replace")) {
+            return $this->asJson(["success" => false, "error" => "Permission denied"]);
+        }
+
+        $log = Editrix::$plugin->log->getLogById($logId);
+
+        if (!$log || (int) $log["userId"] !== (int) Craft::$app->getUser()->getId()) {
+            return $this->asJson(["success" => false, "error" => "Replace not found"]);
+        }
+
+        $counts = Editrix::$plugin->log->itemCounts($logId);
+        $running = in_array($log["status"], ["running", "cancelling"], true);
+
+        $response = [
+            "success" => true,
+            "status" => $log["status"],
+            "total" => Editrix::$plugin->log->getTotal($logId),
+            "done" => array_sum($counts) - ($counts["reverted"] ?? 0),
+            "replaced" => (int) ($counts["applied"] ?? 0),
+            "idleSeconds" => max(0, time() - \craft\helpers\DateTimeHelper::toDateTime($log["dateUpdated"])->getTimestamp()),
+        ];
+
+        if (!$running) {
+            $response += $this->replaceResponse(
+                ["logId" => $logId, "cancelled" => $log["status"] === "cancelled"] +
+                    Editrix::$plugin->replace->summaryFromLog($logId)
+            );
+        }
+
+        return $this->asJson($response);
+    }
+
+    public function actionCancel(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:replace")) {
+            return $this->asJson(["success" => false, "error" => "Permission denied"]);
+        }
+
+        $logId = (int) Craft::$app->getRequest()->getBodyParam("logId", 0);
+        $log = Editrix::$plugin->log->getLogById($logId);
+
+        if ($log && (int) $log["userId"] === (int) Craft::$app->getUser()->getId() && $log["status"] === "running") {
+            Editrix::$plugin->log->finishReplaceLog($logId, "cancelling", (int) $log["replacementCount"]);
+        }
+
+        return $this->asJson(["success" => true]);
     }
 }

@@ -47,6 +47,9 @@
           <p v-if="result.readOnlyReason === 'tag'" class="editrix-form__warning" style="margin-top: 12px;">
             ℹ️ {{ t('Rename the tag directly - it may be shared by other entries.') }}
           </p>
+          <p v-else-if="result.readOnlyReason === 'protected'" class="editrix-form__warning" style="margin-top: 12px;">
+            ℹ️ {{ t('This field or section is protected in Editrix settings and can\'t be replaced.') }}
+          </p>
           <p v-else-if="result.readOnlyReason === 'formatting'" class="editrix-form__warning" style="margin-top: 12px;">
             ℹ️ {{ t('This match spans formatting (like bold or italic) and can\'t be replaced automatically - edit it directly in Craft.') }}
           </p>

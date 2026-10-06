@@ -34,7 +34,7 @@ class SearchResilienceTest extends EditrixTestCase
             $this->siteId(),
             false,
             false,
-            $this->sectionOptions($section[0]),
+            $this->sectionOptions($section[0], ['sqlPrefilter' => false]),
             function (int $done) use (&$scanned) {
                 $scanned = $done;
             },
@@ -153,5 +153,64 @@ class SearchResilienceTest extends EditrixTestCase
 
         $this->assertCount($expected, $ids, 'Every entry should still be visited.');
         $this->assertSame(count($ids), count(array_unique($ids)), 'No entry should be visited twice.');
+    }
+
+    public function testAMemoryLimitAlsoStopsAPrefilteredScan(): void
+    {
+        $section = $this->smallestSection(1);
+        if (!$section) {
+            $this->markTestSkipped('The site has no entries.');
+        }
+
+        $service = new class extends SearchService {
+            protected function memoryLow(): bool
+            {
+                return true;
+            }
+        };
+
+        $meta = [];
+        $service->search(
+            'zzq-editrix-no-such-text-zzq',
+            $this->siteId(),
+            false,
+            false,
+            $this->sectionOptions($section[0]),
+            null,
+            null,
+            $meta
+        );
+
+        $this->assertTrue($meta['prefiltered']);
+        $this->assertTrue($meta['truncated']);
+        $this->assertSame('memory', $meta['stopReason']);
+    }
+
+    public function testAPrefilteredScanCanBeCancelledBetweenWindows(): void
+    {
+        $section = $this->smallestSection(1);
+        if (!$section) {
+            $this->markTestSkipped('The site has no entries.');
+        }
+
+        $calls = 0;
+        $meta = [];
+        Editrix::$plugin->search->search(
+            'zzq-editrix-no-such-text-zzq',
+            $this->siteId(),
+            false,
+            false,
+            $this->sectionOptions($section[0]),
+            function () use (&$calls) {
+                $calls++;
+            },
+            function () use (&$calls) {
+                return $calls >= 2;
+            },
+            $meta
+        );
+
+        $this->assertTrue($meta['prefiltered']);
+        $this->assertLessThan(10, $calls, 'The scan should stop soon after the cancel flag turns on, not run every window.');
     }
 }

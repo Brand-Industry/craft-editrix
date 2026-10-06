@@ -7,6 +7,7 @@ use craft\web\Controller;
 use craft\web\View;
 use yii\web\Response;
 use brandindustry\editrix\Editrix;
+use brandindustry\editrix\jobs\RevertJob;
 use brandindustry\editrix\assetbundles\EditrixLogsAsset;
 use brandindustry\editrix\services\LicenseService;
 
@@ -143,6 +144,13 @@ class LogController extends Controller
             ]);
         }
 
+        if (in_array($log["status"], ["running", "reverting"], true)) {
+            return $this->asJson([
+                "success" => false,
+                "error" => Craft::t("editrix", "This operation is still running."),
+            ]);
+        }
+
         if ($log["status"] === "reverted") {
             return $this->asJson([
                 "success" => false,
@@ -153,27 +161,32 @@ class LogController extends Controller
             ]);
         }
 
-        $replacements = json_decode($log["replacements"], true) ?? [];
-        $validation = Editrix::$plugin->replace->validateRevert($replacements);
+        $validation = Editrix::$plugin->replace->validateRevert(
+            Editrix::$plugin->log->replacementsFor($log)
+        );
 
-        $safeCount = count(
-            array_filter($validation, fn($v) => $v["status"] === "safe")
+        $count = fn(string $status) => count(
+            array_filter($validation, fn($v) => $v["status"] === $status)
         );
-        $modifiedCount = count(
-            array_filter($validation, fn($v) => $v["status"] === "modified")
-        );
-        $missingCount = count(
-            array_filter($validation, fn($v) => $v["status"] === "missing")
-        );
+        $safeCount = $count("safe");
+        $unchangedCount = $count("unchanged");
+        $modifiedCount = $count("modified");
+        $missingCount = $count("missing");
 
         return $this->asJson([
             "success" => true,
             "safe" => $modifiedCount === 0 && $missingCount === 0,
             "total" => count($validation),
             "safeCount" => $safeCount,
+            "unchangedCount" => $unchangedCount,
             "modifiedCount" => $modifiedCount,
             "missingCount" => $missingCount,
-            "details" => $validation,
+            // Only the ones that need a decision, and not all of a large log
+            "details" => array_slice(
+                array_values(array_filter($validation, fn($v) => !in_array($v["status"], ["safe", "unchanged"], true))),
+                0,
+                100
+            ),
         ]);
     }
 
@@ -198,6 +211,13 @@ class LogController extends Controller
             ]);
         }
 
+        if (in_array($log["status"], ["running", "reverting"], true)) {
+            return $this->asJson([
+                "success" => false,
+                "error" => Craft::t("editrix", "This operation is still running."),
+            ]);
+        }
+
         if ($log["status"] === "reverted") {
             return $this->asJson([
                 "success" => false,
@@ -208,59 +228,87 @@ class LogController extends Controller
             ]);
         }
 
-        $replacements = json_decode($log["replacements"], true) ?? [];
         $force = (bool) Craft::$app->getRequest()->getBodyParam("force", false);
 
-        if (!$force) {
-            $validation = Editrix::$plugin->replace->validateRevert(
-                $replacements
-            );
-            $modifiedCount = count(
-                array_filter($validation, fn($v) => $v["status"] === "modified")
-            );
-            $missingCount = count(
-                array_filter($validation, fn($v) => $v["status"] === "missing")
-            );
+        // A large revert runs in the queue, for the same reason a large
+        // replace does: restoring a value saves an entry.
+        $count = Editrix::$plugin->log->revertableCount($log);
+        if ($count > Editrix::$plugin->getSettings()->replaceQueueThreshold) {
+            Editrix::$plugin->log->finishReplaceLog($logId, "reverting", (int) $log["replacementCount"]);
 
-            if ($modifiedCount > 0 || $missingCount > 0) {
-                return $this->asJson([
-                    "success" => false,
-                    "needsConfirmation" => true,
-                    "modifiedCount" => $modifiedCount,
-                    "missingCount" => $missingCount,
-                    "error" => Craft::t(
-                        "editrix",
-                        "{count} element(s) have been modified since the replacement. Use force revert to proceed.",
-                        [
-                            "count" => $modifiedCount + $missingCount,
-                        ]
-                    ),
-                ]);
-            }
+            Craft::$app->getQueue()->push(new RevertJob([
+                "logId" => $logId,
+                "force" => $force,
+                "userId" => (int) Craft::$app->getUser()->getId(),
+            ]));
+
+            return $this->asJson([
+                "success" => true,
+                "queued" => true,
+                "logId" => $logId,
+                "total" => $count,
+            ]);
         }
 
-        $revertedCount = 0;
+        $result = Editrix::$plugin->replace->revertEntries(
+            Editrix::$plugin->log->replacementsFor($log),
+            $force
+        );
 
-        foreach ($replacements as $replacement) {
-            if (Editrix::$plugin->replace->revert($replacement)) {
-                $revertedCount++;
-            }
-        }
+        $left = count($result["conflicts"]) + count($result["missing"]) + count($result["failed"]);
 
-        if ($revertedCount > 0) {
-            Editrix::$plugin->log->markAsReverted($logId);
-        }
+        // Closes the log: reverted, or partial when some values were left
+        // alone (it can be reverted again, or forced, for what remains).
+        Editrix::$plugin->replace->finishRevert($logId, $result, (int) Craft::$app->getUser()->getId());
 
         return $this->asJson([
             "success" => true,
-            "revertedCount" => $revertedCount,
-            "message" => Craft::t(
-                "editrix",
-                "Successfully reverted {count} change(s).",
-                [
-                    "count" => $revertedCount,
-                ]
-            ),
+            "revertedCount" => $result["reverted"],
+            "unchangedCount" => $result["unchanged"],
+            "conflictCount" => count($result["conflicts"]),
+            "missingCount" => count($result["missing"]),
+            "failedCount" => count($result["failed"]),
+            "needsForce" => $result["conflicts"] !== [],
+            "conflicts" => array_slice($result["conflicts"], 0, 20),
+            "failed" => array_slice($result["failed"], 0, 20),
+            "message" => $left === 0
+                ? Craft::t("editrix", "Successfully reverted {count} change(s).", ["count" => $result["reverted"]])
+                : Craft::t(
+                    "editrix",
+                    "Reverted {count} change(s). {left} were left as they are because they were edited since.",
+                    ["count" => $result["reverted"], "left" => $left]
+                ),
+        ]);
+    }
+
+    /**
+     * Progress of a revert that runs in the queue.
+     */
+    public function actionRevertStatus(int $logId): Response
+    {
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:revert")) {
+            return $this->asJson(["success" => false, "error" => "Permission denied"]);
+        }
+
+        $log = Editrix::$plugin->log->getLogById($logId);
+
+        if (!$log) {
+            return $this->asJson(["success" => false, "error" => Craft::t("editrix", "Log entry not found")]);
+        }
+
+        $counts = Editrix::$plugin->log->itemCounts($logId);
+        $reverted = (int) ($counts["reverted"] ?? 0);
+        $left = (int) (($counts["applied"] ?? 0) + ($counts["pending"] ?? 0));
+
+        return $this->asJson([
+            "success" => true,
+            "status" => $log["status"],
+            "running" => $log["status"] === "reverting",
+            "reverted" => $reverted,
+            "left" => $left,
+            "total" => $reverted + $left,
         ]);
     }
 
@@ -389,6 +437,9 @@ class LogController extends Controller
             ),
             "revertUrl" => \craft\helpers\UrlHelper::cpUrl(
                 "editrix/api/logs/revert"
+            ),
+            "revertStatusUrl" => \craft\helpers\UrlHelper::cpUrl(
+                "editrix/api/logs/revert-status"
             ),
             "deleteUrl" => \craft\helpers\UrlHelper::cpUrl(
                 "editrix/api/logs/delete"

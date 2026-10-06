@@ -313,4 +313,59 @@ class ReplaceRevertTest extends EditrixTestCase
         $this->assertTrue(Editrix::$plugin->replace->revert($replacements[0]));
         $this->assertSame($this->originalTitle, $this->currentTitle());
     }
+
+    public function testBlankingARequiredFieldIsRefusedAndReportedNotSilentlySkipped(): void
+    {
+        [$entry, $word, $section] = $this->pickEntry();
+        $result = $this->titleResult($word, $entry->id, $section);
+
+        $skipped = [];
+        $failed = [];
+        // A regex that matches the whole title, replaced by nothing.
+        $replacements = Editrix::$plugin->replace->replace(
+            [$result],
+            '^.*$',
+            '',
+            true,
+            true,
+            false,
+            $skipped,
+            $failed
+        );
+
+        $this->assertSame([], $replacements);
+        $this->assertCount(1, $failed);
+        $this->assertStringContainsString('required', $failed[0]['reason']);
+        $this->assertSame(ReplaceService::keyFor($result), $failed[0]['key']);
+        $this->assertSame($this->originalTitle, $this->currentTitle(), 'The title must not have been blanked.');
+    }
+
+    public function testAnEmptySearchIsRefusedBeforeAnythingIsRead(): void
+    {
+        $this->assertNotEmpty(ReplaceService::objections('', 'x'));
+        $this->assertNotEmpty(ReplaceService::objections('   ', 'x'));
+    }
+
+    public function testAReplacementIdenticalToTheSearchIsRefused(): void
+    {
+        $objections = ReplaceService::objections('hotel', 'hotel');
+
+        $this->assertCount(1, $objections);
+        $this->assertStringContainsString('same', $objections[0]);
+    }
+
+    public function testAReasonableReplacementHasNoObjection(): void
+    {
+        $this->assertSame([], ReplaceService::objections('hotel', 'inn'));
+        $this->assertSame([], ReplaceService::objections('hotel', ''), 'Deleting text is allowed.');
+        $this->assertSame([], ReplaceService::objections('hotel', 'Hotel'), 'A change of case is a change.');
+    }
+
+    public function testReplaceSavesWithoutValidationAndKeepsRevisionsByDefault(): void
+    {
+        $settings = Editrix::$plugin->getSettings();
+
+        $this->assertFalse($settings->validateOnReplace);
+        $this->assertTrue($settings->createRevisionsOnReplace);
+    }
 }

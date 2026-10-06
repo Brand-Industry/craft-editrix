@@ -53,9 +53,10 @@ class SearchJobTest extends EditrixTestCase
         Event::on(ElementQuery::class, ElementQuery::EVENT_AFTER_POPULATE_ELEMENT, $handler);
 
         try {
+            // Without the prefilter, so entries are actually loaded.
             $this->runJob($searchId, [
                 'query' => self::NO_MATCH,
-                'options' => $this->sectionOptions($section[0]),
+                'options' => $this->sectionOptions($section[0], ['sqlPrefilter' => false]),
             ]);
         } finally {
             Event::off(ElementQuery::class, ElementQuery::EVENT_AFTER_POPULATE_ELEMENT, $handler);
@@ -140,7 +141,7 @@ class SearchJobTest extends EditrixTestCase
         try {
             $row = $this->runJob($searchId, [
                 'query' => self::NO_MATCH,
-                'options' => $this->sectionOptions($section[0]),
+                'options' => $this->sectionOptions($section[0], ['sqlPrefilter' => false]),
             ]);
         } finally {
             Event::off(ElementQuery::class, ElementQuery::EVENT_AFTER_POPULATE_ELEMENT, $handler);

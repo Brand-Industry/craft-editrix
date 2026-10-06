@@ -9,7 +9,6 @@ All notable changes to Editrix will be documented in this file.
 - A warning appears when a search is still waiting to start after about 15 seconds, since Craft's queue may not be running (see "Searches and the Craft queue" in the README)
 - A warning appears when a running search stops reporting progress for two minutes, which usually means the server killed the worker; the search can be cancelled from the same screen
 - Searches stop at a limit by edition (Standard 3,000 results, Pro 25,000) and show a notice asking the user to narrow the search, so a broad query can't exhaust memory on a large site; on Standard the notice says what Pro allows. The `maxSearchResults` setting can lower the limit
-- One Replace is limited to 150 rows (`maxRowsPerReplace`), because a request cut off by the server's time limit leaves changes that were never logged and so can't be reverted
 
 - Only one search per user runs at a time, and `maxConcurrentSearches` (default 2) caps searches across all users, so a few broad searches can't overload a large site
 - While a search runs, the search screen shows a moving progress bar and the matches found so far; reloading or leaving and coming back lands on that same search, and the Text card on the home screen shows that a search is in progress
@@ -20,7 +19,19 @@ All notable changes to Editrix will be documented in this file.
 - After a replace, the replaced rows are marked in place instead of the whole search running again, and a summary shows how many were replaced with a link to Logs & History; reopening a saved search shows those rows as replaced
 - A match whose field was edited after the search is skipped and marked "Changed since search" instead of being overwritten with the older content
 
+- The database prefilter: a search asks for the rows whose text contains the searched words before loading any entry (about 400 entries/s for a full scan becomes seconds for a rare word); the `sqlPrefilter` setting turns it off. Verified to return exactly what a full scan returns on the large test site's 14,421 articles
+- Replace runs in the queue above 25 rows, with progress and Cancel; the limit per replace is 200 rows on Standard and 5,000 on Pro, and a replace over the limit is refused rather than cut short
+- Every value of a replace is written to its log before its entry is saved, so a replace that is cancelled or killed can still be reverted
+- Revert restores values one by one and never overwrites an edit made since: those are left alone and reported, with an explicit second step to overwrite them; reverting twice is safe. A log file in `storage/logs/editrix-*.log` records every replace and revert
+- Entries that could not be saved are listed with the reason instead of being skipped silently, and a replace that would leave a required field empty is refused
+- An empty search, or a replacement identical to the search, is refused before anything is read
+- Preserve case (Pro): "widget" to "gadget" also turns "Widget" into "Gadget" and "WIDGET" into "GADGET"
+- Command line (Pro): `editrix/run/search`, `replace` and `revert`, all dry runs unless `--dry-run=0`
+- `protectedFields` and the new `protectedSections` are enforced: their matches are read-only in a search and refused by Replace
+- Searching only some entries by id (`--elements` on the command line)
+
 ### Changed
+- Replace saves entries without validation or propagation (`validateOnReplace` and `createRevisionsOnReplace` settings), so old content that no longer satisfies a required field can still be corrected and each site's row is replaced on its own
 - Results show one row per field instead of one per match: a word that appears four times in an article body is one row marked "4 matches", with a list of each occurrence, and selecting the row replaces every occurrence in that field, as Replace always did. The 5,000 limit now counts rows, so a field with many matches no longer uses it up, and the field's text is stored once per row
 - Results no longer carry the full text of every matched field, only a short context and a fingerprint; the text is read again when a row is opened, previewed or replaced. A 1,500-row search went from about 14 MB to 1.5 MB, so a 5,000-row search is about 5 MB. Replace uses the field's current text and refuses it if the fingerprint shows it changed since the search
 - A search no longer keeps the full text of every matched field in memory, only its fingerprint: on a large test site, a 3,000-row search peaks at about 41 MB instead of 96 MB, and each extra row costs about 3 KB

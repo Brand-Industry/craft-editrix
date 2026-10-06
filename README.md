@@ -32,6 +32,8 @@ Editrix is an advanced search & replace plugin that lets you find and update con
 | Scope Filters            |        -        |    Full    |
 | Export Logs              |        -        | CSV + JSON |
 | Results per search       |      3,000      |   25,000   |
+| Rows per replace         |       200       |   5,000    |
+| Preserve case            |        -        |     ✅     |
 | Presets                  |        5        | Unlimited  |
 | Protected Fields         |        -        |     ✅     |
 | CLI Commands             |        -        |     ✅     |
@@ -59,7 +61,32 @@ If a search is still waiting after about 15 seconds, Editrix shows a warning tha
 
 A search returns up to 3,000 results on Standard and 25,000 on Pro (one result is one field of one entry, however many times it matches), and says so when it stops. Narrow the search (a section, an entry type, specific fields) to see the rest. To return fewer than your edition allows, set `maxSearchResults` in `config/editrix.php`; it can lower the limit but not raise it.
 
-One Replace changes at most 150 rows (`maxRowsPerReplace`). Saving an entry takes about half a second, and a request that outlasts the server's time limit is cut off after changing some entries but before they are logged. Select fewer rows, or replace in several rounds.
+## Large sites and large replaces
+
+**Searching.** Editrix asks the database for the rows whose text contains the words you searched for before it loads any entry, so a rare word on a site with hundreds of thousands of entries takes seconds instead of half an hour. It finds everything except a word that formatting splits in the middle (`Fea<b>tured</b>`). Turn that off with `'sqlPrefilter' => false` in `config/editrix.php` if it matters more than speed. A regex is only filtered when it contains plain words that every match must have; anything cleverer (alternation, groups, lookarounds) is scanned in full.
+
+**Replacing.** A replace of more than 25 rows (`replaceQueueThreshold`) runs in the queue, with progress and a Cancel button, because saving an entry takes about half a second and a web request that outlasts the server's time limit is cut off partway. Every value is written to the log *before* its entry is saved, so a replace that is stopped, cancelled or killed can still be reverted. One replace changes at most 200 rows on Standard and 5,000 on Pro (`maxRowsPerReplace` can lower this, never raise it); a replace over the limit is refused rather than cut short.
+
+**Reverting.** A revert puts values back one by one and never overwrites something edited since: those are left as they are and reported, and can be overwritten afterwards on purpose. Reverting twice, or after an interrupted replace, is safe.
+
+**Saving.** Entries are saved without validation or propagation, so content that predates a field's "required" flag can still be corrected, and each site's row is replaced on its own. Set `'validateOnReplace' => true` to validate, and `'createRevisionsOnReplace' => false` to skip the revision each replace leaves. A replace that would leave a required field empty is refused. Entries that could not be saved are listed with the reason.
+
+**A log file.** Every replace and revert also writes to `storage/logs/editrix-*.log` (which entries were changed, by whom), which survives restoring a database backup.
+
+**Protecting content.** `'protectedFields' => ['stripeCustomerId']` and `'protectedSections' => ['legal']` make matches in them read-only: they show in a search but Replace refuses them, even when called directly.
+
+## Command line (Pro)
+
+Everything is a dry run unless you type `--dry-run=0`:
+
+```bash
+php craft editrix/run/search --find="old name" --sections=articles
+php craft editrix/run/replace --find="old name" --replace="new name" --sections=articles
+php craft editrix/run/replace --find="old name" --replace="new name" --dry-run=0
+php craft editrix/run/revert 12
+```
+
+Options: `--sections`, `--entry-types`, `--fields`, `--sites` (ids or `all`), `--elements` (entry ids), `--regex`, `--case-insensitive`, `--whole-words`, `--preserve-case`, `--user` (who the replace is logged under; defaults to the first admin). `revert --force` also overwrites values edited since.
 
 ## Installation
 

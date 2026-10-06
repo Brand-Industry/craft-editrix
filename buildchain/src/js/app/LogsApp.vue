@@ -193,6 +193,7 @@ const users = config.users || [];
 const apiUrl = config.apiUrl || '';
 const validateRevertUrl = config.validateRevertUrl || '';
 const revertUrl = config.revertUrl || '';
+const revertStatusUrl = config.revertStatusUrl || '';
 const deleteUrl = config.deleteUrl || '';
 const exportUrl = config.exportUrl || '';
 const searchPageUrl = config.searchPageUrl || '';
@@ -258,8 +259,37 @@ const resetAndFetch = () => {
   fetchLogs();
 };
 
+// Starts a revert and, if the server queued it (a large one), follows it
+// until it stops. Returns the final numbers either way.
+const runRevert = async (log, force) => {
+  const data = await post(revertUrl + '/' + log.id, force ? { force: true } : {});
+
+  if (!data.success || !data.queued) return data;
+
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const status = await get(revertStatusUrl + '/' + log.id);
+
+    if (!status.success) return status;
+
+    if (!status.running) {
+      return {
+        success: true,
+        revertedCount: status.reverted,
+        // Values still standing after a finished revert were left alone.
+        conflictCount: status.left,
+        needsForce: status.left > 0,
+        message:
+          status.left > 0
+            ? `Reverted ${status.reverted} change(s). ${status.left} were left as they are because they were edited since.`
+            : `Successfully reverted ${status.reverted} change(s).`,
+      };
+    }
+  }
+};
+
 const confirmRevert = async (log) => {
-  // First, validate the revert to check for modified content
+  // First, validate the revert to see what it would do
   actionInProgress.value = true;
   try {
     const validation = await get(validateRevertUrl + '/' + log.id);
@@ -272,45 +302,56 @@ const confirmRevert = async (log) => {
 
     actionInProgress.value = false;
 
-    if (validation.safe) {
-      // All content is safe to revert
-      pendingAction.value = {
-        title: 'Revert Operation',
-        message: `Revert ${log.count} replacement(s) from "${log.searchQuery}" → "${log.replaceWith}"?`,
-        danger: false,
-        execute: async () => {
-          const data = await post(revertUrl + '/' + log.id, {});
-          if (data.success) {
-            window.Craft?.cp?.displayNotice?.(data.message);
-          } else {
-            window.Craft?.cp?.displayError?.(data.error || 'Revert failed');
-          }
-        },
-      };
-    } else {
-      // Some content was modified after replacement
-      const warnings = [];
-      if (validation.modifiedCount > 0) {
-        warnings.push(`${validation.modifiedCount} element(s) have been modified since the replacement`);
-      }
-      if (validation.missingCount > 0) {
-        warnings.push(`${validation.missingCount} element(s) no longer exist`);
-      }
-
-      pendingAction.value = {
-        title: 'Warning: Content Changed',
-        message: `${warnings.join('. ')}. Only ${validation.safeCount} of ${validation.total} element(s) can be safely reverted.\n\nDo you want to force revert anyway? This will overwrite any changes made after the original replacement.`,
-        danger: true,
-        execute: async () => {
-          const data = await post(revertUrl + '/' + log.id, { force: true });
-          if (data.success) {
-            window.Craft?.cp?.displayNotice?.(data.message);
-          } else {
-            window.Craft?.cp?.displayError?.(data.error || 'Revert failed');
-          }
-        },
-      };
+    const left = validation.modifiedCount + validation.missingCount;
+    const warnings = [];
+    if (validation.modifiedCount > 0) {
+      warnings.push(`${validation.modifiedCount} value(s) have been edited since the replacement`);
     }
+    if (validation.missingCount > 0) {
+      warnings.push(`${validation.missingCount} element(s) no longer exist`);
+    }
+
+    // Values that were edited since are never overwritten by a normal
+    // revert: they are left as they are and reported. Overwriting them is a
+    // separate, explicit step offered afterwards.
+    pendingAction.value = {
+      title: left === 0 ? 'Revert Operation' : 'Revert what is safe',
+      message:
+        left === 0
+          ? `Revert ${validation.safeCount} replacement(s) from "${log.searchQuery}" → "${log.replaceWith}"?`
+          : `${warnings.join('. ')}.\n\n${validation.safeCount} of ${validation.total} value(s) can be restored. The rest will be left exactly as they are.`,
+      danger: false,
+      execute: async () => {
+        const data = await runRevert(log, false);
+
+        if (!data.success) {
+          window.Craft?.cp?.displayError?.(data.error || 'Revert failed');
+          return null;
+        }
+
+        window.Craft?.cp?.displayNotice?.(data.message);
+
+        if (!data.needsForce) return null;
+
+        // Offer the explicit second step for the ones that were edited.
+        return {
+          followUp: {
+            title: 'Overwrite later edits?',
+            message: `${data.conflictCount} value(s) were edited after the replacement and were left alone.\n\nOverwriting them restores the original text and discards those edits. This cannot be undone.`,
+            danger: true,
+            execute: async () => {
+              const forced = await runRevert(log, true);
+              if (forced.success) {
+                window.Craft?.cp?.displayNotice?.(forced.message);
+              } else {
+                window.Craft?.cp?.displayError?.(forced.error || 'Revert failed');
+              }
+              return null;
+            },
+          },
+        };
+      },
+    };
   } catch (err) {
     actionInProgress.value = false;
     window.Craft?.cp?.displayError?.(err.message || 'Failed to validate revert');
@@ -337,8 +378,9 @@ const executeAction = async () => {
   if (!pendingAction.value?.execute) return;
   actionInProgress.value = true;
   try {
-    await pendingAction.value.execute();
-    pendingAction.value = null;
+    const result = await pendingAction.value.execute();
+    // An action can hand back a follow-up step to confirm next.
+    pendingAction.value = result?.followUp ?? null;
     await fetchLogs();
   } catch (err) {
     window.Craft?.cp?.displayError?.(err.message || 'Action failed');
