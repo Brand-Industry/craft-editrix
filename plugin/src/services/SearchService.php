@@ -457,7 +457,24 @@ class SearchService extends Component
             $entryQuery->type($entryTypeFilter);
         }
 
-        $total = !$onProgress ? 0 : ($elementIds !== [] ? count($elementIds) : (clone $entryQuery)->count());
+        $scoped = !empty($sectionFilter) || !empty($entryTypeFilter);
+
+        // With a section or type chosen, its ids are listed once up front;
+        // that list is also the total, so Craft's own count is not needed.
+        $scopeIds = $tokens !== null && $scoped && $elementIds === []
+            ? $this->scopeIds($entryQuery)
+            : null;
+
+        $total = 0;
+        if ($onProgress) {
+            $total = $elementIds !== []
+                ? count($elementIds)
+                : ($scopeIds !== null
+                    ? count($scopeIds)
+                    : ($tokens !== null && !$scoped
+                        ? $this->liveEntryCount($siteId, $entryQuery)
+                        : (clone $entryQuery)->count()));
+        }
         $scanned = 0;
         $rows = [];
 
@@ -487,11 +504,9 @@ class SearchService extends Component
             return true;
         };
 
-        $scoped = !empty($sectionFilter) || !empty($entryTypeFilter);
-
         $entries = $elementIds !== []
             ? $this->entriesById($entryQuery, $elementIds)
-            : $this->eachEntry($entryQuery, $tokens, $siteId, $tokens !== null ? $checkpoint : null, $scoped);
+            : $this->eachEntry($entryQuery, $tokens, $siteId, $tokens !== null ? $checkpoint : null, $scoped, $scopeIds);
 
         foreach ($entries as $entry) {
             $scanned++;
@@ -559,6 +574,35 @@ class SearchService extends Component
     }
 
     /**
+     * How many entries a whole-site search covers. Craft's own count joins
+     * every table the query could filter on (10 s on 845,000 entries); with
+     * no section or type filter the entry rows alone give the same number in
+     * half the time. Only the progress display depends on it, so a failure
+     * falls back to Craft's count.
+     */
+    protected function liveEntryCount(int $siteId, $entryQuery): int
+    {
+        try {
+            return (int) (new Query())
+                ->from(["elements" => Table::ELEMENTS])
+                ->innerJoin(
+                    ["elements_sites" => Table::ELEMENTS_SITES],
+                    "[[elements_sites.elementId]] = [[elements.id]] AND [[elements_sites.siteId]] = :siteId",
+                    [":siteId" => $siteId]
+                )
+                ->where([
+                    "elements.type" => Entry::class,
+                    "elements.draftId" => null,
+                    "elements.revisionId" => null,
+                    "elements.dateDeleted" => null,
+                ])
+                ->count();
+        } catch (\Throwable $e) {
+            return (int) (clone $entryQuery)->count();
+        }
+    }
+
+    /**
      * Walks the query newest id first without holding more than one batch.
      *
      * Craft's own entry query pays for the whole joined table on every
@@ -575,7 +619,8 @@ class SearchService extends Component
         ?array $tokens = null,
         int $siteId = 0,
         ?callable $afterWindow = null,
-        bool $scoped = false
+        bool $scoped = false,
+        ?array $scopeIds = null
     ): \Generator {
         $bounds = (new Query())
             ->select(["min" => "MIN([[id]])", "max" => "MAX([[id]])"])
@@ -606,24 +651,51 @@ class SearchService extends Component
             }
         }
 
+        // Skips what an earlier window already yielded, then hydrates the rest.
+        $emit = function (array $ids) use (&$seen, $entryQuery, $tokens) {
+            if ($tokens !== null) {
+                $ids = array_values(array_filter($ids, fn($id) => !isset($seen[$id])));
+                foreach ($ids as $id) {
+                    $seen[$id] = true;
+                }
+                rsort($ids);
+            }
+
+            foreach (array_chunk($ids, 100) as $chunk) {
+                yield from $this->loadEntries($entryQuery, $chunk);
+            }
+        };
+
+        // A section or entry type is chosen: its ids are listed once (a
+        // section of 200,000 entries is a few MB of ids), and the text check
+        // only looks at those rows. Walking the whole id range instead would
+        // pay a query for every window of a site's 3 million ids.
+        if ($scopeIds === null && $tokens !== null && $scoped) {
+            $scopeIds = $this->scopeIds($entryQuery);
+        }
+
+        if ($scopeIds !== null) {
+            $count = max(1, count($scopeIds));
+            $done = 0;
+
+            foreach (array_chunk($scopeIds, self::ID_WINDOW) as $window) {
+                $ids = $this->candidateIdsAmong($tokens, $window, $siteId, $tagOwners) ?? $window;
+                yield from $emit($ids);
+
+                $done += count($window);
+                if ($afterWindow !== null && $afterWindow($done / $count) === false) {
+                    return;
+                }
+            }
+
+            return;
+        }
+
         for ($hi = $top; $hi > $min; $hi -= self::ID_WINDOW) {
             $lo = max($min, $hi - self::ID_WINDOW);
             $ids = null;
 
-            if ($tokens !== null && $scoped) {
-                // A section or entry type is chosen: listing its ids is
-                // cheap, and the text check then only has to look at those
-                // rows instead of the whole table.
-                try {
-                    $listed = (clone $entryQuery)
-                        ->id("and, >= {$lo}, < {$hi}")
-                        ->orderBy("elements.id DESC")
-                        ->ids();
-                    $ids = $this->candidateIdsAmong($tokens, $listed, $siteId, $tagOwners) ?? $listed;
-                } catch (\Throwable $e) {
-                    $ids = null;
-                }
-            } elseif ($tokens !== null) {
+            if ($tokens !== null) {
                 $ids = $this->candidateIds($tokens, $lo, $hi, $siteId, $tagOwners);
             }
 
@@ -645,21 +717,34 @@ class SearchService extends Component
                 }
             }
 
-            if ($tokens !== null) {
-                $ids = array_values(array_filter($ids, fn($id) => !isset($seen[$id])));
-                foreach ($ids as $id) {
-                    $seen[$id] = true;
-                }
-                rsort($ids);
-            }
-
-            foreach (array_chunk($ids, 100) as $chunk) {
-                yield from $this->loadEntries($entryQuery, $chunk);
-            }
+            yield from $emit($ids);
 
             if ($afterWindow !== null && $afterWindow(($top - $lo) / $span) === false) {
                 return;
             }
+        }
+    }
+
+    /**
+     * Every id the query covers, newest first, or null when listing them
+     * failed (the caller then walks the id range instead).
+     *
+     * @return int[]|null
+     */
+    protected function scopeIds($entryQuery): ?array
+    {
+        try {
+            $ids = array_map("intval", (clone $entryQuery)->orderBy("elements.id")->ids());
+            rsort($ids);
+
+            return $ids;
+        } catch (\Throwable $e) {
+            Craft::error(
+                "Editrix: could not list the chosen entries, walking the id range instead - " . $e->getMessage(),
+                __METHOD__
+            );
+
+            return null;
         }
     }
 
@@ -732,7 +817,18 @@ class SearchService extends Component
                 ->select(["elements_sites.elementId"])
                 ->distinct()
                 ->from(["elements_sites" => Table::ELEMENTS_SITES])
+                // Revisions are over half the rows on a site that keeps them,
+                // and a search never reads them.
+                ->innerJoin(
+                    ["elements" => Table::ELEMENTS],
+                    "[[elements.id]] = [[elements_sites.elementId]]"
+                )
                 ->where(["elements_sites.siteId" => $siteId])
+                ->andWhere([
+                    "elements.draftId" => null,
+                    "elements.revisionId" => null,
+                    "elements.dateDeleted" => null,
+                ])
                 ->andWhere(["between", "elements_sites.elementId", $lo, $hi - 1])
                 ->andWhere([
                     "or",

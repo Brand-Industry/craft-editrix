@@ -163,6 +163,54 @@ class SearchPrefilterDifferentialTest extends EditrixTestCase
         $this->assertFalse($meta['prefiltered'], 'One letter is too short to filter on.');
     }
 
+    private function callSearch(string $method, array $args)
+    {
+        $m = new \ReflectionMethod(Editrix::$plugin->search, $method);
+        $m->setAccessible(true);
+
+        return $m->invokeArgs(Editrix::$plugin->search, $args);
+    }
+
+    public function testRevisionsAreNeverCandidates(): void
+    {
+        $rows = (new Query())
+            ->select(['es.elementId', 'es.title'])
+            ->from(['es' => Table::ELEMENTS_SITES])
+            ->innerJoin(['e' => Table::ELEMENTS], '[[e.id]] = [[es.elementId]]')
+            ->where(['es.siteId' => $this->siteId()])
+            ->andWhere(['not', ['e.revisionId' => null]])
+            ->orderBy(['es.elementId' => SORT_DESC])
+            ->limit(200)
+            ->all();
+
+        $row = null;
+        foreach ($rows as $candidate) {
+            if (preg_match('/[A-Za-z]{5,}/', (string) $candidate['title'], $m)) {
+                $row = $candidate;
+                break;
+            }
+        }
+
+        if (!$row) {
+            $this->markTestSkipped('The site keeps no revisions with a title word.');
+        }
+
+        $id = (int) $row['elementId'];
+        $candidates = $this->callSearch('candidateIds', [[$m[0]], $id, $id + 1, $this->siteId(), []]);
+
+        $this->assertSame([], $candidates, 'A revision holds the word but a search never reads it.');
+    }
+
+    public function testTheCheaperTotalIsTheNumberCraftCounts(): void
+    {
+        $query = Entry::find()->siteId($this->siteId())->status(null)->drafts(false)->revisions(false);
+
+        $this->assertSame(
+            (int) $query->count(),
+            $this->callSearch('liveEntryCount', [$this->siteId(), $query])
+        );
+    }
+
     public function testTheSettingTurnsThePrefilterOff(): void
     {
         $section = $this->smallestSection(20);
