@@ -41,8 +41,8 @@ Editrix is an advanced search & replace plugin that lets you find and update con
 
 ## Requirements
 
-- Craft CMS 4.0+
-- PHP 8.0.2+
+- Craft CMS 5.0+
+- PHP 8.2+
 
 ## Searches and the Craft queue
 
@@ -89,6 +89,25 @@ php craft editrix/run/revert 12
 Options: `--sections`, `--entry-types`, `--fields`, `--sites` (ids or `all`), `--elements` (entry ids), `--regex`, `--case-insensitive`, `--whole-words`, `--preserve-case`, `--user` (who the replace is logged under; defaults to the first admin). `revert --force` also overwrites values edited since.
 
 ## Installation
+
+From the root of your Craft project:
+
+```bash
+composer require brand-industry/craft-editrix
+php craft plugin/install editrix
+```
+
+You can also install it from **Settings, Plugins** in the control panel.
+
+### Updating
+
+Some releases add database migrations, which raises the plugin's schema version. Craft compares that version with the one recorded in `config/project/project.yaml`, and if they differ, `php craft up` ends with "Your project config files were created for different versions of Craft and/or plugins". This is Craft's own check on every plugin; your content is not affected. To update without it:
+
+1. In a development environment with `allowAdminChanges` on, run `composer update brand-industry/craft-editrix` and then `php craft up`.
+2. Commit the changed `config/project/project.yaml`.
+3. Deploy, and run `php craft up` there.
+
+If the notice already appears because the file was left behind, run `php craft project-config/write` in development and commit the result.
 
 ## Usage
 
