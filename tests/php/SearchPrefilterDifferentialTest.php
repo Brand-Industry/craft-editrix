@@ -201,14 +201,18 @@ class SearchPrefilterDifferentialTest extends EditrixTestCase
         $this->assertSame([], $candidates, 'A revision holds the word but a search never reads it.');
     }
 
-    public function testTheCheaperTotalIsTheNumberCraftCounts(): void
+    public function testNeoOwnersAreReadFromTheColumnTheInstalledNeoHas(): void
     {
-        $query = Entry::find()->siteId($this->siteId())->status(null)->drafts(false)->revisions(false);
+        $column = $this->callSearch('neoOwnerColumn', []);
+        $table = Craft::$app->getDb()->getTableSchema('{{%neoblocks}}', true);
 
-        $this->assertSame(
-            (int) $query->count(),
-            $this->callSearch('liveEntryCount', [$this->siteId(), $query])
-        );
+        if (!$table) {
+            $this->assertNull($column);
+            return;
+        }
+
+        $this->assertContains($column, ['primaryOwnerId', 'ownerId']);
+        $this->assertNotNull($table->getColumn($column), 'The column must exist in the table, or the query fails.');
     }
 
     public function testTheSettingTurnsThePrefilterOff(): void

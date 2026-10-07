@@ -471,9 +471,7 @@ class SearchService extends Component
                 ? count($elementIds)
                 : ($scopeIds !== null
                     ? count($scopeIds)
-                    : ($tokens !== null && !$scoped
-                        ? $this->liveEntryCount($siteId, $entryQuery)
-                        : (clone $entryQuery)->count()));
+                    : (clone $entryQuery)->count());
         }
         $scanned = 0;
         $rows = [];
@@ -571,35 +569,6 @@ class SearchService extends Component
         }
 
         return $results;
-    }
-
-    /**
-     * How many entries a whole-site search covers. Craft's own count joins
-     * every table the query could filter on (10 s on 845,000 entries); with
-     * no section or type filter the entry rows alone give the same number in
-     * half the time. Only the progress display depends on it, so a failure
-     * falls back to Craft's count.
-     */
-    protected function liveEntryCount(int $siteId, $entryQuery): int
-    {
-        try {
-            return (int) (new Query())
-                ->from(["elements" => Table::ELEMENTS])
-                ->innerJoin(
-                    ["elements_sites" => Table::ELEMENTS_SITES],
-                    "[[elements_sites.elementId]] = [[elements.id]] AND [[elements_sites.siteId]] = :siteId",
-                    [":siteId" => $siteId]
-                )
-                ->where([
-                    "elements.type" => Entry::class,
-                    "elements.draftId" => null,
-                    "elements.revisionId" => null,
-                    "elements.dateDeleted" => null,
-                ])
-                ->count();
-        } catch (\Throwable $e) {
-            return (int) (clone $entryQuery)->count();
-        }
     }
 
     /**
@@ -876,7 +845,7 @@ class SearchService extends Component
         }
 
         try {
-            $hasNeo = Craft::$app->getDb()->tableExists("{{%neoblocks}}");
+            $neoOwner = $this->neoOwnerColumn();
             $matched = [];
             $level = $ids;
 
@@ -912,13 +881,13 @@ class SearchService extends Component
                             ->column()
                     );
 
-                    if ($hasNeo) {
+                    if ($neoOwner !== null) {
                         $children = array_merge(
                             $children,
                             (new Query())
                                 ->select(["id"])
                                 ->from("{{%neoblocks}}")
-                                ->where(["ownerId" => $chunk])
+                                ->where([$neoOwner => $chunk])
                                 ->column()
                         );
                     }
@@ -990,6 +959,27 @@ class SearchService extends Component
     }
 
     /**
+     * The column of Neo's block table that names the owner: `primaryOwnerId`
+     * from Neo 5, `ownerId` before. Null when Neo is not installed.
+     */
+    protected function neoOwnerColumn(): ?string
+    {
+        $table = Craft::$app->getDb()->getTableSchema("{{%neoblocks}}", true);
+
+        if (!$table) {
+            return null;
+        }
+
+        foreach (["primaryOwnerId", "ownerId"] as $column) {
+            if ($table->getColumn($column)) {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Maps element ids to the top-level entries that hold them: an entry
      * that is not nested stands for itself, a nested one (Matrix block,
      * embedded entry, Neo block) stands for its owner, followed up to the
@@ -1001,8 +991,7 @@ class SearchService extends Component
     private function topLevelIds(array $ids): array
     {
         $top = [];
-        $db = Craft::$app->getDb();
-        $hasNeo = $db->tableExists("{{%neoblocks}}");
+        $neoOwner = $this->neoOwnerColumn();
 
         for ($depth = 0; $depth < 6 && $ids !== []; $depth++) {
             $next = [];
@@ -1022,10 +1011,10 @@ class SearchService extends Component
                     }
                 }
 
-                if ($hasNeo) {
+                if ($neoOwner !== null) {
                     foreach (
                         (new Query())
-                            ->select(["ownerId"])
+                            ->select([$neoOwner])
                             ->from("{{%neoblocks}}")
                             ->where(["id" => $chunk])
                             ->column() as $owner
