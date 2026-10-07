@@ -860,15 +860,19 @@ class ReplaceService extends Component
      * server-side backstop, for every element type this class can write to
      * (entries, Matrix/Neo blocks, categories, globals).
      */
-    public function isReplaceableField(array $result): bool
+    public function isReplaceableField(array $result, mixed $element = null): bool
     {
         if ($result["fieldHandle"] === "title") {
             return true;
         }
 
-        $field = Craft::$app
-            ->getFields()
-            ->getFieldByHandle($result["fieldHandle"]);
+        // The handle in a result is the one the element's layout gives the
+        // field, and the same field can have a different handle in each
+        // layout, so the global handle alone does not find it.
+        $element ??= $this->getElement($result);
+        $field =
+            $element?->getFieldLayout()?->getFieldByHandle($result["fieldHandle"]) ??
+            Craft::$app->getFields()->getFieldByHandle($result["fieldHandle"]);
 
         if (!$field) {
             return false;
@@ -897,20 +901,20 @@ class ReplaceService extends Component
         ?string &$error = null,
         bool $guardRequired = true
     ): bool {
-        if (!$this->isReplaceableField($result)) {
-            Craft::warning(
-                "Editrix: Refused to replace non-replaceable field '{$result["fieldHandle"]}'",
-                __METHOD__
-            );
-            $error = "this field cannot be replaced";
-            return false;
-        }
-
         try {
             $element ??= $this->getElement($result);
 
             if (!$element) {
                 $error = "it no longer exists";
+                return false;
+            }
+
+            if (!$this->isReplaceableField($result, $element)) {
+                Craft::warning(
+                    "Editrix: Refused to replace non-replaceable field '{$result["fieldHandle"]}'",
+                    __METHOD__
+                );
+                $error = "this field cannot be replaced";
                 return false;
             }
 
@@ -1203,10 +1207,6 @@ class ReplaceService extends Component
 
     public function revert(array $replacement): bool
     {
-        if (!$this->isReplaceableField($replacement)) {
-            return false;
-        }
-
         try {
             $element = $this->getElement($replacement);
 

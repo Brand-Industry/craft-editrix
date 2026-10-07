@@ -48,6 +48,7 @@ All notable changes to Editrix will be documented in this file.
 - Replacing in a CKEditor field that contains nested entries flattened those entries into static HTML; they are now kept intact, and Revert restores them
 - A fresh install did not create the table that background searches need, so every search failed on a new site
 - Replacing inside a Matrix block failed on Craft 5
+- A field that has its own handle in a layout (Craft 5 lets the same field carry a different handle in each layout) was found by a search but refused by Replace with "this field cannot be replaced"; on a test site that was more than half of the matches for one word. The field is now looked up through the element's layout
 - "Replace Selected" appeared in Search mode, where nothing can be replaced
 - A single entry that fails to load (for example, a template error from another plugin) no longer aborts the whole search; it is logged and skipped
 
