@@ -2,7 +2,7 @@
 
 Lo que ya cubren las pruebas automáticas (ver `README.md` de esta carpeta) no se repite aquí: la lógica de reemplazo, el tope de resultados, el ciclo del job, el log, la migración. Esta lista cubre lo que solo se ve en el navegador, con sesión del panel de Craft.
 
-Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.0-beta.4` más commit), el navegador, el usuario y la edición.
+Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la sección 15 (versión y commit, navegador, usuario y edición). Lo que ya se sabe que no funciona o no está probado está en la sección 13: no hace falta reportarlo.
 
 ## 0. Preparación
 
@@ -12,11 +12,16 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] Puedes cambiar la edición (Standard / Pro) desde Configuración, Plugins.
 - [ ] Anota cómo corre la cola en este entorno: `runQueueAutomatically` (por defecto activo) o un worker. La sección 4 necesita poder apagarla.
 - [ ] Haz una copia de la base de datos antes de reemplazar contenido.
+- [ ] Anota la versión y el commit que vas a probar (`version` en `composer.json` y `git rev-parse --short HEAD` en la carpeta del plugin). Todos los reportes la llevan.
+- [ ] Qué se ha probado ya y dónde: un sitio de pruebas grande local (MySQL, 845,000 entradas, un solo sitio) y un segundo sitio de pruebas (PostgreSQL, Neo 5, un solo sitio), los dos en Pro. **Ninguno es multisitio ni Standard**: esas partes (3.4, el reemplazo en dos sitios y los bloqueos de Standard) solo se pueden probar en un entorno aparte.
+- [ ] Si el sitio tiene Neo, comprueba la versión de Neo (en Neo 5 la tabla de bloques usa `primaryOwnerId`).
 
 ## 1. Instalación y ediciones
 
 - [ ] Plugin instala sin errores y aparece "Editrix" en el menú con tres entradas: New Operation, Logs & History, Settings.
-- [ ] Tras actualizar desde una versión anterior, las migraciones corren y existe la tabla `editrix_searches`.
+- [ ] Tras actualizar desde una versión anterior, las migraciones corren y existen las tablas `editrix_searches` y `editrix_log_items`.
+- [ ] **Instalación nueva** con `composer require brand-industry/craft-editrix` y `php craft plugin/install editrix`: instala sin errores y la primera búsqueda funciona (la tabla de búsquedas se crea sola).
+- [ ] **Actualización**: tras `composer update` y `php craft up`, si el sitio guarda el `project.yaml` en git y su versión del plugin quedó atrás, Craft termina con "Your project config files were created for different versions". No es un fallo del plugin. Con `php craft project-config/write` en desarrollo (con `allowAdminChanges` activo) el aviso desaparece y `php craft up` termina limpio. El README explica los pasos.
 - [ ] **Standard**: Matrix, Categories, selector de varios sitios, filtros de alcance (Segmented) y exportar CSV/JSON no están disponibles (ocultos o desactivados, y nunca devuelven resultados de todos modos). La insignia del título dice Standard.
 - [ ] **Pro**: aparecen todos esos elementos y la insignia dice Pro.
 - [ ] Cambiar de Standard a Pro (y de vuelta) sin recargar manualmente no deja la pantalla en un estado raro. Recarga y confirma.
@@ -72,6 +77,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] Un consejo cambia cada ~8 segundos y el primero dice que se puede salir de la página. Sin Pro no aparece el consejo de Segmented Search.
 - [ ] Con "reducir movimiento" activado en el sistema, las animaciones se detienen y el texto sigue ahí.
 - [ ] La barra de progreso sube y el porcentaje coincide con X de Y.
+- [ ] **Tiempos de referencia** (un sitio de pruebas grande local, 845,000 entradas, con la base ya caliente; la primera vez pueden ser el doble; son cifras esperadas, por confirmar): una palabra rara en todo el sitio, cerca de 40 s; «hotel», que se corta en el tope, unos 20 s; una sección de 27,000 entradas, de 2 a 4 s. Si tarda mucho más, anota el equipo y la memoria asignada a Docker.
 - [ ] El botón **Cancel search** detiene la búsqueda en pocos segundos y muestra lo encontrado hasta ese momento.
 - [ ] Cancelar y lanzar otra búsqueda enseguida muestra solo los resultados de la nueva.
 - [ ] **Recargar a mitad de búsqueda**: lanza una búsqueda grande y recarga la página. Te deja en la vista de búsqueda de texto, siguiendo la misma búsqueda: spinner, barra con movimiento, "Scanning X of Y entries", "N matches so far" y el botón **Cancel search**. El formulario se ve con los valores usados y deshabilitado.
@@ -106,6 +112,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] Coincidencias dentro de HTML que cruzan una etiqueta (ej. negritas a mitad de la frase) aparecen como solo lectura con la explicación. No se pueden seleccionar para reemplazar.
 - [ ] Coincidencias de Tags aparecen como solo lectura ("Search only").
 - [ ] Bloques anidados (Matrix o CKEditor con entradas) aparecen una sola vez, con su entrada padre.
+- [ ] **Neo** (si el sitio lo tiene): una búsqueda amplia termina sin error, y los bloques Neo salen con su etiqueta "Neo" y la ruta de su entrada padre. En Neo 5 con PostgreSQL esto fallaba con "column ownerId does not exist".
 - [ ] **Export CSV** (con permiso y Pro) descarga un archivo con las filas seleccionadas. Sin permiso o en Standard no aparece.
 
 ## 6. Reemplazar
@@ -145,6 +152,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - [ ] **Revert** de un reemplazo donde editaste una de las entradas después: se restauran las demás, esa se deja como está y se informa; luego se ofrece "Overwrite later edits?" como paso aparte. Revertir dos veces no hace daño.
 - [ ] **Revert grande** (más de 25 valores) corre en la cola y avisa al terminar.
 - [ ] Cada reemplazo y revert escribe líneas en `storage/logs/editrix-*.log`.
+- [ ] **Campos con handle propio en el layout**: en Craft 5 un mismo campo puede llamarse distinto en cada layout (en un sitio de pruebas grande, `exampleField` aparece como `exampleField` en las guías y `exampleField` como `exampleField` a `4`; en un segundo sitio de pruebas, `exampleField` y `exampleField`). Busca una palabra que esté en uno de esos campos, selecciona su fila y reemplaza: debe guardarse, sin "this field cannot be replaced". Revierte desde Logs & History y la entrada vuelve igual. Ninguna fila encontrada debe rechazarse por el tipo de campo (solo por estar protegida o ser de solo lectura).
 
 ### 6.2 Línea de comandos (Pro)
 
@@ -155,7 +163,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 
 ## 7. Logs & History
 
-- [ ] Cada reemplazo y cada búsqueda aparece en la lista con fecha, usuario, texto y número de ocurrencias.
+- [ ] Cada reemplazo y cada búsqueda aparece en la lista con fecha, usuario, texto y número de ocurrencias. Una búsqueda sale como tipo `search` y su número son las coincidencias encontradas, no cambios: no se puede revertir y no modifica nada.
 - [ ] Los filtros y la paginación de la lista funcionan.
 - [ ] Una búsqueda registrada se puede re-ejecutar con su alcance.
 - [ ] **Revert** de un reemplazo sin cambios posteriores restaura el contenido original y marca el log como revertido.
@@ -213,6 +221,13 @@ Marca cada línea con `[x]` al probarla. Si algo falla, anota la versión (`2.0.
 - **Cola en producción**: confirmar con quien administra el servidor de un sitio de pruebas grande que corre un worker o cron (o Craft Cloud).
 - **un sitio de pruebas grande**: el error de Twig en `a client template` (línea 8, `is defined` en vez de comprobar null) es de su template. El plugin ya lo omite, pero conviene que lo corrijan.
 - **No cubierto por pruebas automáticas**: los endpoints del controlador y toda la interfaz. Por eso existe esta lista.
+- **Palabra partida por formato**: el prefiltro no encuentra una palabra cortada por una etiqueta (`Fea<b>tured</b>`). El ajuste `sqlPrefilter` en `false` lo apaga.
+- **Con el tope de filas**, el prefiltro y el escaneo completo pueden quedarse con filas ligeramente distintas entre las primeras. En una búsqueda completa, sin tope, son idénticos.
+- **No existe todavía**: Presets y API/Webhooks (el README los menciona), reglas guardadas o programadas, pantalla para campos protegidos e ids de elementos (solo por configuración y línea de comandos).
+- **Versiones**: esta rama es solo Craft 5 y PHP 8.2 o superior; Craft 4 no se ha portado. Redactor no se ha probado con datos reales (CKEditor, Matrix y Neo sí).
+- **Aviso de `craft up`** con el `project.yaml` desfasado: es la comprobación normal de Craft (ver la sección 1).
+- **Revertir** solo funciona mientras exista el registro: 30 días en Standard y 90 en Pro.
+- **Entornos**: no hay un sitio multisitio ni uno en Standard con el que se haya probado; la sección 0 lo marca.
 
 ## 14. Guion de demo (unos 10 minutos)
 
@@ -226,3 +241,16 @@ Prepara antes: una palabra que aparezca en 20 a 50 entradas, una entrada con neg
 6. Abre la entrada en Craft y enséñala cambiada.
 7. Logs & History: abre el reemplazo y haz **Revert**. Vuelve a la entrada.
 8. Cierra con Categories o Tags y mostrar que Standard queda bloqueado frente a Pro.
+
+## 15. Cómo reportar un problema
+
+Una línea por punto:
+
+- **Versión y commit** del plugin.
+- **Entorno**: Craft, PHP, MySQL o PostgreSQL, navegador, ddev o servidor.
+- **Edición y usuario**: Standard o Pro, y si eras admin, solo búsqueda o buscar y reemplazar.
+- **Dónde** de esta lista: número de sección y la línea que probabas.
+- **Qué hiciste**: texto buscado, opciones, alcance, y a cuántas filas afectó.
+- **Qué esperabas y qué pasó**, con captura.
+- **Consola del navegador** y las últimas líneas de `storage/logs/editrix-*.log` y del log web de Craft.
+- **Si se repite**, y si pasa con otra palabra o con otra entrada.
