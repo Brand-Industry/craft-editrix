@@ -2,7 +2,11 @@
 
 All notable changes to Editrix will be documented in this file.
 
-## [Unreleased]
+## [2.0.0-beta.5] - 2026-10-08
+
+### Changed
+- Editrix is now a paid plugin with two editions, Standard (USD 19) and Pro (USD 99). The free edition no longer exists; both editions can be tried in development and staging. The license is now the Craft License (`LICENSE.md`)
+- The README is shorter, and the full documentation is in the `docs` folder
 
 ### Added
 - Searches now run as background jobs on Craft's queue, with a progress bar and a "Cancel search" button, so large sites no longer time out or tie up PHP workers
