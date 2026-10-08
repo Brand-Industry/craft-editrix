@@ -58,11 +58,9 @@ class LicenseService extends Component
     public const FEATURE_ENV_INDICATOR = "envIndicator";
 
     private array $featureMatrix = [
-        // Standard is the free edition: general Search and Search & Replace
-        // (Entries + Globals, no segmented scope) stay useful without a
-        // license. Everything that used to be "Standard or Pro" (Matrix/Neo,
-        // Categories, segmented scope, multi-site, CSV export) now requires
-        // Pro.
+        // Standard is the entry edition: general Search and Search & Replace
+        // on Entries and Globals, no segmented scope. Matrix/Neo,
+        // Categories, segmented scope, multi-site and exports need Pro.
         Editrix::EDITION_STANDARD => [
             self::FEATURE_SEARCH_ENTRIES => true,
             self::FEATURE_SEARCH_GLOBALS => true,
