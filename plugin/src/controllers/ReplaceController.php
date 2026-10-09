@@ -245,7 +245,7 @@ class ReplaceController extends Controller
                 ]);
             }
 
-            $originalValue = Editrix::$plugin->replace->currentValueFor($result);
+            $originalValue = Editrix::$plugin->replace->currentValueFor($result, (int) Craft::$app->getUser()->getId());
             if ($originalValue === null) {
                 return $this->asJson([
                     "success" => false,
@@ -255,16 +255,23 @@ class ReplaceController extends Controller
             $stale = !Editrix::$plugin->replace->matchesSearchSnapshot($result, $originalValue);
         }
 
-        $newValue = Editrix::$plugin->replace->computeNewValue(
-            $result,
-            $originalValue,
-            $searchQuery,
-            $replaceWith,
-            $useRegex,
-            !$caseInsensitive,
-            $wholeWords,
-            $preserveCase
-        );
+        try {
+            $newValue = Editrix::$plugin->replace->computeNewValue(
+                $result,
+                $originalValue,
+                $searchQuery,
+                $replaceWith,
+                $useRegex,
+                !$caseInsensitive,
+                $wholeWords,
+                $preserveCase
+            );
+        } catch (\brandindustry\editrix\helpers\RegexException $e) {
+            return $this->asJson([
+                "success" => false,
+                "error" => $e->getMessage(),
+            ]);
+        }
 
         return $this->asJson([
             "success" => true,

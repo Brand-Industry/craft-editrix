@@ -103,6 +103,22 @@ export function useSearch(actionMode) {
   const queueStalled = ref(false);
   const jobStalled = ref(false);
 
+  // Occurrences the user turned off inside a row, by their place in the
+  // row's list. A row still replaces as a whole; these are left alone.
+  const excludedMatches = ref({});
+  const excludedFor = r => [...(excludedMatches.value[resultKey(r)] || [])].sort((a, b) => a - b);
+  const excludedCount = r => (excludedMatches.value[resultKey(r)] || []).length;
+  const isMatchIncluded = (r, index) => !(excludedMatches.value[resultKey(r)] || []).includes(index);
+  const toggleMatch = (r, index) => {
+    const key = resultKey(r);
+    const current = excludedMatches.value[key] || [];
+    const next = current.includes(index) ? current.filter(i => i !== index) : [...current, index];
+    const copy = { ...excludedMatches.value };
+    if (next.length) copy[key] = next;
+    else delete copy[key];
+    excludedMatches.value = copy;
+  };
+
   // Search params
   const searchParams = reactive({
     query: '',
@@ -113,6 +129,7 @@ export function useSearch(actionMode) {
     useRegex: false,
     caseInsensitive: false,
     wholeWords: false,
+    includeLinks: false,
     preserveCase: false,
     dryRun: false,
     searchEntries: true,
@@ -158,6 +175,7 @@ export function useSearch(actionMode) {
     replacedKeys.value = new Set();
     staleKeys.value = new Set();
     failedKeys.value = new Set();
+    excludedMatches.value = {};
     truncated.value = false;
     stopReason.value = null;
     resultLimit.value = null;
@@ -173,6 +191,7 @@ export function useSearch(actionMode) {
       useRegex: searchParams.useRegex,
       caseInsensitive: searchParams.caseInsensitive,
       wholeWords: searchParams.wholeWords,
+      includeLinks: searchParams.includeLinks,
       dryRun: searchParams.dryRun,
       searchEntries: searchParams.searchEntries,
       searchGlobals: searchParams.searchGlobals,
@@ -445,7 +464,7 @@ export function useSearch(actionMode) {
       let data = await post(replaceUrl.value, {
         searchQuery: searchParams.query,
         replaceWith: replaceWith ?? searchParams.replaceWith,
-        selectedResults: toReplace.map(slimRow),
+        selectedResults: toReplace.map(r => slimRow(r, excludedFor(r))),
         siteId: searchParams.siteId,
         useRegex: searchParams.useRegex,
         caseInsensitive: searchParams.caseInsensitive,
@@ -481,13 +500,18 @@ export function useSearch(actionMode) {
       ...replacedKeys.value,
       ...(data.replacedKeys || []),
     ]);
+    // A row whose text changed (or is gone) is "changed since search". One
+    // that was refused (protected, or not editable by this user) is shown
+    // as not saved, since searching again would not change the answer.
+    const changedSince = s => s.reason === 'changed' || s.reason === 'missing';
     staleKeys.value = new Set([
       ...staleKeys.value,
-      ...(data.skipped || []).map(s => s.key),
+      ...(data.skipped || []).filter(changedSince).map(s => s.key),
     ]);
     failedKeys.value = new Set([
       ...failedKeys.value,
       ...(data.failed || []).map(s => s.key),
+      ...(data.skipped || []).filter(s => !changedSince(s)).map(s => s.key),
     ]);
     selectedResults.value = selectedResults.value.filter(r => !rowState(r));
   };
@@ -564,7 +588,7 @@ export function useSearch(actionMode) {
   const getPreview = async (result) => {
     try {
       const data = await post(previewUrl.value, {
-        result: slimRow(result),
+        result: slimRow(result, excludedFor(result)),
         searchQuery: searchParams.query,
         replaceWith: searchParams.replaceWith,
         useRegex: searchParams.useRegex,
@@ -616,6 +640,7 @@ export function useSearch(actionMode) {
     searchParams.useRegex = false;
     searchParams.caseInsensitive = false;
     searchParams.wholeWords = false;
+    searchParams.includeLinks = false;
     searchParams.preserveCase = false;
     searchParams.dryRun = false;
     searchParams.sections = [];
@@ -639,6 +664,10 @@ export function useSearch(actionMode) {
     cancelReplace,
     resumeReplace,
     rowState,
+    excludedMatches,
+    excludedCount,
+    isMatchIncluded,
+    toggleMatch,
     loadRecentSearches,
     openSearch,
     activeSearches,

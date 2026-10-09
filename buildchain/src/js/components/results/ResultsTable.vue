@@ -115,6 +115,7 @@
               {{ row.result.fieldName }}
               <span class="editrix-badge editrix-badge--neutral">{{ elementTypeLabel(row.result.elementType) }}</span>
               <span v-if="(row.result.matchCount || 1) > 1" class="editrix-badge editrix-badge--info">{{ t('{count} matches', { count: row.result.matchCount }) }}</span>
+              <span v-if="excludedCount(row.result) > 0" class="editrix-badge editrix-badge--neutral">{{ t('{count} of {total} will change', { count: (row.result.matchCount || 1) - excludedCount(row.result), total: row.result.matchCount || 1 }) }}</span>
               <span v-if="rowState(row.result) === 'replaced'" class="editrix-badge editrix-badge--success">{{ t('Replaced') }}</span>
               <span v-else-if="rowState(row.result) === 'stale'" class="editrix-badge editrix-badge--warning" :title="t('Its content changed after the search. Search again to see the current text.')">{{ t('Changed since search') }}</span>
               <span v-else-if="rowState(row.result) === 'failed'" class="editrix-badge editrix-badge--warning">{{ t('Not saved') }}</span>
@@ -147,7 +148,19 @@
             <td></td>
             <td colspan="4">
               <ol class="editrix-results__matches">
-                <li v-for="(m, i) in row.result.matches" :key="i" v-html="formatPreview(m.context)"></li>
+                <li v-for="(m, i) in row.result.matches" :key="i">
+                  <label class="editrix-results__match">
+                    <input
+                      v-if="actionMode === 'replace' && !row.result.readOnly"
+                      type="checkbox"
+                      :checked="isMatchIncluded(row.result, i)"
+                      :disabled="m.readOnly || rowState(row.result) !== null"
+                      :title="t('Leave this match out of the replace')"
+                      @change="$emit('toggle-match', row.result, i)"
+                    />
+                    <span v-html="formatPreview(m.context)"></span>
+                  </label>
+                </li>
               </ol>
               <p v-if="row.result.matchCount > row.result.matches.length" class="editrix-results__matches-more">
                 {{ t('and {count} more', { count: row.result.matchCount - row.result.matches.length }) }}
@@ -210,6 +223,9 @@ const props = defineProps({
   rowState: { type: Function, default: () => null },
   actionMode: { type: String, default: 'replace' },
   searchQuery: { type: String, default: '' },
+  // Occurrences inside a row can be left out of a replace.
+  isMatchIncluded: { type: Function, default: () => true },
+  excludedCount: { type: Function, default: () => 0 },
 });
 
 // Results come from the backend as one big grouped-by-site batch (the
@@ -283,7 +299,7 @@ const pageRangeEnd = computed(() =>
 watch(() => props.results, () => { currentPage.value = 1; });
 watch(pageSize, () => { currentPage.value = 1; });
 
-defineEmits(['toggle', 'toggle-all', 'view', 'replace']);
+defineEmits(['toggle', 'toggle-all', 'view', 'replace', 'toggle-match']);
 
 // Format preview with highlighted match
 const formatPreview = (context) => {

@@ -11,6 +11,7 @@ use craft\helpers\StringHelper;
 use craft\web\Controller;
 use craft\web\View;
 use yii\web\Response;
+use brandindustry\editrix\helpers\Regex;
 use brandindustry\editrix\Editrix;
 use brandindustry\editrix\assetbundles\EditrixAsset;
 use brandindustry\editrix\jobs\SearchJob;
@@ -422,7 +423,7 @@ class SearchController extends Controller
             ]);
         }
 
-        $value = $service->currentValueFor($result);
+        $value = $service->currentValueFor($result, (int) Craft::$app->getUser()->getId());
 
         if ($value === null) {
             return $this->asJson([
@@ -499,6 +500,9 @@ class SearchController extends Controller
             $request->getBodyParam("wholeWords", false)
         );
         $dryRun = $this->parseBoolean($request->getBodyParam("dryRun", false));
+        $includeLinks = $this->parseBoolean(
+            $request->getBodyParam("includeLinks", false)
+        );
 
         $searchEntries = $this->parseBoolean(
             $request->getBodyParam("searchEntries", true)
@@ -594,14 +598,11 @@ class SearchController extends Controller
             $searchCategories = false;
         }
 
-        if ($useRegex && @preg_match("/{$query}/", "") === false) {
+        if ($useRegex && ($invalid = Regex::validate($query)) !== null) {
             return [
                 "error" => [
                     "success" => false,
-                    "error" => Craft::t(
-                        "editrix",
-                        "Invalid regular expression"
-                    ),
+                    "error" => $invalid,
                 ],
             ];
         }
@@ -614,6 +615,7 @@ class SearchController extends Controller
                 "useRegex" => $useRegex,
                 "caseInsensitive" => $caseInsensitive,
                 "wholeWords" => $wholeWords,
+                "includeLinks" => $includeLinks,
                 "dryRun" => $dryRun,
                 "searchEntries" => $searchEntries,
                 "searchGlobals" => $searchGlobals,
@@ -643,6 +645,7 @@ class SearchController extends Controller
             "useRegex",
             "caseInsensitive",
             "wholeWords",
+            "includeLinks",
             "dryRun",
             "searchEntries",
             "searchGlobals",
@@ -662,10 +665,14 @@ class SearchController extends Controller
             "searchMatrix" => $p["searchMatrix"],
             "searchCategories" => $p["searchCategories"],
             "wholeWords" => $p["wholeWords"],
+            "includeLinks" => $p["includeLinks"],
             "sections" => $p["sections"],
             "fields" => $p["fields"],
             "entryTypes" => $p["entryTypes"],
             "siteIds" => $p["siteIds"],
+            // Craft's permissions hold for this user: what they may not
+            // open is left out of the results.
+            "userId" => (int) Craft::$app->getUser()->getId(),
         ];
     }
 
@@ -679,6 +686,7 @@ class SearchController extends Controller
             "searchGlobals" => $p["searchGlobals"],
             "searchMatrix" => $p["searchMatrix"],
             "searchCategories" => $p["searchCategories"],
+            "includeLinks" => $p["includeLinks"],
             "sections" => $p["sections"],
             "fields" => $p["fields"],
             "entryTypes" => $p["entryTypes"],
@@ -905,6 +913,12 @@ class SearchController extends Controller
             "Not saved",
             "{count} could not be saved and were left unchanged.",
             "Show why",
+            "protected field or section",
+            "Include link addresses",
+            "Also search the address of links and images in rich text fields",
+            "Leave this match out of the replace",
+            "{count} of {total} will change",
+            "you can't edit this entry in Craft",
             "There is nothing to find.",
             "The replacement is the same as the search, so nothing would change.",
             "Your edition shows up to {limit} results; Pro shows up to {proLimit}.",

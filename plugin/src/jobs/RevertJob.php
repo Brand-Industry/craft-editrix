@@ -29,7 +29,9 @@ class RevertJob extends BaseJob
 
         $result = $service->revertEntries(
             Editrix::$plugin->log->replacementsFor($log),
-            $this->force
+            $this->force,
+            userId: $this->userId,
+            logId: $this->logId
         );
 
         $service->finishRevert($this->logId, $result, $this->userId);

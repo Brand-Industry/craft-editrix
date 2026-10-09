@@ -1957,6 +1957,19 @@
     }
   }
 
+  // One occurrence in a row, with the box that leaves it out of a replace.
+  &__match {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+
+    input {
+      margin-top: 2px;
+      flex: none;
+    }
+  }
+
   &__matches-more {
     margin: 6px 0 0 20px;
     font-size: 12px;

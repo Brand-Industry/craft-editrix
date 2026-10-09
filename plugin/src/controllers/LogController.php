@@ -252,7 +252,9 @@ class LogController extends Controller
 
         $result = Editrix::$plugin->replace->revertEntries(
             Editrix::$plugin->log->replacementsFor($log),
-            $force
+            $force,
+            userId: (int) Craft::$app->getUser()->getId(),
+            logId: $logId
         );
 
         $left = count($result["conflicts"]) + count($result["missing"]) + count($result["failed"]);

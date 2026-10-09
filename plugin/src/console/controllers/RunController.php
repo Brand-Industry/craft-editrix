@@ -58,6 +58,9 @@ class RunController extends Controller
     /** @var bool Match whole words only. */
     public bool $wholeWords = false;
 
+    /** @var bool Also search the addresses of links and images in rich text. */
+    public bool $links = false;
+
     /** @var bool Give the replacement the capitalisation of what it replaces. */
     public bool $preserveCase = false;
 
@@ -76,7 +79,7 @@ class RunController extends Controller
     public function options($actionID): array
     {
         $options = parent::options($actionID);
-        $scope = ["find", "sections", "entryTypes", "fields", "sites", "elements", "regex", "caseInsensitive", "wholeWords", "limit"];
+        $scope = ["find", "sections", "entryTypes", "fields", "sites", "elements", "regex", "caseInsensitive", "wholeWords", "links", "limit"];
 
         return match ($actionID) {
             "search" => array_merge($options, $scope),
@@ -247,7 +250,11 @@ class RunController extends Controller
                 "siteIds" => count($siteIds) > 1 ? $siteIds : [],
                 "elementIds" => array_map("intval", self::parseList($this->elements)),
                 "wholeWords" => $this->wholeWords,
+                "includeLinks" => $this->links,
                 "maxResults" => $maxRows,
+                // The user the command acts as is held to their Craft
+                // permissions, so the default admin sees everything.
+                "userId" => $this->resolveUser(),
             ],
             null,
             null,
@@ -330,12 +337,15 @@ class RunController extends Controller
             return ["error" => "That replace is still running."];
         }
 
+        $userId = $this->resolveUser();
         $result = Editrix::$plugin->replace->revertEntries(
             Editrix::$plugin->log->replacementsFor($log),
-            $force
+            $force,
+            userId: $userId,
+            logId: $id
         );
 
-        Editrix::$plugin->replace->finishRevert($id, $result, $this->resolveUser());
+        Editrix::$plugin->replace->finishRevert($id, $result, $userId);
 
         return $result;
     }

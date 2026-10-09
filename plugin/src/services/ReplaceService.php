@@ -9,7 +9,10 @@ use craft\elements\GlobalSet;
 use craft\elements\Category;
 use craft\elements\MatrixBlock;
 use benf\neo\elements\Block as NeoBlock;
+use brandindustry\editrix\helpers\Access;
 use brandindustry\editrix\helpers\FieldValue;
+use brandindustry\editrix\helpers\Regex;
+use brandindustry\editrix\helpers\RegexException;
 use brandindustry\editrix\helpers\HtmlText;
 use brandindustry\editrix\migrations\Install;
 use brandindustry\editrix\models\SearchResult;
@@ -17,6 +20,12 @@ use brandindustry\editrix\Editrix;
 
 class ReplaceService extends Component
 {
+    /** Who the current replace or revert acts for, held to Craft's permissions. */
+    private ?int $actingUserId = null;
+
+    /** Written on the revision each save leaves, so an editor can tell where it came from. */
+    private ?string $revisionNote = null;
+
     public function replace(
         array $results,
         string $searchQuery,
@@ -32,6 +41,8 @@ class ReplaceService extends Component
         // is saved; "onRow" is called as fn(int $done, int $total);
         // "isCancelled" is polled between rows.
         $logId = $hooks["logId"] ?? null;
+        $this->actingUserId = ($hooks["userId"] ?? null) ?: null;
+        $this->revisionNote = $logId ? "Editrix replace #{$logId}" : null;
         $log = Editrix::$plugin->log;
         $position = 0;
         $done = 0;
@@ -83,9 +94,13 @@ class ReplaceService extends Component
             $current = $this->readCurrent($result);
             $element = $current[0] ?? null;
             $oldValue = $current[1] ?? null;
-            $reason = $oldValue === null
-                ? "missing"
-                : ($this->matchesSearchSnapshot($result, $oldValue) ? null : "changed");
+            // Craft's permissions decide which entries a user may change, as
+            // they do in the control panel.
+            $reason = $element !== null && !Access::canSave($element, $this->actingUserId)
+                ? "permission"
+                : ($oldValue === null
+                    ? "missing"
+                    : ($this->matchesSearchSnapshot($result, $oldValue) ? null : "changed"));
             if ($reason !== null) {
                 $skipped[] = [
                     "key" => self::keyFor($result),
@@ -102,16 +117,34 @@ class ReplaceService extends Component
                 continue;
             }
 
-            $newValue = $this->computeNewValue(
-                $result,
-                $oldValue,
-                $searchQuery,
-                $replaceWith,
-                $useRegex,
-                $caseSensitive,
-                $wholeWords,
-                (bool) ($hooks["preserveCase"] ?? false)
-            );
+            try {
+                $newValue = $this->computeNewValue(
+                    $result,
+                    $oldValue,
+                    $searchQuery,
+                    $replaceWith,
+                    $useRegex,
+                    $caseSensitive,
+                    $wholeWords,
+                    (bool) ($hooks["preserveCase"] ?? false)
+                );
+            } catch (RegexException $e) {
+                // This field is too much for the pattern; the others are not
+                // affected.
+                $failed[] = [
+                    "key" => self::keyFor($result),
+                    "elementId" => $result["elementId"],
+                    "elementTitle" => $result["elementTitle"] ?? "",
+                    "fieldHandle" => $result["fieldHandle"],
+                    "reason" => $e->getMessage(),
+                ];
+
+                if ($logId) {
+                    $log->addItem($logId, $this->entryFor($result, null, null, $e->getMessage()), $position++, "failed");
+                }
+
+                continue;
+            }
 
             if ($newValue === $oldValue) {
                 continue;
@@ -201,6 +234,7 @@ class ReplaceService extends Component
                 $failed,
                 [
                     "logId" => $logId,
+                    "userId" => $userId,
                     "preserveCase" => $preserveCase,
                     "onRow" => $onRow,
                     "isCancelled" => function () use ($isCancelled, &$cancelled) {
@@ -342,7 +376,7 @@ class ReplaceService extends Component
             "parentId" => $result["parentId"] ?? null,
             "message" => $message,
             // Occurrences in the field minus any left alone for crossing formatting
-            "matches" => max(1, (int) ($result["matchCount"] ?? 1) - (int) ($result["readOnlyMatchCount"] ?? 0)),
+            "matches" => max(1, (int) ($result["matchCount"] ?? 1) - (int) ($result["readOnlyMatchCount"] ?? 0) - count((array) ($result["excludedMatches"] ?? []))),
         ];
     }
 
@@ -410,7 +444,7 @@ class ReplaceService extends Component
                     $row["matches"] ?? [],
                     fn($m) => !empty($m["readOnly"])
                 ));
-            $total += max(1, (int) ($row["matchCount"] ?? 1) - $skipped);
+            $total += max(1, (int) ($row["matchCount"] ?? 1) - $skipped - count((array) ($row["excludedMatches"] ?? [])));
         }
 
         return $total;
@@ -429,9 +463,16 @@ class ReplaceService extends Component
      * The field's stored text right now, or null if the element is gone.
      * Same reader the search used, so the two are comparable.
      */
-    public function currentValueFor(array $result): ?string
+    public function currentValueFor(array $result, ?int $userId = null): ?string
     {
-        return $this->readCurrent($result)[1] ?? null;
+        $read = $this->readCurrent($result);
+
+        // What a user may not open is not shown to them either.
+        if ($read === null || !Access::canView($read[0], $userId)) {
+            return null;
+        }
+
+        return $read[1] ?? null;
     }
 
     /** @return array{0: mixed, 1: string}|null the element and the field's text */
@@ -567,25 +608,91 @@ class ReplaceService extends Component
         bool $wholeWords = false,
         bool $preserveCase = false
     ): string {
-        return !empty($result["isRichText"])
-            ? $this->performReplacementInHtml(
+        // Occurrences the user turned off, by their place in the row's list.
+        $excluded = array_values(array_unique(array_map(
+            "intval",
+            (array) ($result["excludedMatches"] ?? [])
+        )));
+
+        if (!empty($result["isRichText"])) {
+            return $this->performReplacementInHtml(
                 $value,
                 $query,
                 $replaceWith,
                 $useRegex,
                 $caseSensitive,
                 $wholeWords,
-                $preserveCase
-            )
-            : $this->performReplacement(
-                $value,
-                $query,
-                $replaceWith,
-                $useRegex,
-                $caseSensitive,
-                $wholeWords,
-                $preserveCase
+                $preserveCase,
+                $excluded,
+                !empty($result["includeLinks"])
             );
+        }
+
+        if ($excluded !== []) {
+            return $this->performReplacementExcluding(
+                $value,
+                $query,
+                $replaceWith,
+                $useRegex,
+                $caseSensitive,
+                $wholeWords,
+                $preserveCase,
+                $excluded
+            );
+        }
+
+        return $this->performReplacement(
+            $value,
+            $query,
+            $replaceWith,
+            $useRegex,
+            $caseSensitive,
+            $wholeWords,
+            $preserveCase
+        );
+    }
+
+    /**
+     * Replaces every match of a plain text field except the ones in
+     * $excluded, which are numbered in the order the search lists them.
+     * Each match is rewritten on its own, from the last to the first so the
+     * positions of the ones still to do do not move.
+     *
+     * @param int[] $excluded
+     */
+    private function performReplacementExcluding(
+        string $value,
+        string $query,
+        string $replaceWith,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $wholeWords,
+        bool $preserveCase,
+        array $excluded
+    ): string {
+        $matches = Editrix::$plugin->search->findMatches($value, $query, $useRegex, $caseSensitive, $wholeWords);
+        $skip = array_flip($excluded);
+        $pattern = $useRegex ? Regex::pattern($query, $caseSensitive) : null;
+
+        for ($i = count($matches) - 1; $i >= 0; $i--) {
+            if (isset($skip[$i])) {
+                continue;
+            }
+
+            $start = $matches[$i]["start"];
+            $end = $matches[$i]["end"];
+            $old = mb_substr($value, $start, $end - $start);
+
+            // A regex can refer to its groups ($1) and look at what
+            // surrounds the match, so it is expanded against the whole text.
+            $new = $pattern !== null
+                ? Regex::expand($pattern, $replaceWith, $value, $start)
+                : $this->performReplacement($old, $query, $replaceWith, false, $caseSensitive, $wholeWords, $preserveCase);
+
+            $value = mb_substr($value, 0, $start) . $new . mb_substr($value, $end);
+        }
+
+        return $value;
     }
 
     private function performReplacement(
@@ -614,9 +721,7 @@ class ReplaceService extends Component
         }
 
         if ($useRegex) {
-            $flags = $caseSensitive ? "u" : "iu";
-            $pattern = "/{$query}/{$flags}";
-            return @preg_replace($pattern, $replaceWith, $value) ?? $value;
+            return Regex::replace(Regex::pattern($query, $caseSensitive), $replaceWith, $value);
         }
 
         // Not regex mode - $replaceWith is literal user text, not a regex
@@ -661,48 +766,52 @@ class ReplaceService extends Component
         bool $useRegex,
         bool $caseSensitive,
         bool $wholeWords,
-        bool $preserveCase = false
+        bool $preserveCase = false,
+        array $excluded = [],
+        bool $includeLinks = false
     ): string {
         [$plain, $charMap] = HtmlText::stripTagsWithCharMap($value);
 
-        if ($plain === "") {
-            return $value;
-        }
-
-        $plainMatches = Editrix::$plugin->search->findMatches(
-            $plain,
+        $occurrences = Editrix::$plugin->search->htmlOccurrences(
+            $value,
             $query,
             $useRegex,
             $caseSensitive,
-            $wholeWords
+            $wholeWords,
+            $includeLinks
         );
 
-        if (empty($plainMatches)) {
+        if ($occurrences === []) {
             return $value;
         }
 
-        // findMatches() always reports CHARACTER offsets, so no unit
-        // conversion is needed here - $charMap is keyed by character
-        // position too.
-        $charMapLen = count($charMap);
+        $skip = array_flip($excluded);
 
-        // Process back-to-front so each raw-string edit doesn't invalidate
-        // the positions of matches still to be processed.
-        for ($i = count($plainMatches) - 1; $i >= 0; $i--) {
-            $match = $plainMatches[$i];
+        // Every edit is worked out against the text as it was, then applied
+        // from the end, so none of them moves another.
+        $edits = [];
 
-            $startChar = $match["start"];
-            $endChar = $match["end"];
-
-            if ($endChar <= $startChar || $endChar > $charMapLen) {
+        foreach ($occurrences as $i => $occurrence) {
+            if (isset($skip[$i])) {
                 continue;
             }
 
-            $oldPlainMatch = mb_substr(
-                $plain,
-                $startChar,
-                $endChar - $startChar
-            );
+            // An address is rewritten where it stands, between its quotes.
+            if (!empty($occurrence["attr"])) {
+                $old = $occurrence["match"];
+                $new = $this->performReplacement($old, $query, $replaceWith, $useRegex, $caseSensitive, $wholeWords, $preserveCase);
+
+                if ($new !== $old) {
+                    $edits[] = [$occurrence["start"], $occurrence["end"], $new];
+                }
+
+                continue;
+            }
+
+            $startChar = $occurrence["plainStart"];
+            $endChar = $occurrence["plainEnd"];
+
+            $oldPlainMatch = mb_substr($plain, $startChar, $endChar - $startChar);
             $newPlainMatch = $this->performReplacement(
                 $oldPlainMatch,
                 $query,
@@ -724,15 +833,8 @@ class ReplaceService extends Component
                 $endChar
             );
 
-            $innerRawStart = $this->rawStartForPlainIndex(
-                $innerPlainStart,
-                $charMap
-            );
-            $innerRawEnd = $this->rawEndForPlainIndex(
-                $innerPlainEnd,
-                $charMap,
-                $innerRawStart
-            );
+            $innerRawStart = $this->rawStartForPlainIndex($innerPlainStart, $charMap);
+            $innerRawEnd = $this->rawEndForPlainIndex($innerPlainEnd, $charMap, $innerRawStart);
 
             // The matched PHRASE can span a tag (or now, a decoded entity)
             // and still be safe to edit, as long as the part that actually
@@ -740,21 +842,27 @@ class ReplaceService extends Component
             // an <i> is fine, overwriting a span that contains the <i>
             // itself would delete only one side of it and corrupt the
             // markup. When the diff span does include a tag, leave this
-            // occurrence untouched rather than risk that - same as any
-            // other no-op, it's just excluded from the result below.
-            $innerRawSlice = mb_substr(
-                $value,
-                $innerRawStart,
-                $innerRawEnd - $innerRawStart
-            );
+            // occurrence untouched rather than risk that.
+            $innerRawSlice = mb_substr($value, $innerRawStart, $innerRawEnd - $innerRawStart);
             if (str_contains($innerRawSlice, "<")) {
                 continue;
             }
 
-            $value =
-                mb_substr($value, 0, $innerRawStart) .
-                $newMiddle .
-                mb_substr($value, $innerRawEnd);
+            $edits[] = [$innerRawStart, $innerRawEnd, $newMiddle];
+        }
+
+        usort($edits, fn(array $a, array $b) => $b[0] <=> $a[0]);
+
+        $floor = PHP_INT_MAX;
+        foreach ($edits as [$from, $to, $text]) {
+            // Two edits never share characters; if they ever would, the
+            // later one in the text wins and the other is left alone.
+            if ($to > $floor) {
+                continue;
+            }
+
+            $value = mb_substr($value, 0, $from) . $text . mb_substr($value, $to);
+            $floor = $from;
         }
 
         return $value;
@@ -935,6 +1043,16 @@ class ReplaceService extends Component
             // A revision is how an editor sees, in the screen they already
             // use, that an entry changed and what it changed from.
             $element->resaving = !$settings->createRevisionsOnReplace;
+
+            if (!$element->resaving) {
+                if ($this->revisionNote) {
+                    $element->setRevisionNotes($this->revisionNote);
+                }
+
+                if ($this->actingUserId) {
+                    $element->setRevisionCreatorId($this->actingUserId);
+                }
+            }
 
             // A nested entry or block is a first-class element: save it
             // directly. (Re-fetching and saving its owner would discard
@@ -1135,10 +1253,17 @@ class ReplaceService extends Component
      * @param iterable $entries entries as logs keep them (from LogService::replacementsFor)
      * @return array{reverted: int, unchanged: int, conflicts: array, missing: array, failed: array}
      */
-    public function revertEntries(iterable $entries, bool $force = false, ?callable $onEach = null): array
-    {
+    public function revertEntries(
+        iterable $entries,
+        bool $force = false,
+        ?callable $onEach = null,
+        ?int $userId = null,
+        ?int $logId = null
+    ): array {
         $out = ["reverted" => 0, "unchanged" => 0, "conflicts" => [], "missing" => [], "failed" => []];
         $log = Editrix::$plugin->log;
+        $this->actingUserId = $userId ?: null;
+        $this->revisionNote = $logId ? "Editrix revert of #{$logId}" : null;
 
         foreach ($entries as $entry) {
             $status = $this->revertStatus($entry, $current, $element);
@@ -1156,6 +1281,8 @@ class ReplaceService extends Component
                 $itemId && $log->setItemState($itemId, "reverted", "already held the original text");
             } elseif ($status === "modified" && !$force) {
                 $out["conflicts"][] = $about;
+            } elseif ($element !== null && !Access::canSave($element, $this->actingUserId)) {
+                $out["failed"][] = $about + ["reason" => "permission"];
             } else {
                 $error = null;
 
