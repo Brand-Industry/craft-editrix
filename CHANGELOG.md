@@ -2,6 +2,20 @@
 
 All notable changes to Editrix will be documented in this file.
 
+## [Unreleased]
+
+### Security
+- A search and a replace now follow Craft's own permissions. A user who may use Editrix but cannot open an entry's section no longer sees that entry in results, cannot read its text through the match preview, and cannot change it with Replace or Revert: those rows are skipped with the reason "you can't edit this entry in Craft". Matrix and Neo blocks follow the entry that owns them; globals and categories follow their own permissions; the category and tag assignment lists leave out entries the user cannot open. Admins, and the command line (which acts as the `--user` it logs under), are unchanged
+
+### Fixed
+- A regular expression with a `/` in it, such as `https?://`, was refused as invalid; it now works
+- A regular expression that cannot finish on some text used to be read as "no match", so a search quietly missed entries. Patterns are now limited to 100,000 steps per text and fail with a message saying the pattern is too complex; in a replace, only the rows it fails on are reported as not saved
+
+### Added
+- Leave single occurrences out of a replace: in a row with several matches, each one has a box (Show all matches). The row says "2 of 3 will change", the preview shows the result without the ones left out, and the log counts only what changed. Works for plain text, regular expressions with groups (`$1`), and rich text
+- "Include link addresses" (and `--links` on the command line) also searches and replaces the `href` and `src` of links and images in rich text fields, where a changed domain lives. Only the text between the quotes is touched, never the markup
+- Each save a replace or a revert makes leaves a revision whose note says where it came from ("Editrix replace #12") and which user made it
+
 ## [2.0.0-beta.5] - 2026-10-08
 
 ### Changed

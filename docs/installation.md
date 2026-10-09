@@ -36,6 +36,8 @@ Admins can use everything. For other users, turn on the permissions they need un
 | Delete logs | Delete log entries |
 | Export logs | Export logs and search results (Pro) |
 
+Editrix's permissions say who may use the tool. Craft's own permissions still decide which entries a person can reach with it: someone who cannot view or save a section in Craft cannot see or change its entries through Editrix either.
+
 ## Updating
 
 ```bash

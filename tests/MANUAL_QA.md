@@ -254,3 +254,56 @@ Una línea por punto:
 - **Qué esperabas y qué pasó**, con captura.
 - **Consola del navegador** y las últimas líneas de `storage/logs/editrix-*.log` y del log web de Craft.
 - **Si se repite**, y si pasa con otra palabra o con otra entrada.
+
+## 16. Cambios posteriores a beta.5
+
+Probar con la rama o la versión que los incluya. Los puntos de permisos necesitan un usuario que **no** sea admin.
+
+### 16.1 Permisos de Craft sobre secciones
+
+Crear un grupo con permisos de Editrix (buscar y reemplazar, revertir) y, en Craft, permiso para ver y guardar entradas **solo de la sección A**. Dos entradas con una palabra en común: una en A y otra en B.
+
+- [ ] Con ese usuario, buscar la palabra: salen solo las filas de A.
+- [ ] Un admin ve las dos secciones.
+- [ ] Con ese usuario, Reemplazar sobre una fila de A funciona. El log queda a su nombre.
+- [ ] Llamando a la API a mano con un `elementId` de la sección B (`editrix/api/search/value`, `editrix/api/preview`) no devuelve el texto.
+- [ ] Llamando a `editrix/api/replace` a mano con una fila de B: la entrada no cambia y el resumen dice "you can't edit this entry in Craft".
+- [ ] Revertir con ese usuario un log hecho por un admin sobre entradas de B: esos valores no se restauran y salen como fallidos.
+- [ ] Un bloque Matrix o Neo de una entrada de B tampoco aparece ni se puede cambiar.
+- [ ] Un global y una categoría a los que no tiene acceso no aparecen (con Categories activado).
+- [ ] La búsqueda por categoría o tag (Pro) no lista entradas de B.
+- [ ] Por línea de comandos con `--user=<ese usuario>` pasa lo mismo.
+
+### 16.2 Expresiones regulares
+
+- [ ] `https?://` es una expresión válida y encuentra direcciones.
+- [ ] Reemplazar `http://` por `https://` con Regex funciona.
+- [ ] `(a+)+$` sobre un texto largo de aes seguidas de otra letra termina con el mensaje "too complex", no se queda colgada ni dice "sin resultados".
+- [ ] `(abc` sigue diciendo "Invalid regular expression".
+
+### 16.3 Dejar fuera coincidencias
+
+- [ ] En un campo con 3 coincidencias, abrir "Show all 3 matches" y apagar la segunda. La fila dice "2 of 3 will change".
+- [ ] La vista previa (View) muestra el texto sin cambiar esa coincidencia.
+- [ ] Tras reemplazar, la coincidencia apagada sigue intacta en Craft y las otras dos cambiaron.
+- [ ] El resumen y el log cuentan 2 coincidencias, no 3.
+- [ ] Con Regex y `$1` en el reemplazo, las coincidencias que sí cambian usan sus grupos.
+- [ ] En un campo de texto enriquecido pasa lo mismo.
+- [ ] Revertir ese reemplazo devuelve el valor original.
+
+### 16.4 Direcciones de enlaces
+
+Un campo CKEditor con un enlace `<a href="http://dominio-viejo.test/x">dominio-viejo.test</a>` y una imagen con `src` del mismo dominio.
+
+- [ ] Sin "Include link addresses", buscar `dominio-viejo.test` encuentra solo el texto visible.
+- [ ] Con la casilla, encuentra también el `href` y el `src`, y la fila cuenta todas las coincidencias.
+- [ ] Reemplazar con la casilla cambia el texto, el `href` y el `src`, y no toca el resto de la etiqueta (clases, `target`, otros atributos).
+- [ ] Se puede apagar solo la coincidencia del `href` y dejar las demás.
+- [ ] Un enlace entre comillas simples también se encuentra.
+- [ ] `php craft editrix/run/replace --find=... --replace=... --links` hace lo mismo, y sin `--links` no toca direcciones.
+
+### 16.5 Notas de revisión
+
+- [ ] Tras un reemplazo, en la entrada, la pestaña de revisiones muestra la nota "Editrix replace #N" y el usuario que lo hizo.
+- [ ] Tras revertir, la nota dice "Editrix revert of #N".
+- [ ] Con `createRevisionsOnReplace` en `false` no se crea revisión.

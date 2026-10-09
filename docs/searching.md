@@ -22,9 +22,14 @@ The field types that are searched are listed in the `searchableFieldTypes` setti
 | Regular expression | Treats the text as a PCRE pattern. An invalid pattern shows "Invalid regular expression" and nothing runs. |
 | Case insensitive | "hotel" also finds "Hotel" and "HOTEL". Without it, case must match. |
 | Whole words | "cat" does not match inside "concatenate". |
+| Include link addresses | Also searches the `href` of links and the `src` of images in rich text fields, where a changed domain lives. Only the text between the quotes is searched, never the markup around it. The address is matched as written in the HTML, so `a&b` does not match `a&amp;b`. |
 | Dry Run Mode | Shows what a replace would do without saving anything. See [Replacing](replacing.md). |
 
 The checkboxes for Entries, Globals, Matrix fields and Categories choose where to look. Their defaults are set in [Settings](configuration.md).
+
+## Whose permissions apply
+
+A search shows what the person running it may open in Craft. An entry in a section they cannot view is left out of their results, as are the Matrix and Neo blocks it owns, and the globals and categories they have no access to. Admins see everything. Editrix's own permissions say who may use the tool, and Craft's say which content they may reach with it.
 
 ## Limiting the search
 

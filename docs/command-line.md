@@ -23,10 +23,11 @@ php craft editrix/run/revert 12
 | `--regex` | Treat `--find` as a regular expression |
 | `--case-insensitive` | Ignore case when matching |
 | `--whole-words` | Match whole words only |
+| `--links` | Also search and replace the `href` and `src` of links and images in rich text |
 | `--preserve-case` | Give the replacement the capitalisation of what it replaces |
 | `--dry-run` | `1` (default) reports only. `0` changes content. |
 | `--user` | The user a replace is logged under: id, username or email. Defaults to the first admin. |
 | `--limit` | How many matches to list. Default 20. |
 | `--force` | On `revert`, also overwrite values edited since |
 
-The same limits apply as in the control panel: the rows per replace of your edition, and `protectedFields` and `protectedSections`. A replace from the command line is logged and can be reverted from **Logs & History**.
+The same limits apply as in the control panel: the rows per replace of your edition, `protectedFields` and `protectedSections`, and Craft's permissions for the `--user` the command acts as. The default user is the first admin, who may edit everything. A replace from the command line is logged and can be reverted from **Logs & History**.
