@@ -113,7 +113,7 @@ import { useConfig } from '../../composables/useConfig';
 import { useApi } from '../../composables/useApi';
 import { fieldValueParams } from '../../utils/fieldValue';
 import { elementTypeLabel } from '../../utils/elementType';
-import { highlightMatches } from '../../utils/highlight';
+import { highlightMatches, contextToHtml } from '../../utils/highlight';
 
 const t = inject('t');
 const { cpUrl, fieldValueUrl } = useConfig();
@@ -170,10 +170,7 @@ watch(
   { immediate: true }
 );
 
-const formatContext = context =>
-  (context || '')
-    .replace(/\[\[MATCH\]\]/g, '<span class="match">')
-    .replace(/\[\[\/MATCH\]\]/g, '</span>');
+const formatContext = contextToHtml;
 
 const showReplaceField = ref(false);
 const replaceValue = ref('');

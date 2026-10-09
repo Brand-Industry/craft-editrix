@@ -206,6 +206,7 @@
 <script setup>
 import { inject, ref, computed, watch } from 'vue';
 import { elementTypeLabel } from '../../utils/elementType';
+import { contextToHtml } from '../../utils/highlight';
 
 const t = inject('t');
 const hasFeature = inject('hasFeature');
@@ -302,15 +303,12 @@ watch(pageSize, () => { currentPage.value = 1; });
 defineEmits(['toggle', 'toggle-all', 'view', 'replace', 'toggle-match']);
 
 // Format preview with highlighted match
-const formatPreview = (context) => {
-  if (!context) return '';
-  return context
-    .replace(/\[\[MATCH\]\]/g, '<span class="match">')
-    .replace(/\[\[\/MATCH\]\]/g, '</span>');
-};
+const formatPreview = contextToHtml;
 
 const csvCell = (value) => {
-  const str = String(value ?? '');
+  let str = String(value ?? '');
+  // A cell starting with = + - @ is run as a formula by spreadsheets
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
 };
 

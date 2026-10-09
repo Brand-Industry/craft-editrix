@@ -86,9 +86,10 @@ class ReplaceComputationTest extends TestCase
         $this->assertSame('Smith, John', $this->plain('John Smith', '(\w+) (\w+)', '$2, $1', true));
     }
 
-    public function testAnInvalidRegexLeavesTheValueUntouched(): void
+    public function testAnInvalidRegexIsRefusedInsteadOfBeingReadAsNoMatch(): void
     {
-        $this->assertSame('keep me', $this->plain('keep me', '(unclosed', 'x', true));
+        $this->expectException(\brandindustry\editrix\helpers\RegexException::class);
+        $this->plain('keep me', '(unclosed', 'x', true);
     }
 
     public function testMultibyteTextIsReplacedWithoutCorruption(): void

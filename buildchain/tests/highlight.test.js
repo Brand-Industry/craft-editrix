@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { highlightMatches } from '../src/js/utils/highlight';
+import { highlightMatches, contextToHtml } from '../src/js/utils/highlight';
 
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const mark = s => `<span class="match">${s}</span>`;
@@ -46,5 +46,18 @@ describe('highlightMatches', () => {
   it('returns the escaped value when there is nothing to highlight', () => {
     expect(highlightMatches('a < b', [], esc)).toBe('a &lt; b');
     expect(highlightMatches('a < b', undefined, esc)).toBe('a &lt; b');
+  });
+});
+
+describe('contextToHtml', () => {
+  it('escapes markup in the field text and keeps the highlight', () => {
+    expect(contextToHtml('<img src=x onerror=alert(1)> [[MATCH]]a&b[[/MATCH]] "q"')).toBe(
+      '&lt;img src=x onerror=alert(1)&gt; <span class="match">a&amp;b</span> &quot;q&quot;'
+    );
+  });
+
+  it('handles empty input', () => {
+    expect(contextToHtml(undefined)).toBe('');
+    expect(contextToHtml('')).toBe('');
   });
 });
