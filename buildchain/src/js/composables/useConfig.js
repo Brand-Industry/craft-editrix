@@ -13,6 +13,7 @@ export function useConfig() {
   const resultLimit = computed(() => config.value.resultLimit || 0);
   const upgradeResultLimit = computed(() => config.value.upgradeResultLimit || null);
   const replaceRowLimit = computed(() => config.value.replaceRowLimit || 0);
+  const dryRunRowLimit = computed(() => config.value.dryRunRowLimit || 0);
   const replaceStatusUrl = computed(() => config.value.replaceStatusUrl || '');
   const replaceCancelUrl = computed(() => config.value.replaceCancelUrl || '');
   const replaceActiveUrl = computed(() => config.value.replaceActiveUrl || '');
@@ -86,6 +87,7 @@ export function useConfig() {
     resultLimit,
     upgradeResultLimit,
     replaceRowLimit,
+    dryRunRowLimit,
     searchCancelUrl,
     replaceUrl,
     previewUrl,

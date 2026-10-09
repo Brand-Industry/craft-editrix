@@ -17,6 +17,7 @@ use brandindustry\editrix\assetbundles\EditrixAsset;
 use brandindustry\editrix\jobs\SearchJob;
 use brandindustry\editrix\migrations\m260924_000000_add_search_sessions as SearchSessions;
 use brandindustry\editrix\services\LicenseService;
+use brandindustry\editrix\services\ReplaceService;
 
 class SearchController extends Controller
 {
@@ -724,6 +725,7 @@ class SearchController extends Controller
             "resultLimit" => Editrix::$plugin->search->currentResultLimit(),
             "upgradeResultLimit" => Editrix::$plugin->search->upgradeResultLimit(),
             "replaceRowLimit" => Editrix::$plugin->replace->currentRowLimit(),
+            "dryRunRowLimit" => ReplaceService::DRY_RUN_ROW_LIMIT,
             "replaceQueueThreshold" => Editrix::$plugin->getSettings()->replaceQueueThreshold,
 
             "apiUrl" => \craft\helpers\UrlHelper::actionUrl(
@@ -944,6 +946,9 @@ class SearchController extends Controller
             "Changed since search",
             "Its content changed after the search. Search again to see the current text.",
             "Replaced {count} matches.",
+            "Dry run: {count} matches would change. Nothing was saved.",
+            "Run dry run",
+            "Select at most {limit} rows for a dry run.",
             "View in Logs & History",
             "{count} skipped because their content changed after the search. Search again to see the current text.",
             "Search again",

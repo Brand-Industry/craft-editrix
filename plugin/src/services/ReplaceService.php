@@ -20,6 +20,13 @@ use brandindustry\editrix\Editrix;
 
 class ReplaceService extends Component
 {
+    /**
+     * A dry run is a check, run inside the request and never queued, so it
+     * covers few rows: enough to see what a replace would do, not a job in
+     * itself.
+     */
+    public const DRY_RUN_ROW_LIMIT = 100;
+
     /** Who the current replace or revert acts for, held to Craft's permissions. */
     private ?int $actingUserId = null;
 
@@ -39,7 +46,9 @@ class ReplaceService extends Component
     ): array {
         // $hooks: "logId" writes every value to that log before its entry
         // is saved; "onRow" is called as fn(int $done, int $total);
-        // "isCancelled" is polled between rows.
+        // "isCancelled" is polled between rows; "dryRun" works out what each
+        // row would become and saves nothing.
+        $dryRun = (bool) ($hooks["dryRun"] ?? false);
         $logId = $hooks["logId"] ?? null;
         $this->actingUserId = ($hooks["userId"] ?? null) ?: null;
         $this->revisionNote = $logId ? "Editrix replace #{$logId}" : null;
@@ -147,6 +156,12 @@ class ReplaceService extends Component
             }
 
             if ($newValue === $oldValue) {
+                continue;
+            }
+
+            if ($dryRun) {
+                $replacements[] = $this->entryFor($result, $oldValue, $newValue);
+
                 continue;
             }
 
@@ -275,6 +290,57 @@ class ReplaceService extends Component
             "replacedCount" => $count,
             "replacedMatches" => array_sum(array_map(fn(array $r) => (int) ($r["matches"] ?? 1), $replacements)),
             "replacedKeys" => array_map(fn(array $r) => self::keyFor($r), $replacements),
+            "skipped" => $skipped,
+            "failed" => $failed,
+        ];
+    }
+
+    /**
+     * Works out what a replace would do and saves nothing: no entry is
+     * touched, no log is written and the rows on screen are not marked.
+     * The rows are held to the same checks as a real replace (protected,
+     * changed since the search, Craft's permissions), so what it reports is
+     * what a real one would change.
+     *
+     * @param array[] $rows the selected rows
+     * @return array same shape as run(), with "dryRun" set and "logId" null
+     */
+    public function dryRun(
+        array $rows,
+        string $query,
+        string $replaceWith,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $wholeWords,
+        ?int $userId = null,
+        bool $preserveCase = false
+    ): array {
+        $skipped = [];
+        $failed = [];
+
+        $replacements = $this->replace(
+            $rows,
+            $query,
+            $replaceWith,
+            $useRegex,
+            $caseSensitive,
+            $wholeWords,
+            $skipped,
+            $failed,
+            [
+                "dryRun" => true,
+                "userId" => $userId,
+                "preserveCase" => $preserveCase,
+            ]
+        );
+
+        return [
+            "dryRun" => true,
+            "logId" => null,
+            "cancelled" => false,
+            "replacedCount" => count($replacements),
+            "replacedMatches" => array_sum(array_map(fn(array $r) => (int) ($r["matches"] ?? 1), $replacements)),
+            "replacedKeys" => [],
             "skipped" => $skipped,
             "failed" => $failed,
         ];
