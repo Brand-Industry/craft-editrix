@@ -43,6 +43,7 @@ class ReplaceController extends Controller
         $preserveCase = $this->parseBoolean(
             $request->getBodyParam("preserveCase", false)
         );
+        $dryRun = $this->parseBoolean($request->getBodyParam("dryRun", false));
         // Variants of different case can only be found, and so kept, when
         // the search ignores case.
         $caseInsensitive = $caseInsensitive || $preserveCase;
@@ -88,6 +89,19 @@ class ReplaceController extends Controller
                     ["limit" => $rowLimit, "count" => count($selectedResults)]
                 ),
             ]);
+        }
+
+        // A dry run changes nothing, so it needs no confirmation code.
+        if ($dryRun) {
+            return $this->dryRunResponse(
+                array_values($selectedResults),
+                $searchQuery,
+                $replaceWith,
+                $useRegex,
+                !$caseInsensitive,
+                $wholeWords,
+                $preserveCase
+            );
         }
 
         $confirmationError = $this->checkSafetyConfirmation(
@@ -383,6 +397,60 @@ class ReplaceController extends Controller
     }
 
     /** The JSON a finished replace sends back, inline or from the queue. */
+    private function dryRunResponse(
+        array $rows,
+        string $query,
+        string $replaceWith,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $wholeWords,
+        bool $preserveCase
+    ): Response {
+        if (count($rows) > ReplaceService::DRY_RUN_ROW_LIMIT) {
+            return $this->asJson([
+                "success" => false,
+                "error" => Craft::t(
+                    "editrix",
+                    "A dry run checks at most {limit} rows; you selected {count}. Select fewer, or narrow the search.",
+                    ["limit" => ReplaceService::DRY_RUN_ROW_LIMIT, "count" => count($rows)]
+                ),
+            ]);
+        }
+
+        try {
+            $summary = Editrix::$plugin->replace->dryRun(
+                $rows,
+                $query,
+                $replaceWith,
+                $useRegex,
+                $caseSensitive,
+                $wholeWords,
+                (int) Craft::$app->getUser()->getId(),
+                $preserveCase
+            );
+        } catch (\Throwable $e) {
+            Craft::error("Editrix dry run error: " . $e->getMessage(), __METHOD__);
+
+            return $this->asJson([
+                "success" => false,
+                "error" => Craft::t("editrix", "Dry run failed: {message}", [
+                    "message" => $e->getMessage(),
+                ]),
+            ]);
+        }
+
+        return $this->asJson(
+            [
+                "dryRun" => true,
+                "message" => Craft::t(
+                    "editrix",
+                    "Dry run: {count} occurrence(s) would change. Nothing was saved.",
+                    ["count" => $summary["replacedMatches"]]
+                ),
+            ] + $this->replaceResponse($summary)
+        );
+    }
+
     private function replaceResponse(array $summary): array
     {
         return [

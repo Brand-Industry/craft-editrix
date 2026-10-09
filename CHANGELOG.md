@@ -11,6 +11,8 @@ All notable changes to Editrix will be documented in this file.
 - The revert check no longer shows the current text of an entry the user cannot open in Craft, and the log list caps how many rows one request can ask for
 
 ### Fixed
+- Dry Run Mode did nothing in the control panel: Replace Selected saved the changes as usual. It now runs the replace without saving, reports how many matches would change and which rows would be skipped, writes no log and needs no confirmation. It checks at most 100 rows and never uses the queue
+- The before and after preview marked everything between the first and the last change as changed. It now marks each changed word on its own
 - A regular expression with a `/` in it, such as `https?://`, was refused as invalid; it now works
 - A regular expression that cannot finish on some text used to be read as "no match", so a search quietly missed entries. Patterns are now limited to 100,000 steps per text and fail with a message saying the pattern is too complex; in a replace, only the rows it fails on are reported as not saved
 

@@ -43,11 +43,11 @@
           :disabled="selectedCount === 0 || overReplaceLimit"
           @click="$emit('replace')"
         >
-          {{ t('Replace Selected') }}
+          {{ dryRun ? t('Run dry run') : t('Replace Selected') }}
           <span v-if="selectedCount > 0">({{ selectedCount }})</span>
         </button>
         <span v-if="overReplaceLimit" class="editrix-results__limit-note">
-          {{ t('Select at most {limit} rows to replace at once.', { limit: replaceLimit.toLocaleString() }) }}
+          {{ t(dryRun ? 'Select at most {limit} rows for a dry run.' : 'Select at most {limit} rows to replace at once.', { limit: replaceLimit.toLocaleString() }) }}
         </span>
       </div>
     </header>
@@ -223,6 +223,8 @@ const props = defineProps({
   // 'replaced', 'stale' or null for a result.
   rowState: { type: Function, default: () => null },
   actionMode: { type: String, default: 'replace' },
+  // Replace only reports what it would change.
+  dryRun: { type: Boolean, default: false },
   searchQuery: { type: String, default: '' },
   // Occurrences inside a row can be left out of a replace.
   isMatchIncluded: { type: Function, default: () => true },

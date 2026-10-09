@@ -4,7 +4,7 @@ Choose **Search & Replace** on the search screen and enter the replacement text.
 
 ## Preview first
 
-Open any result row to see the original text and the proposed text. **Dry Run Mode** goes further: it runs the whole replace and reports what it would change without saving anything.
+Open any result row to see the original text and the proposed text, with each changed word marked. **Dry Run Mode** goes further: turn it on, choose the rows and click **Run dry run**. Editrix works out the whole replace and reports how many matches would change and which rows it would skip, and why. It saves nothing, writes no log, asks for no confirmation and leaves the rows on screen as they were. It runs inside the request and is never queued, so it covers at most 100 rows; select fewer, or narrow the search.
 
 ## Replace
 

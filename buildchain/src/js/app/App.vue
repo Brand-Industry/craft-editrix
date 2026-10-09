@@ -265,7 +265,10 @@
           </div>
 
           <div v-if="lastReplace" class="editrix-replace-summary">
-            <p v-if="lastReplace.replaced > 0" class="editrix-replace-summary__done">
+            <p v-if="lastReplace.dryRun" class="editrix-replace-summary__done">
+              {{ t('Dry run: {count} matches would change. Nothing was saved.', { count: lastReplace.replaced.toLocaleString() }) }}
+            </p>
+            <p v-else-if="lastReplace.replaced > 0" class="editrix-replace-summary__done">
               ✓ {{ t('Replaced {count} matches.', { count: lastReplace.replaced.toLocaleString() }) }}
               <a v-if="logsPageUrl" :href="logsPageUrl">{{ t('View in Logs & History') }}</a>
             </p>
@@ -338,12 +341,13 @@
             :is-match-included="isMatchIncluded"
             :excluded-count="excludedCount"
             :action-mode="actionMode"
+            :dry-run="searchParams.dryRun"
             :search-query="searchParams.query"
             @toggle="toggleResult"
             @toggle-match="toggleMatch"
             @toggle-all="toggleSelectAll"
             @view="openView"
-            :replace-limit="replaceRowLimit"
+            :replace-limit="rowLimit"
             @replace="requestBulkReplace"
           />
           </template>
@@ -426,6 +430,7 @@ const {
   canExport,
   canReplace,
   replaceRowLimit,
+  dryRunRowLimit,
 } = useConfig();
 const { get: apiGet } = useApi();
 
@@ -822,6 +827,8 @@ const confirmCount = computed(() =>
 // past the bulk threshold, or in production with Safe Mode on, the
 // confirm modal requires typing "REPLACE" (also enforced server-side).
 const requiresConfirmationCode = computed(() => {
+  // A dry run changes nothing.
+  if (searchParams.dryRun) return false;
   const threshold = safety.value.bulkConfirmationThreshold;
   const overThreshold =
     typeof threshold === 'number' && confirmCount.value > threshold;
@@ -851,19 +858,35 @@ const handleRequestSingleReplace = ({ result, replaceWith }) => {
   singleReplaceValue.value = replaceWith;
   detailResult.value = null;
   previewResult.value = null;
+  // Nothing to confirm when nothing will be saved.
+  if (searchParams.dryRun) {
+    handleReplace('');
+    return;
+  }
   showReplaceConfirm.value = true;
 };
 
 // One request can only change so many entries before the server may cut it
 // off (see maxRowsPerReplace); the server refuses more, this says so first.
+// A dry run is a quick check, so it covers fewer rows than a replace.
+const rowLimit = computed(() =>
+  searchParams.dryRun && dryRunRowLimit.value > 0
+    ? Math.min(dryRunRowLimit.value, replaceRowLimit.value || dryRunRowLimit.value)
+    : replaceRowLimit.value
+);
+
 const requestBulkReplace = () => {
-  if (replaceRowLimit.value > 0 && selectedCount.value > replaceRowLimit.value) {
+  if (rowLimit.value > 0 && selectedCount.value > rowLimit.value) {
     window.Craft?.cp?.displayError?.(
       t('Select at most {limit} rows per replace; you selected {count}.', {
-        limit: replaceRowLimit.value.toLocaleString(),
+        limit: rowLimit.value.toLocaleString(),
         count: selectedCount.value.toLocaleString(),
       })
     );
+    return;
+  }
+  if (searchParams.dryRun) {
+    handleReplace('');
     return;
   }
   showReplaceConfirm.value = true;
@@ -889,6 +912,7 @@ const showReplaceSummary = (data) => {
   const changedSince = (s) => s.reason === 'changed' || s.reason === 'missing';
 
   lastReplace.value = {
+    dryRun: !!data.dryRun,
     replaced: data.replacedMatches ?? data.replacedCount ?? 0,
     skipped: skipped.filter(changedSince).length,
     // Refused rows are listed with the failures, each with its reason.

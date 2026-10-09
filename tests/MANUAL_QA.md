@@ -119,7 +119,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 
 - [ ] **Preview Changes** muestra la vista de diff. En Standard es texto, en Pro es lado a lado (ORIGINAL / PROPOSED).
 - [ ] "Apply to this element" y "Skip" por elemento funcionan.
-- [ ] **Dry Run Mode**: no cambia nada en las entradas ni crea cambios reales.
+- [ ] **Dry Run Mode**: con el interruptor activo el botón dice "Run dry run"; al pulsarlo informa cuántas coincidencias cambiarían y qué filas omitiría, no cambia ninguna entrada, no crea un log en Logs & History, no pide el código REPLACE y las filas siguen sin marcar como reemplazadas.
 - [ ] Reemplazo real: aparece "Successfully replaced N occurrence(s)." y la entrada, abierta en otra pestaña, tiene el texto nuevo.
 - [ ] **CKEditor con entradas anidadas** (en Frommers: la entrada 157657, campo `articleBody`): reemplaza una palabra del texto, abre la entrada en el editor y comprueba que los bloques anidados siguen ahí. Revierte desde Logs & History y vuelve igual.
 - [ ] **Después de reemplazar no se vuelve a buscar**: las filas reemplazadas quedan visibles con la marca verde "Replaced", sin casilla, y arriba aparece "Replaced N matches." con el enlace a Logs & History y el botón **Search again**. No aparece la barra de progreso.

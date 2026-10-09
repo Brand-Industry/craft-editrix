@@ -470,6 +470,7 @@ export function useSearch(actionMode) {
         caseInsensitive: searchParams.caseInsensitive,
         wholeWords: searchParams.wholeWords,
         preserveCase: searchParams.preserveCase,
+        dryRun: searchParams.dryRun,
         confirmationCode: confirmationCode ?? '',
         searchId: loadedSearchId.value ?? '',
       });
@@ -481,7 +482,8 @@ export function useSearch(actionMode) {
         data = await followReplace(data.logId, data.total);
       }
 
-      markReplaced(data);
+      // A dry run saved nothing, so the rows stay as they are.
+      if (!data?.dryRun) markReplaced(data);
 
       return data;
     } catch (err) {
