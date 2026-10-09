@@ -62,6 +62,16 @@
         <span v-if="!hasFeature('wholeWords')" class="editrix-badge editrix-badge--info">Standard</span>
       </label>
 
+      <label class="editrix-form__checkbox">
+        <input
+          type="checkbox"
+          :checked="includeLinks"
+          :title="t('Also search the address of links and images in rich text fields')"
+          @change="$emit('update:includeLinks', $event.target.checked)"
+        />
+        <span>{{ t('Include link addresses') }}</span>
+      </label>
+
       <label v-if="actionMode === 'replace' && !useRegex" class="editrix-form__checkbox">
         <input
           type="checkbox"
@@ -183,6 +193,7 @@ defineProps({
   useRegex: { type: Boolean, default: false },
   caseInsensitive: { type: Boolean, default: false },
   wholeWords: { type: Boolean, default: false },
+  includeLinks: { type: Boolean, default: false },
   preserveCase: { type: Boolean, default: false },
   dryRun: { type: Boolean, default: false },
   searchEntries: { type: Boolean, default: true },
@@ -201,6 +212,7 @@ defineEmits([
   'update:useRegex',
   'update:caseInsensitive',
   'update:wholeWords',
+  'update:includeLinks',
   'update:preserveCase',
   'update:dryRun',
   'update:searchEntries',

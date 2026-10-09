@@ -13,10 +13,12 @@ export function fieldValueParams(result) {
 // A row sent back to the server (replace, preview) only needs to identify
 // the field and say how many matches it had. The list of contexts is for
 // display, and can be long.
-export function slimRow(row) {
+export function slimRow(row, excludedMatches = []) {
   const { matches, ...rest } = row;
   return {
     ...rest,
     readOnlyMatchCount: (matches || []).filter(m => m.readOnly).length,
+    // Occurrences left out of this replace, by their place in the row's list.
+    ...(excludedMatches.length ? { excludedMatches } : {}),
   };
 }

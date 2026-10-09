@@ -13,7 +13,10 @@ use craft\db\Query;
 use craft\db\Table;
 use yii\db\Expression;
 use craft\fields\Tags;
+use brandindustry\editrix\helpers\Access;
 use brandindustry\editrix\helpers\FieldValue;
+use brandindustry\editrix\helpers\Regex;
+use brandindustry\editrix\helpers\RegexException;
 use brandindustry\editrix\helpers\HtmlText;
 use brandindustry\editrix\helpers\Prefilter;
 use brandindustry\editrix\models\SearchResult;
@@ -94,6 +97,12 @@ class SearchService extends Component
     /** Why the last search ended before covering everything, if it did. */
     private ?string $stopReason = null;
 
+    /** Who the last search ran for; what they may not view is left out. */
+    private ?int $actingUserId = null;
+
+    /** Whether the last search also looked in link and image addresses of rich text. */
+    private bool $includeLinks = false;
+
     public function search(
         string $query,
         ?int $siteId = null,
@@ -108,6 +117,8 @@ class SearchService extends Component
         $truncated = false;
         $this->stopReason = null;
         $this->matchesBase = 0;
+        $this->actingUserId = ($options["userId"] ?? null) ?: null;
+        $this->includeLinks = (bool) ($options["includeLinks"] ?? false);
         $limit = $this->currentResultLimit();
         $maxResults = min($limit, (int) ($options["maxResults"] ?? $limit));
         $settings = Editrix::$plugin->getSettings();
@@ -364,6 +375,9 @@ class SearchService extends Component
                 "matchStart" => $result->matchStart,
                 "matchEnd" => $result->matchEnd,
                 "isRichText" => $result->isRichText,
+                // Whether the search also looked in link addresses, so the
+                // replace that follows reads the field the same way.
+                "includeLinks" => $result->isRichText && $this->includeLinks,
                 "cpEditUrl" => $result->getCpEditUrl(),
                 "parentId" => $result->parentId,
                 "parentTitle" => $result->parentTitle,
@@ -537,6 +551,10 @@ class SearchService extends Component
                     $fieldFilter,
                     $results
                 );
+            } catch (RegexException $e) {
+                // The pattern, not the entry, is the problem: every entry
+                // would fail the same way, so say so instead of skipping.
+                throw $e;
             } catch (\Throwable $e) {
                 // One broken/orphaned entry (e.g. a nested Craft 5 entry
                 // whose owner was deleted, tripping up another plugin's own
@@ -547,6 +565,17 @@ class SearchService extends Component
                         $e->getMessage(),
                     __METHOD__
                 );
+            }
+
+            // Craft's permissions apply to what a search shows. Checked only
+            // for an entry that matched, so a scan of the whole site does not
+            // pay for it on every entry.
+            if (
+                $this->actingUserId &&
+                count($results) > $before &&
+                !Access::canView($entry, $this->actingUserId)
+            ) {
+                array_splice($results, $before);
             }
 
             // The cap is on rows (fields), counted as they appear, so a field
@@ -1582,6 +1611,10 @@ class SearchService extends Component
 
         // Global sets are few per site, so ->all() here is fine.
         foreach ($globalSets as $globalSet) {
+            if (!Access::canView($globalSet, $this->actingUserId)) {
+                continue;
+            }
+
             $fieldLayout = $globalSet->getFieldLayout();
 
             if (!$fieldLayout) {
@@ -1657,6 +1690,10 @@ class SearchService extends Component
         $categoryQuery = Category::find()->siteId($siteId)->status(null);
 
         foreach ($categoryQuery->each() as $category) {
+            if (!Access::canView($category, $this->actingUserId)) {
+                continue;
+            }
+
             $group = $category->getGroup();
 
             if (empty($fieldFilter) || in_array("title", $fieldFilter)) {
@@ -1837,6 +1874,37 @@ class SearchService extends Component
         bool $caseSensitive,
         bool $wholeWords
     ): array {
+        return $this->htmlOccurrences(
+            $value,
+            $query,
+            $useRegex,
+            $caseSensitive,
+            $wholeWords,
+            $this->includeLinks
+        );
+    }
+
+    /**
+     * Every occurrence in a rich text field, in the order they appear in
+     * its HTML. Replace reads the same list, so the number a person sees
+     * next to an occurrence is the one it is replaced by.
+     *
+     * Most are in the visible text, found in the text with the tags
+     * stripped. With $includeLinks, the address of a link (href) or an
+     * image (src) is searched too, which is where a changed domain lives;
+     * those are marked "attr" and matched as they are written in the HTML.
+     *
+     * Offsets are character offsets in $value. A text occurrence also
+     * carries "plainStart" and "plainEnd" in the stripped text.
+     */
+    public function htmlOccurrences(
+        mixed $value,
+        string $query,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $wholeWords,
+        bool $includeLinks = false
+    ): array {
         if (is_object($value)) {
             $value = FieldValue::toString($value);
         }
@@ -1845,71 +1913,131 @@ class SearchService extends Component
             return [];
         }
 
+        $results = [];
         [$plain, $charMap] = HtmlText::stripTagsWithCharMap($value);
 
-        if ($plain === "") {
-            return [];
-        }
-
-        $plainMatches = $this->findMatches(
-            $plain,
-            $query,
-            $useRegex,
-            $caseSensitive,
-            $wholeWords
-        );
-
-        if (empty($plainMatches)) {
-            return [];
-        }
-
-        // findMatches() always reports CHARACTER offsets, regardless of
-        // which internal branch handles the search - the same convention
-        // getMatchContext() and the frontend's JS string slicing both
-        // expect. $charMap is keyed by character position, so no unit
-        // conversion is needed here.
-        $plainCharLen = count($charMap);
-        $results = [];
-
-        foreach ($plainMatches as $match) {
-            $startChar = $match["start"];
-            $endChar = $match["end"];
-
-            if (
-                !isset($charMap[$startChar]) ||
-                $endChar <= $startChar ||
-                $endChar > $plainCharLen
-            ) {
-                continue;
-            }
-
-            $rawStart = $charMap[$startChar][0];
-            $rawEnd = isset($charMap[$endChar - 1])
-                ? $charMap[$endChar - 1][1]
-                : $rawStart;
-
-            $crossesTag = str_contains(
-                mb_substr($value, $rawStart, $rawEnd - $rawStart),
-                "<"
+        if ($plain !== "") {
+            $plainMatches = $this->findMatches(
+                $plain,
+                $query,
+                $useRegex,
+                $caseSensitive,
+                $wholeWords
             );
 
-            $results[] = [
-                "start" => $rawStart,
-                "end" => $rawEnd,
-                "match" => mb_substr($value, $rawStart, $rawEnd - $rawStart),
-                "context" => $this->getMatchContext(
-                    $value,
-                    $rawStart,
-                    $rawEnd,
-                    50
-                ),
-                "crossesTag" => $crossesTag,
-            ];
+            // findMatches() always reports CHARACTER offsets, regardless of
+            // which internal branch handles the search - the same convention
+            // getMatchContext() and the frontend's JS string slicing both
+            // expect. $charMap is keyed by character position, so no unit
+            // conversion is needed here.
+            $plainCharLen = count($charMap);
+
+            foreach ($plainMatches as $match) {
+                $startChar = $match["start"];
+                $endChar = $match["end"];
+
+                if (
+                    !isset($charMap[$startChar]) ||
+                    $endChar <= $startChar ||
+                    $endChar > $plainCharLen
+                ) {
+                    continue;
+                }
+
+                $rawStart = $charMap[$startChar][0];
+                $rawEnd = isset($charMap[$endChar - 1])
+                    ? $charMap[$endChar - 1][1]
+                    : $rawStart;
+
+                $crossesTag = str_contains(
+                    mb_substr($value, $rawStart, $rawEnd - $rawStart),
+                    "<"
+                );
+
+                $results[] = [
+                    "start" => $rawStart,
+                    "end" => $rawEnd,
+                    "match" => mb_substr($value, $rawStart, $rawEnd - $rawStart),
+                    "context" => $this->getMatchContext(
+                        $value,
+                        $rawStart,
+                        $rawEnd,
+                        50
+                    ),
+                    "crossesTag" => $crossesTag,
+                    "attr" => false,
+                    "plainStart" => $startChar,
+                    "plainEnd" => $endChar,
+                ];
+            }
+        }
+
+        if ($includeLinks) {
+            $results = array_merge(
+                $results,
+                $this->linkOccurrences($value, $query, $useRegex, $caseSensitive, $wholeWords)
+            );
+            usort($results, fn(array $a, array $b) => $a["start"] <=> $b["start"]);
         }
 
         return $results;
     }
 
+    /**
+     * The matches inside the href and src attributes of the tags in $value.
+     * Only the text between the quotes is looked at, never the markup
+     * around it.
+     */
+    private function linkOccurrences(
+        string $value,
+        string $query,
+        bool $useRegex,
+        bool $caseSensitive,
+        bool $wholeWords
+    ): array {
+        if (!preg_match_all('/<[a-zA-Z][^>]*>/u', $value, $tags, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        $found = [];
+
+        foreach ($tags[0] as [$tag, $tagByte]) {
+            if (!preg_match_all(
+                '/\b(?:href|src)\s*=\s*(?:"([^"]*)"|\'([^\']*)\')/iu',
+                $tag,
+                $attrs,
+                PREG_OFFSET_CAPTURE | PREG_SET_ORDER
+            )) {
+                continue;
+            }
+
+            foreach ($attrs as $attr) {
+                [$text, $byteInTag] = ($attr[1][1] ?? -1) !== -1 ? $attr[1] : ($attr[2] ?? ["", -1]);
+
+                if ($text === "" || $byteInTag < 0) {
+                    continue;
+                }
+
+                $base = mb_strlen(substr($value, 0, $tagByte + $byteInTag));
+
+                foreach ($this->findMatches($text, $query, $useRegex, $caseSensitive, $wholeWords) as $match) {
+                    $start = $base + $match["start"];
+                    $end = $base + $match["end"];
+
+                    $found[] = [
+                        "start" => $start,
+                        "end" => $end,
+                        "match" => $match["match"],
+                        "context" => $this->getMatchContext($value, $start, $end, 50),
+                        "crossesTag" => false,
+                        "attr" => true,
+                    ];
+                }
+            }
+        }
+
+        return $found;
+    }
 
     public function findMatches(
         mixed $value,
@@ -1932,19 +2060,10 @@ class SearchService extends Component
         $contextLength = 50;
 
         if ($useRegex) {
-            $flags = $caseSensitive ? "u" : "iu";
-            $pattern = "/{$query}/{$flags}";
-
-            if (
-                @preg_match_all(
-                    $pattern,
-                    $value,
-                    $regexMatches,
-                    PREG_OFFSET_CAPTURE
-                ) === false
-            ) {
-                return [];
-            }
+            $regexMatches = [Regex::matchAll(
+                Regex::pattern($query, $caseSensitive),
+                $value
+            )];
 
             foreach ($regexMatches[0] as $match) {
                 $matchText = $match[0];

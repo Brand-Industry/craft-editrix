@@ -194,6 +194,7 @@
             v-model:use-regex="searchParams.useRegex"
             v-model:case-insensitive="searchParams.caseInsensitive"
             v-model:whole-words="searchParams.wholeWords"
+            v-model:include-links="searchParams.includeLinks"
             v-model:preserve-case="searchParams.preserveCase"
             v-model:dry-run="searchParams.dryRun"
             v-model:search-entries="searchParams.searchEntries"
@@ -334,9 +335,12 @@
             :all-selected="allSelected"
             :is-selected="isSelected"
             :row-state="rowState"
+            :is-match-included="isMatchIncluded"
+            :excluded-count="excludedCount"
             :action-mode="actionMode"
             :search-query="searchParams.query"
             @toggle="toggleResult"
+            @toggle-match="toggleMatch"
             @toggle-all="toggleSelectAll"
             @view="openView"
             :replace-limit="replaceRowLimit"
@@ -551,6 +555,7 @@ const rerunLog = (log) => {
   searchParams.wholeWords = !!log.wholeWords;
 
   const scope = log.scope || {};
+  searchParams.includeLinks = !!scope.includeLinks;
   searchParams.allSites = !!scope.allSites;
   searchParams.sections = scope.sections || [];
   searchParams.fields = scope.fields || [];
@@ -600,6 +605,9 @@ const {
   cancelReplace,
   resumeReplace,
   rowState,
+  isMatchIncluded,
+  excludedCount,
+  toggleMatch,
   loadRecentSearches,
   openSearch,
   activeSearches,
@@ -871,11 +879,23 @@ const lastReplace = ref(null);
 
 // The rows are marked in place; searching again would rescan the whole
 // scope just to show what we already know.
+const refusalText = (reason) => ({
+  protected: t('protected field or section'),
+  permission: t("you can't edit this entry in Craft"),
+}[reason] || reason);
+
 const showReplaceSummary = (data) => {
+  const skipped = data.skipped || [];
+  const changedSince = (s) => s.reason === 'changed' || s.reason === 'missing';
+
   lastReplace.value = {
     replaced: data.replacedMatches ?? data.replacedCount ?? 0,
-    skipped: (data.skipped || []).length,
-    failed: data.failed || [],
+    skipped: skipped.filter(changedSince).length,
+    // Refused rows are listed with the failures, each with its reason.
+    failed: [
+      ...(data.failed || []),
+      ...skipped.filter((s) => !changedSince(s)).map((s) => ({ ...s, reason: refusalText(s.reason) })),
+    ],
   };
 };
 

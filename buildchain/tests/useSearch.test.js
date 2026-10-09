@@ -628,6 +628,24 @@ describe('useSearch after a replace', () => {
     expect(post.mock.calls[0][0]).toBe('/replace');
   });
 
+  it('marks a row changed since the search as stale, and a refused one as not saved', async () => {
+    post.mockResolvedValue({
+      success: true,
+      replacedKeys: [],
+      skipped: [
+        { key: resultKey(row(1)), reason: 'changed' },
+        { key: resultKey(row(2)), reason: 'permission' },
+        { key: resultKey(row(3)), reason: 'protected' },
+      ],
+    });
+
+    await s.replace({ results: [row(1), row(2), row(3)], replaceWith: 'x' });
+
+    expect(s.rowState(row(1))).toBe('stale');
+    expect(s.rowState(row(2))).toBe('failed');
+    expect(s.rowState(row(3))).toBe('failed');
+  });
+
   it('sends rows without their lists of contexts', async () => {
     post.mockResolvedValue({ success: true, replacedKeys: [], skipped: [] });
 
