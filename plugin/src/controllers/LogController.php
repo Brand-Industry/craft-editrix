@@ -51,8 +51,8 @@ class LogController extends Controller
             "userId" => $request->getParam("userId"),
             "type" => $request->getParam("type"),
             "status" => $request->getParam("status"),
-            "limit" => (int) $request->getParam("limit", 20),
-            "offset" => (int) $request->getParam("offset", 0),
+            "limit" => max(1, min(200, (int) $request->getParam("limit", 20))),
+            "offset" => max(0, (int) $request->getParam("offset", 0)),
         ];
 
         $logs = Editrix::$plugin->log->getLogs($filters);
@@ -162,7 +162,8 @@ class LogController extends Controller
         }
 
         $validation = Editrix::$plugin->replace->validateRevert(
-            Editrix::$plugin->log->replacementsFor($log)
+            Editrix::$plugin->log->replacementsFor($log),
+            (int) Craft::$app->getUser()->getId()
         );
 
         $count = fn(string $status) => count(

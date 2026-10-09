@@ -71,7 +71,18 @@ class RegexGuardTest extends TestCase
     public function testASearchDoesNotSwallowARunawayPattern(): void
     {
         $service = new class extends SearchService {
-            protected function searchOneEntry(&...$args): void
+            protected function searchOneEntry(
+                \craft\elements\Entry $entry,
+                string $query,
+                int $siteId,
+                $site,
+                bool $useRegex,
+                bool $caseSensitive,
+                bool $searchMatrix,
+                bool $wholeWords,
+                array $fieldFilter,
+                array &$results
+            ): void
             {
                 throw new RegexException('too complex');
             }

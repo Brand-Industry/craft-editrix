@@ -1184,8 +1184,10 @@ class ReplaceService extends Component
      * - 'missing' = element no longer exists
      *
      * @param iterable $replacements entries as logs keep them
+     * @param int|null $userId whose Craft permissions decide whether the
+     *   current text of an entry may be shown
      */
-    public function validateRevert(iterable $replacements): array
+    public function validateRevert(iterable $replacements, ?int $userId = null): array
     {
         $results = [];
 
@@ -1197,9 +1199,11 @@ class ReplaceService extends Component
                 "fieldHandle" => $replacement["fieldHandle"],
             ];
 
-            $status = $this->revertStatus($replacement, $current);
+            $status = $this->revertStatus($replacement, $current, $element);
 
-            if ($status === "modified") {
+            if ($status === "modified" && $element !== null && !Access::canView($element, $userId)) {
+                $base["elementTitle"] = "(hidden)";
+            } elseif ($status === "modified") {
                 $expected = (string) ($replacement["newValue"] ?? "");
                 $base["expectedValue"] = mb_substr($expected, 0, 100);
                 $base["currentValue"] = mb_substr((string) $current, 0, 100);

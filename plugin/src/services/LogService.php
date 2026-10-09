@@ -622,6 +622,19 @@ class LogService extends Component
         return $affected;
     }
 
+    /**
+     * A cell that starts with = + - or @ is run as a formula by a
+     * spreadsheet, and search and replace text is typed by users.
+     */
+    private function csvSafe(mixed $value): mixed
+    {
+        if (is_string($value) && preg_match('/^[=+\-@\t\r]/', $value)) {
+            return "'" . $value;
+        }
+
+        return $value;
+    }
+
     public function exportToCsv(array $filters = []): string
     {
         $logs = $this->getLogs(array_merge($filters, ["limit" => 10000]));
@@ -641,7 +654,7 @@ class LogService extends Component
         ]);
 
         foreach ($logs as $log) {
-            fputcsv($output, [
+            fputcsv($output, array_map([$this, "csvSafe"], [
                 $log["id"],
                 $log["dateCreated"],
                 $log["type"] ?? "replace",
@@ -651,7 +664,7 @@ class LogService extends Component
                 $log["replaceWith"],
                 $log["replacementCount"],
                 $log["status"],
-            ]);
+            ]));
         }
 
         rewind($output);
