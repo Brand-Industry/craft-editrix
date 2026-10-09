@@ -16,6 +16,8 @@ Open an operation and choose **Revert**. Editrix puts the values back one at a t
 - After a revert, you can choose to overwrite those edited values on purpose.
 - Reverting twice, or reverting after an interrupted replace, is safe.
 
+A revert also follows Craft's permissions: a value in an entry the user may not save is left as it is and reported as failed. Each value it restores leaves a revision noted "Editrix revert of #12".
+
 A revert of many values runs in the queue, with progress.
 
 A revert only works while the log exists. Logs are kept for the number of days in the **Log Retention** setting, up to 30 days on Standard and 90 on Pro.

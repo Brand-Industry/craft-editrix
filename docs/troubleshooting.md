@@ -33,8 +33,17 @@ The field was edited after your search, so Editrix skipped it rather than overwr
 - **Too many rows.** You selected more rows than your edition allows in one replace (200 on Standard, 5,000 on Pro). Replace in several batches.
 - **This field cannot be replaced.** The field's type is not one Editrix writes to, or the field is no longer in the entry's layout.
 - **Protected.** The field or its section is in `protectedFields` or `protectedSections`. Those rows are skipped and listed as protected.
+- **You can't edit this entry in Craft.** Your user group lacks the permission to save entries in that section. The row is skipped and listed with this reason.
 - **Read-only match.** The text runs across an HTML tag in a rich text field. See [Replacing](replacing.md).
 - **A required field would be left empty.** The entry is skipped and listed with the reason.
+
+## "This regular expression is too complex for some of the text it meets"
+
+A pattern needed more than 100,000 steps on some text. This happens with nested repeats such as `(a+)+` or with `.*` used several times in a row. Make the pattern more specific, anchor it, or search for the plain text. Editrix stops instead of reporting "no results", because a pattern that gives up would hide matches.
+
+## An entry I know is there is missing from the results
+
+If you are not an admin, entries in sections you may not view in Craft are left out on purpose. Ask an admin to run the search, or to give your user group the view permission for that section.
 
 ## A search does not find a word that is on the page
 
