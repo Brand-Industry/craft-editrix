@@ -83,6 +83,8 @@
 
 <script setup>
 import { computed, inject } from 'vue';
+import { diffText } from '../../utils/textDiff';
+import { escapeText } from '../../utils/highlight';
 
 const t = inject('t');
 
@@ -100,56 +102,16 @@ const props = defineProps({
 defineEmits(['close', 'apply', 'skip']);
 
 // The before/after text comes straight from the server - the same
-// tag/entity-aware engine that would actually run on Apply - so the
-// highlight here just needs to show WHERE the two differ, via their
-// common prefix/suffix, rather than re-deriving the change itself.
-const diff = computed(() => {
-  const oldStr = props.original;
-  const newStr = props.proposed;
+// tag/entity-aware engine that would actually run on Apply - so this only
+// shows WHERE the two differ, word by word.
+const parts = computed(() => diffText(props.original, props.proposed));
 
-  let prefixLen = 0;
-  const maxPrefix = Math.min(oldStr.length, newStr.length);
-  while (prefixLen < maxPrefix && oldStr[prefixLen] === newStr[prefixLen]) {
-    prefixLen++;
-  }
+const render = (keep, mark) =>
+  parts.value
+    .filter(p => p.type === 'same' || p.type === keep)
+    .map(p => (p.type === keep ? `<span class="${mark}">${escapeText(p.text)}</span>` : escapeText(p.text)))
+    .join('');
 
-  let suffixLen = 0;
-  const maxSuffix = maxPrefix - prefixLen;
-  while (
-    suffixLen < maxSuffix &&
-    oldStr[oldStr.length - 1 - suffixLen] === newStr[newStr.length - 1 - suffixLen]
-  ) {
-    suffixLen++;
-  }
-
-  return {
-    prefix: oldStr.slice(0, prefixLen),
-    oldMiddle: oldStr.slice(prefixLen, oldStr.length - suffixLen),
-    newMiddle: newStr.slice(prefixLen, newStr.length - suffixLen),
-    oldSuffix: oldStr.slice(oldStr.length - suffixLen),
-    newSuffix: newStr.slice(newStr.length - suffixLen),
-  };
-});
-
-const originalHtml = computed(() => {
-  const d = diff.value;
-  const middle = d.oldMiddle
-    ? `<span class="diff-remove">${escapeHtml(d.oldMiddle)}</span>`
-    : '';
-  return escapeHtml(d.prefix) + middle + escapeHtml(d.oldSuffix);
-});
-
-const proposedHtml = computed(() => {
-  const d = diff.value;
-  const middle = d.newMiddle
-    ? `<span class="diff-add">${escapeHtml(d.newMiddle)}</span>`
-    : '';
-  return escapeHtml(d.prefix) + middle + escapeHtml(d.newSuffix);
-});
-
-const escapeHtml = (text) => {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-};
+const originalHtml = computed(() => render('del', 'diff-remove'));
+const proposedHtml = computed(() => render('add', 'diff-add'));
 </script>

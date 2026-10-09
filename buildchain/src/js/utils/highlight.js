@@ -30,9 +30,12 @@ const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'
 // The server sends a match's context as raw field text with [[MATCH]] around
 // the hit. That text can hold markup, so it is escaped first and only then
 // are the markers turned into the highlight span.
+export function escapeText(text) {
+  return String(text ?? '').replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
+
 export function contextToHtml(context) {
-  return String(context || '')
-    .replace(/[&<>"']/g, ch => HTML_ESCAPES[ch])
+  return escapeText(context)
     .replace(/\[\[MATCH\]\]/g, '<span class="match">')
     .replace(/\[\[\/MATCH\]\]/g, '</span>');
 }
