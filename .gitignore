@@ -27,3 +27,6 @@ Thumbs.db
 .claudeignore
 AGENTS.md
 .claude/skills/
+
+# Internal security checklists and audit records, kept private
+/security/
