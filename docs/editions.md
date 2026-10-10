@@ -14,7 +14,9 @@ Editrix has two paid editions. There is no free edition. Either one can be tried
 | Segmented search by section, entry type and field | No | Yes |
 | Rows returned per search | 3,000 | 25,000 |
 | **Replacing** | | |
-| Preview and dry run | Yes | Yes |
+| Preview and dry run (up to 100 rows) | Yes | Yes |
+| Leave single matches out of a replace | Yes | Yes |
+| Search and replace link addresses in rich text | Yes | Yes |
 | Replace, with the queue for large replaces | Yes | Yes |
 | Rows changed per replace | 200 | 5,000 |
 | Preserve case | No | Yes |

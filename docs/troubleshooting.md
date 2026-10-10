@@ -34,6 +34,7 @@ The field was edited after your search, so Editrix skipped it rather than overwr
 - **This field cannot be replaced.** The field's type is not one Editrix writes to, or the field is no longer in the entry's layout.
 - **Protected.** The field or its section is in `protectedFields` or `protectedSections`. Those rows are skipped and listed as protected.
 - **You can't edit this entry in Craft.** Your user group lacks the permission to save entries in that section. The row is skipped and listed with this reason.
+- **A dry run checks at most 100 rows.** Dry Run Mode runs inside the request and never in the queue. Select fewer rows, or narrow the search.
 - **Read-only match.** The text runs across an HTML tag in a rich text field. See [Replacing](replacing.md).
 - **A required field would be left empty.** The entry is skipped and listed with the reason.
 

@@ -2,7 +2,7 @@
 
 Find text across your Craft content, preview what a replacement would change, apply it, and undo it value by value if you need to.
 
-It searches entries, globals, Matrix and Neo blocks, and rich text fields (CKEditor, Redactor). Every replace is written to a log before any entry is saved, so a replace that is cancelled or interrupted can still be reverted. The work runs on Craft's queue, so a large site does not hit a request time limit.
+It searches entries, globals, Matrix and Neo blocks, and rich text fields (CKEditor, Redactor). Every replace is written to a log before any entry is saved, so a replace that is cancelled or interrupted can still be reverted. The work runs on Craft's queue, so a large site does not hit a request time limit. Editrix follows Craft's own permissions: people only find and change the entries they can already open and save in Craft.
 
 ## Requirements
 
@@ -36,6 +36,8 @@ You can also install it from **Settings, Plugins** in the control panel. If `php
 | Search entries and globals | Yes | Yes |
 | Regular expressions, case, whole words | Yes | Yes |
 | Preview and dry run | Yes | Yes |
+| Leave single matches out of a replace | Yes | Yes |
+| Search and replace link addresses in rich text | Yes | Yes |
 | Logs and revert | 30 days | 90 days |
 | Rows returned per search | 3,000 | 25,000 |
 | Rows changed per replace | 200 | 5,000 |
