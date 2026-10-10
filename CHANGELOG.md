@@ -8,6 +8,7 @@ All notable changes to Editrix will be documented in this file.
 - A search and a replace now follow Craft's own permissions. A user who may use Editrix but cannot open an entry's section no longer sees that entry in results, cannot read its text through the match preview, and cannot change it with Replace or Revert: those rows are skipped with the reason "you can't edit this entry in Craft". Matrix and Neo blocks follow the entry that owns them; globals and categories follow their own permissions; the category and tag assignment lists leave out entries the user cannot open. Admins, and the command line (which acts as the `--user` it logs under), are unchanged
 - The text around a match is now escaped before it is shown. Before, markup inside a field (such as an `<img onerror>` typed by an editor) ran in the browser of whoever opened the results
 - Exported files (the logs CSV and the results CSV) no longer let a cell that starts with `=`, `+`, `-` or `@` run as a spreadsheet formula
+- The section and entry type lists in the search form leave out sections the user cannot open in Craft, and the settings handed to the page are encoded so that markup in a site or section name cannot close the script tag
 - The revert check no longer shows the current text of an entry the user cannot open in Craft, and the log list caps how many rows one request can ask for
 
 ### Fixed

@@ -37,7 +37,7 @@ class SearchController extends Controller
 
         $config = $this->buildJsConfig();
         $view->registerJs(
-            "window.EditrixConfig = " . json_encode($config) . ";",
+            "window.EditrixConfig = " . json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP) . ";",
             View::POS_HEAD
         );
 
