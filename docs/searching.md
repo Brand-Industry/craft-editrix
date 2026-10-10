@@ -23,7 +23,7 @@ The field types that are searched are listed in the `searchableFieldTypes` setti
 | Case insensitive | "hotel" also finds "Hotel" and "HOTEL". Without it, case must match. |
 | Whole words | "cat" does not match inside "concatenate". |
 | Include link addresses | Also searches the `href` of links and the `src` of images in rich text fields, where a changed domain lives. Only the text between the quotes is searched, never the markup around it. The address is matched as written in the HTML, so `a&b` does not match `a&amp;b`. |
-| Dry Run Mode | Shows what a replace would do without saving anything. See [Replacing](replacing.md). |
+| Dry Run Mode | Replace Selected becomes **Run dry run**: it reports what a replace would change, for up to 100 rows, and saves nothing. See [Replacing](replacing.md). |
 
 The checkboxes for Entries, Globals, Matrix fields and Categories choose where to look. Their defaults are set in [Settings](configuration.md).
 
