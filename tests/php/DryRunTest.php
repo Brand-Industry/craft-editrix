@@ -21,13 +21,6 @@ class DryRunTest extends EditrixTestCase
     {
         parent::setUp();
 
-        $this->entry = Entry::find()
-            ->siteId($this->siteId())
-            ->status(null)
-            ->drafts(false)
-            ->revisions(false)
-            ->all()[0] ?? null;
-
         foreach (
             Entry::find()->siteId($this->siteId())->status(null)->drafts(false)->revisions(false)->limit(50)->all() as $candidate
         ) {
