@@ -2,7 +2,7 @@
 
 All notable changes to Editrix will be documented in this file.
 
-## [Unreleased]
+## [2.0.0-beta.6] - 2026-10-12
 
 ### Security
 - A search and a replace now follow Craft's own permissions. A user who may use Editrix but cannot open an entry's section no longer sees that entry in results, cannot read its text through the match preview, and cannot change it with Replace or Revert: those rows are skipped with the reason "you can't edit this entry in Craft". Matrix and Neo blocks follow the entry that owns them; globals and categories follow their own permissions; the category and tag assignment lists leave out entries the user cannot open. Admins, and the command line (which acts as the `--user` it logs under), are unchanged
@@ -12,6 +12,7 @@ All notable changes to Editrix will be documented in this file.
 - The revert check no longer shows the current text of an entry the user cannot open in Craft, and the log list caps how many rows one request can ask for
 
 ### Fixed
+- The settings page showed "Requires Pro edition" under the Matrix and Categories boxes even on the Pro edition. It now shows it only when the edition is not Pro
 - Dry Run Mode did nothing in the control panel: Replace Selected saved the changes as usual. It now runs the replace without saving, reports how many matches would change and which rows would be skipped, writes no log and needs no confirmation. It checks at most 100 rows and never uses the queue
 - The before and after preview marked everything between the first and the last change as changed. It now marks each changed word on its own
 - A regular expression with a `/` in it, such as `https?://`, was refused as invalid; it now works
