@@ -1,0 +1,11 @@
+{
+  "name": "brand-industry/craft-editrix-tests",
+  "description": "Test runner for Editrix. Kept separate from the plugin's composer.json so PHPUnit never ends up in a client's vendor directory.",
+  "type": "project",
+  "require-dev": {
+    "phpunit/phpunit": "^10.5"
+  },
+  "config": {
+    "sort-packages": true
+  }
+}

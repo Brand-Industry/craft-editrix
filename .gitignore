@@ -1,6 +1,8 @@
 # Dependencies
 /buildchain/node_modules/
 /vendor/
+/tests/vendor/
+/tests/.phpunit.cache/
 
 # Build output - committed intentionally: this plugin is installed via
 # Composer/Packagist, and consumers don't run the buildchain themselves.
@@ -24,3 +26,7 @@ Thumbs.db
 # Agents
 .claudeignore
 AGENTS.md
+.claude/skills/
+
+# Internal security checklists and audit records, kept private
+/security/

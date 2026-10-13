@@ -7,6 +7,18 @@ export function useConfig() {
   const sites = computed(() => config.value.sites || []);
   const currentSiteId = computed(() => config.value.currentSiteId || 1);
   const apiUrl = computed(() => config.value.apiUrl || '');
+  const searchStartUrl = computed(() => config.value.searchStartUrl || '');
+  const searchStatusUrl = computed(() => config.value.searchStatusUrl || '');
+  const searchRecentUrl = computed(() => config.value.searchRecentUrl || '');
+  const resultLimit = computed(() => config.value.resultLimit || 0);
+  const upgradeResultLimit = computed(() => config.value.upgradeResultLimit || null);
+  const replaceRowLimit = computed(() => config.value.replaceRowLimit || 0);
+  const dryRunRowLimit = computed(() => config.value.dryRunRowLimit || 0);
+  const replaceStatusUrl = computed(() => config.value.replaceStatusUrl || '');
+  const replaceCancelUrl = computed(() => config.value.replaceCancelUrl || '');
+  const replaceActiveUrl = computed(() => config.value.replaceActiveUrl || '');
+  const fieldValueUrl = computed(() => config.value.fieldValueUrl || '');
+  const searchCancelUrl = computed(() => config.value.searchCancelUrl || '');
   const replaceUrl = computed(() => config.value.replaceUrl || '');
   const previewUrl = computed(() => config.value.previewUrl || '');
   const cpUrl = computed(() => config.value.cpUrl || '');
@@ -65,6 +77,18 @@ export function useConfig() {
     sites,
     currentSiteId,
     apiUrl,
+    searchStartUrl,
+    searchStatusUrl,
+    searchRecentUrl,
+    fieldValueUrl,
+    replaceStatusUrl,
+    replaceCancelUrl,
+    replaceActiveUrl,
+    resultLimit,
+    upgradeResultLimit,
+    replaceRowLimit,
+    dryRunRowLimit,
+    searchCancelUrl,
     replaceUrl,
     previewUrl,
     cpUrl,

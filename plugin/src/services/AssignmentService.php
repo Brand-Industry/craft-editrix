@@ -8,6 +8,7 @@ use craft\base\Element;
 use craft\elements\Category;
 use craft\elements\Entry;
 use craft\elements\Tag;
+use brandindustry\editrix\helpers\Access;
 
 /**
  * Finds which entries have a given category or tag assigned to them - a
@@ -19,26 +20,30 @@ class AssignmentService extends Component
     public function searchCategoryAssignments(
         string $query,
         ?int $siteId,
-        array $sectionFilter = []
+        array $sectionFilter = [],
+        ?int $userId = null
     ): array {
         return $this->searchAssignments(
             Category::class,
             $query,
             $siteId,
-            $sectionFilter
+            $sectionFilter,
+            $userId
         );
     }
 
     public function searchTagAssignments(
         string $query,
         ?int $siteId,
-        array $sectionFilter = []
+        array $sectionFilter = [],
+        ?int $userId = null
     ): array {
         return $this->searchAssignments(
             Tag::class,
             $query,
             $siteId,
-            $sectionFilter
+            $sectionFilter,
+            $userId
         );
     }
 
@@ -46,7 +51,8 @@ class AssignmentService extends Component
         string $elementClass,
         string $query,
         ?int $siteId,
-        array $sectionFilter
+        array $sectionFilter,
+        ?int $userId = null
     ): array {
         $sites = $siteId !== null
             ? array_filter([Craft::$app->getSites()->getSiteById($siteId)])
@@ -79,7 +85,12 @@ class AssignmentService extends Component
                     $entryQuery->section($sectionFilter);
                 }
 
-                $entries = $entryQuery->all();
+                // Only entries the user may open: a category listing is
+                // not a way around a section's permissions.
+                $entries = array_values(array_filter(
+                    $entryQuery->all(),
+                    fn(Entry $entry) => Access::canView($entry, $userId)
+                ));
 
                 if (empty($entries)) {
                     continue;

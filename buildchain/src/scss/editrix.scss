@@ -579,12 +579,13 @@
   }
   
   &__preview {
-    max-width: 300px;
+    max-width: 360px;
     font-family: monospace;
     font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    // Wraps instead of cutting at the cell edge: the match sits in the
+    // middle of its context, and an ellipsis used to hide it.
+    white-space: normal;
+    overflow-wrap: anywhere;
     color: $text-secondary;
     
     .match {
@@ -963,6 +964,30 @@
 @keyframes editrix-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+.editrix-search-progress {
+  padding: $spacing-xl $spacing-lg;
+  text-align: center;
+
+  &__bar {
+    height: 8px;
+    background: $gray-200;
+    border-radius: $radius-sm;
+    overflow: hidden;
+  }
+
+  &__fill {
+    height: 100%;
+    background: $secondary;
+    transition: width 0.3s ease;
+  }
+
+  &__label {
+    margin: $spacing-sm 0 $spacing-md;
+    color: $text-muted;
+    font-size: 13px;
   }
 }
 
@@ -1561,4 +1586,403 @@
       text-decoration: underline;
     }
   }
+}
+
+.editrix-recent-searches {
+  margin-top: 16px;
+  font-size: 13px;
+
+  summary {
+    cursor: pointer;
+    color: $text-muted;
+  }
+
+  ul {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    border-top: 1px solid $gray-200;
+  }
+
+  &__query {
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__meta {
+    flex: 1;
+    color: $text-muted;
+  }
+}
+
+// A search that is running: spinner, moving bar, live counts.
+.editrix-form-lock {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+.editrix-search-progress {
+  &__title {
+    margin: 0 auto $spacing-md;
+    font-weight: 600;
+    max-width: 70%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__fill.is-active {
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.45) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200px 100%;
+    background-repeat: no-repeat;
+    background-color: $secondary;
+    animation: editrix-sweep 1.4s linear infinite;
+  }
+
+  &__matches {
+    margin: 0 0 $spacing-md;
+    font-size: 13px;
+    font-weight: 600;
+  }
+}
+
+.editrix-live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: $success-light;
+  color: darken($success, 20%);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+
+  &__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: $success;
+    animation: editrix-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes editrix-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes editrix-sweep {
+  from {
+    background-position: -200px 0;
+  }
+  to {
+    background-position: calc(100% + 200px) 0;
+  }
+}
+
+@keyframes editrix-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editrix-search-progress__fill.is-active,
+  .editrix-live-tag__dot {
+    animation: none;
+  }
+}
+
+.editrix-results tr.is-replaced td {
+  background: $success-light;
+  opacity: 0.75;
+}
+
+.editrix-results tr.is-stale td {
+  background: $gray-50;
+  opacity: 0.75;
+}
+
+.editrix-replace-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+
+  p {
+    margin: 0;
+  }
+
+  &__done a {
+    margin-left: 8px;
+  }
+}
+
+// Illustration shown while a search runs. One SVG; the phase class decides
+// which parts move.
+.editrix-search-art {
+  display: block;
+  margin: 0 auto $spacing-md;
+  overflow: visible;
+
+  &__row {
+    fill: $gray-200;
+
+    &.is-hit {
+      animation: editrix-hit 2.4s ease-in-out infinite;
+    }
+  }
+
+  &__lens {
+    fill: none;
+    stroke: $secondary;
+    stroke-width: 4;
+    stroke-linecap: round;
+    transform-box: fill-box;
+    transform-origin: center;
+    opacity: 0;
+  }
+
+  &__dots {
+    fill: $secondary;
+    opacity: 0;
+
+    circle {
+      animation: editrix-dot 1.2s ease-in-out infinite;
+
+      &:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      &:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+    }
+  }
+
+  &__check {
+    fill: none;
+    stroke: $success;
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 80;
+    stroke-dashoffset: 80;
+    opacity: 0;
+  }
+
+  &.is-sending &__dots,
+  &.is-queued &__dots {
+    opacity: 1;
+  }
+
+  &.is-sending &__row,
+  &.is-queued &__row {
+    opacity: 0.35;
+  }
+
+  &.is-counting &__lens,
+  &.is-scanning &__lens {
+    opacity: 1;
+  }
+
+  &.is-counting &__lens {
+    animation: editrix-lens-pulse 1.3s ease-in-out infinite;
+  }
+
+  &.is-scanning &__lens {
+    animation: editrix-lens-sweep 3.2s ease-in-out infinite;
+  }
+
+  &.is-finishing &__row {
+    animation: editrix-settle 0.9s ease-out forwards;
+  }
+
+  &.is-finishing &__check {
+    opacity: 1;
+    animation: editrix-draw 0.8s ease-out 0.2s forwards;
+  }
+}
+
+.editrix-search-progress {
+  &__time {
+    margin: 0 0 $spacing-sm;
+    font-size: 12px;
+    color: $text-muted;
+  }
+
+  &__tip {
+    min-height: 2.6em;
+    margin: $spacing-md auto;
+    max-width: 440px;
+    font-size: 13px;
+    color: $text-muted;
+    animation: editrix-fade-in 0.6s ease-out;
+  }
+}
+
+@keyframes editrix-lens-sweep {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(46px);
+  }
+}
+
+@keyframes editrix-lens-pulse {
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+@keyframes editrix-dot {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+@keyframes editrix-hit {
+  0%, 100% {
+    fill: $gray-200;
+  }
+  50% {
+    fill: $secondary;
+  }
+}
+
+@keyframes editrix-settle {
+  to {
+    opacity: 0.25;
+  }
+}
+
+@keyframes editrix-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes editrix-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editrix-search-art__lens,
+  .editrix-search-art__row.is-hit,
+  .editrix-search-art__dots circle,
+  .editrix-search-art__check,
+  .editrix-search-progress__tip {
+    animation: none !important;
+  }
+
+  .editrix-search-art__check {
+    stroke-dashoffset: 0;
+  }
+}
+
+.editrix-results {
+  &__matches-total {
+    margin-left: 8px;
+    font-size: 12px;
+    font-weight: 400;
+    color: $text-muted;
+  }
+
+  &__expand {
+    display: block;
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: $secondary;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  &__matches-row td {
+    background: $gray-50;
+    cursor: default;
+  }
+
+  &__matches {
+    margin: 0;
+    padding-left: 20px;
+    font-family: monospace;
+    font-size: 12px;
+    color: $text-secondary;
+
+    li {
+      margin: 4px 0;
+      overflow-wrap: anywhere;
+    }
+
+    .match {
+      background: $diff-highlight;
+      padding: 1px 3px;
+      border-radius: 2px;
+      color: $text-primary;
+    }
+  }
+
+  // One occurrence in a row, with the box that leaves it out of a replace.
+  &__match {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+
+    input {
+      margin-top: 2px;
+      flex: none;
+    }
+  }
+
+  &__matches-more {
+    margin: 6px 0 0 20px;
+    font-size: 12px;
+    color: $text-muted;
+  }
+}
+
+.editrix-results__limit-note {
+  font-size: 12px;
+  color: $text-muted;
+}
+
+.editrix-results tr.is-failed td {
+  background: $gray-50;
+  opacity: 0.75;
 }

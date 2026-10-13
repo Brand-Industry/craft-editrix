@@ -8,6 +8,8 @@ class Install extends Migration
 {
     public const TABLE_LOGS = '{{%editrix_logs}}';
     public const TABLE_PRESETS = '{{%editrix_presets}}';
+    public const TABLE_SEARCHES = '{{%editrix_searches}}';
+    public const TABLE_LOG_ITEMS = '{{%editrix_log_items}}';
 
     public function safeUp(): bool
     {
@@ -19,6 +21,8 @@ class Install extends Migration
 
     public function safeDown(): bool
     {
+        $this->dropTableIfExists(self::TABLE_LOG_ITEMS);
+        $this->dropTableIfExists(self::TABLE_SEARCHES);
         $this->dropTableIfExists(self::TABLE_PRESETS);
         $this->dropTableIfExists(self::TABLE_LOGS);
         return true;
@@ -66,6 +70,60 @@ class Install extends Migration
             'dateUpdated' => $this->dateTime()->notNull(),
             'uid' => $this->uid(),
         ]);
+
+        // One row per value a replace changed
+        $this->createTable(self::TABLE_LOG_ITEMS, self::logItemColumns($this));
+
+        // Background searches (SearchJob): progress while running, results
+        // once done, kept for a day so a user can leave and come back.
+        $this->createTable(self::TABLE_SEARCHES, [
+            'id' => $this->primaryKey(),
+            'searchId' => $this->string(36)->notNull(),
+            'userId' => $this->integer()->notNull(),
+            'status' => $this->string(20)->notNull()->defaultValue('running'), // queued, running, completed, cancelled, error
+            'scannedCount' => $this->integer()->defaultValue(0),
+            'totalCount' => $this->integer()->defaultValue(0),
+            'resultCount' => $this->integer(),
+            'paramsJson' => $this->text(), // what was searched, to restore the form
+            'resultsJson' => $this->longText(),
+            'replacedJson' => $this->longText(), // keys of matches already replaced
+            'errorMessage' => $this->text(),
+            'dateCreated' => $this->dateTime()->notNull(),
+            'dateUpdated' => $this->dateTime()->notNull(),
+            'uid' => $this->uid(),
+        ]);
+    }
+
+    /**
+     * Columns of the log items table, shared with the migration that adds
+     * it to existing installs so the two cannot drift apart.
+     */
+    public static function logItemColumns(Migration $m): array
+    {
+        return [
+            'id' => $m->primaryKey(),
+            'logId' => $m->integer()->notNull(),
+            'position' => $m->integer()->notNull()->defaultValue(0),
+            'elementType' => $m->string(20)->notNull(),
+            'elementId' => $m->integer()->notNull(),
+            'siteId' => $m->integer()->notNull(),
+            'fieldHandle' => $m->string(255)->notNull(),
+            'fieldName' => $m->string(255),
+            'elementTitle' => $m->text(),
+            'sectionHandle' => $m->string(255),
+            'parentId' => $m->integer(),
+            'oldValue' => $m->longText(),
+            'newValue' => $m->longText(),
+            // occurrences changed inside this value, for the summary
+            'matches' => $m->integer(),
+            // pending (written before the entry is saved), applied,
+            // reverted, skipped, failed
+            'state' => $m->string(20)->notNull()->defaultValue('applied'),
+            'message' => $m->text(),
+            'dateCreated' => $m->dateTime()->notNull(),
+            'dateUpdated' => $m->dateTime()->notNull(),
+            'uid' => $m->uid(),
+        ];
     }
 
     protected function createIndexes(): void
@@ -81,6 +139,16 @@ class Install extends Migration
         $this->createIndex(null, self::TABLE_PRESETS, ['userId']);
         $this->createIndex(null, self::TABLE_PRESETS, ['isShared']);
         $this->createIndex(null, self::TABLE_PRESETS, ['sortOrder']);
+
+        // Log items indexes
+        $this->createIndex(null, self::TABLE_LOG_ITEMS, ['logId', 'position']);
+        $this->createIndex(null, self::TABLE_LOG_ITEMS, ['logId', 'state']);
+
+        // Searches indexes
+        $this->createIndex(null, self::TABLE_SEARCHES, ['searchId'], true);
+        $this->createIndex(null, self::TABLE_SEARCHES, ['userId']);
+        $this->createIndex(null, self::TABLE_SEARCHES, ['status']);
+        $this->createIndex(null, self::TABLE_SEARCHES, ['dateCreated']);
     }
 
     protected function addForeignKeys(): void
@@ -120,6 +188,28 @@ class Install extends Migration
         $this->addForeignKey(
             null,
             self::TABLE_PRESETS,
+            ['userId'],
+            '{{%users}}',
+            ['id'],
+            'CASCADE',
+            'CASCADE'
+        );
+
+        // Log items foreign keys
+        $this->addForeignKey(
+            null,
+            self::TABLE_LOG_ITEMS,
+            ['logId'],
+            self::TABLE_LOGS,
+            ['id'],
+            'CASCADE',
+            'CASCADE'
+        );
+
+        // Searches foreign keys
+        $this->addForeignKey(
+            null,
+            self::TABLE_SEARCHES,
             ['userId'],
             '{{%users}}',
             ['id'],

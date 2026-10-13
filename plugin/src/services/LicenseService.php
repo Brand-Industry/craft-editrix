@@ -28,6 +28,7 @@ class LicenseService extends Component
     public const FEATURE_REGEX_ADVANCED = "regex.advanced";
     public const FEATURE_CASE_INSENSITIVE = "caseInsensitive";
     public const FEATURE_WHOLE_WORDS = "wholeWords";
+    public const FEATURE_PRESERVE_CASE = "preserveCase";
 
     public const FEATURE_MULTISITE = "multisite";
     public const FEATURE_SCOPE_FILTERS = "scopeFilters";
@@ -57,11 +58,9 @@ class LicenseService extends Component
     public const FEATURE_ENV_INDICATOR = "envIndicator";
 
     private array $featureMatrix = [
-        // Standard is the free edition: general Search and Search & Replace
-        // (Entries + Globals, no segmented scope) stay useful without a
-        // license. Everything that used to be "Standard or Pro" (Matrix/Neo,
-        // Categories, segmented scope, multi-site, CSV export) now requires
-        // Pro.
+        // Standard is the entry edition: general Search and Search & Replace
+        // on Entries and Globals, no segmented scope. Matrix/Neo,
+        // Categories, segmented scope, multi-site and exports need Pro.
         Editrix::EDITION_STANDARD => [
             self::FEATURE_SEARCH_ENTRIES => true,
             self::FEATURE_SEARCH_GLOBALS => true,
@@ -76,6 +75,7 @@ class LicenseService extends Component
             self::FEATURE_REGEX_ADVANCED => false,
             self::FEATURE_CASE_INSENSITIVE => true,
             self::FEATURE_WHOLE_WORDS => true,
+            self::FEATURE_PRESERVE_CASE => false,
 
             self::FEATURE_MULTISITE => false,
             self::FEATURE_SCOPE_FILTERS => false,
@@ -119,6 +119,7 @@ class LicenseService extends Component
             self::FEATURE_REGEX_ADVANCED => true,
             self::FEATURE_CASE_INSENSITIVE => true,
             self::FEATURE_WHOLE_WORDS => true,
+            self::FEATURE_PRESERVE_CASE => true,
 
             self::FEATURE_MULTISITE => true,
             self::FEATURE_SCOPE_FILTERS => true,
@@ -156,10 +157,14 @@ class LicenseService extends Component
         Editrix::EDITION_STANDARD => [
             "logRetentionDays" => 30,
             "maxPresets" => 5,
+            "searchResultLimit" => 3000,
+            "replaceRowLimit" => 200,
         ],
         Editrix::EDITION_PRO => [
             "logRetentionDays" => 90,
             "maxPresets" => -1, // Unlimited
+            "searchResultLimit" => 25000,
+            "replaceRowLimit" => 5000,
         ],
     ];
 
@@ -176,6 +181,14 @@ class LicenseService extends Component
     public function getLimit(string $limit): int
     {
         return $this->limits[Editrix::$plugin->edition][$limit] ?? 0;
+    }
+
+    /**
+     * A limit of another edition, to tell a user what upgrading would give.
+     */
+    public function getLimitFor(string $edition, string $limit): int
+    {
+        return $this->limits[$edition][$limit] ?? 0;
     }
 
     public function getFeaturesConfig(): array

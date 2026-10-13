@@ -34,7 +34,7 @@ class Editrix extends Plugin
 {
     public static Editrix $plugin;
 
-    public string $schemaVersion = "1.0.1";
+    public string $schemaVersion = "1.4.0";
     public bool $hasCpSettings = true;
     public bool $hasCpSection = true;
 
@@ -72,6 +72,35 @@ class Editrix extends Plugin
         return $this->is($edition, ">=");
     }
 
+    /** Category for the plugin's own log file, `storage/logs/editrix-*.log`. */
+    public const LOG_CATEGORY = "editrix";
+
+    /**
+     * A log file of what replaces and reverts did. The database log can be
+     * lost with a restored backup; a file in storage/logs survives it, and
+     * says which entries were changed.
+     */
+    private function registerLogFile(): void
+    {
+        if (!class_exists(\craft\log\MonologTarget::class)) {
+            return;
+        }
+
+        Craft::getLogger()->dispatcher->targets[] = new \craft\log\MonologTarget([
+            "name" => "editrix",
+            "categories" => [self::LOG_CATEGORY],
+            "level" => \Psr\Log\LogLevel::INFO,
+            "logContext" => false,
+            "allowLineBreaks" => false,
+            "formatter" => new \Monolog\Formatter\LineFormatter(
+                format: "%datetime% [%level_name%] %message%\n",
+                dateFormat: "Y-m-d H:i:s",
+                allowInlineLineBreaks: false,
+                ignoreEmptyContextAndExtra: true
+            ),
+        ]);
+    }
+
     public function init(): void
     {
         parent::init();
@@ -86,6 +115,7 @@ class Editrix extends Plugin
         ]);
 
         $this->installCpEventListeners();
+        $this->registerLogFile();
 
         Craft::info(
             Craft::t("editrix", "{name} plugin loaded ({edition} edition)", [
@@ -211,12 +241,20 @@ class Editrix extends Plugin
             "editrix/settings" => "editrix/settings/index",
 
             "editrix/api/search" => "editrix/search/search",
+            "editrix/api/search/start" => "editrix/search/search-start",
+            "editrix/api/search/status" => "editrix/search/search-status",
+            "editrix/api/search/recent" => "editrix/search/search-recent",
+            "editrix/api/search/value" => "editrix/search/field-value",
+            "editrix/api/search/cancel" => "editrix/search/search-cancel",
             "editrix/api/replace" => "editrix/replace/execute",
+            "editrix/api/replace/status/<logId:\d+>" => "editrix/replace/status",
+            "editrix/api/replace/cancel" => "editrix/replace/cancel",
             "editrix/api/preview" => "editrix/replace/preview",
             "editrix/api/logs" => "editrix/log/list",
             "editrix/api/logs/validate-revert/<logId:\d+>" =>
                 "editrix/log/validate-revert",
             "editrix/api/logs/revert/<logId:\d+>" => "editrix/log/revert",
+            "editrix/api/logs/revert-status/<logId:\d+>" => "editrix/log/revert-status",
             "editrix/api/logs/delete/<logId:\d+>" => "editrix/log/delete",
             "editrix/api/logs/export" => "editrix/log/export",
 
