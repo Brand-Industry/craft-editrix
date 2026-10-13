@@ -4,6 +4,9 @@
       <h2 class="editrix-results__title">
         {{ t('Results') }}
         <span class="editrix-results__count">{{ totalResults }}</span>
+        <span v-if="occurrenceCount > totalResults" class="editrix-results__matches-total">
+          {{ t('{count} matches', { count: occurrenceCount.toLocaleString() }) }}
+        </span>
 
         <label v-if="totalResults > 0" class="editrix-results__page-size">
           {{ t('Show') }}
@@ -21,26 +24,31 @@
           {{ allSelected ? t('Deselect All') : t('Select All') }}
         </button>
 
-        <button
-          v-if="actionMode === 'search' && canExport"
-          class="editrix-btn editrix-btn--primary editrix-btn--sm"
-          :disabled="totalResults === 0 || !hasFeature('export.csv')"
-          @click="exportCsv"
-        >
-          {{ t('Export CSV') }}
-          <span v-if="selectedCount > 0">({{ selectedCount }})</span>
-        </button>
-        <span v-if="actionMode === 'search' && canExport && !hasFeature('export.csv')" class="editrix-badge editrix-badge--info">Pro</span>
+        <template v-if="actionMode === 'search'">
+          <button
+            v-if="canExport"
+            class="editrix-btn editrix-btn--primary editrix-btn--sm"
+            :disabled="totalResults === 0 || !hasFeature('export.csv')"
+            @click="exportCsv"
+          >
+            {{ t('Export CSV') }}
+            <span v-if="selectedCount > 0">({{ selectedCount }})</span>
+          </button>
+          <span v-if="canExport && !hasFeature('export.csv')" class="editrix-badge editrix-badge--info">Pro</span>
+        </template>
 
         <button
           v-else
           class="editrix-btn editrix-btn--primary"
-          :disabled="selectedCount === 0"
+          :disabled="selectedCount === 0 || overReplaceLimit"
           @click="$emit('replace')"
         >
-          {{ t('Replace Selected') }}
+          {{ dryRun ? t('Run dry run') : t('Replace Selected') }}
           <span v-if="selectedCount > 0">({{ selectedCount }})</span>
         </button>
+        <span v-if="overReplaceLimit" class="editrix-results__limit-note">
+          {{ t(dryRun ? 'Select at most {limit} rows for a dry run.' : 'Select at most {limit} rows to replace at once.', { limit: replaceLimit.toLocaleString() }) }}
+        </span>
       </div>
     </header>
 
@@ -76,13 +84,19 @@
           </tr>
 
           <tr
-            :class="{ 'is-selected': isSelected(row.result) }"
+            :class="{
+              'is-selected': isSelected(row.result),
+              'is-replaced': rowState(row.result) === 'replaced',
+              'is-stale': rowState(row.result) === 'stale',
+              'is-failed': rowState(row.result) === 'failed',
+            }"
             @click="$emit('toggle', row.result)"
           >
             <td class="editrix-results__checkbox" @click.stop>
               <input
                 type="checkbox"
                 :checked="isSelected(row.result)"
+                :disabled="rowState(row.result) !== null"
                 @change="$emit('toggle', row.result)"
               />
             </td>
@@ -100,8 +114,26 @@
             <td class="editrix-results__field">
               {{ row.result.fieldName }}
               <span class="editrix-badge editrix-badge--neutral">{{ elementTypeLabel(row.result.elementType) }}</span>
+              <span v-if="(row.result.matchCount || 1) > 1" class="editrix-badge editrix-badge--info">{{ t('{count} matches', { count: row.result.matchCount }) }}</span>
+              <span v-if="excludedCount(row.result) > 0" class="editrix-badge editrix-badge--neutral">{{ t('{count} of {total} will change', { count: (row.result.matchCount || 1) - excludedCount(row.result), total: row.result.matchCount || 1 }) }}</span>
+              <span v-if="rowState(row.result) === 'replaced'" class="editrix-badge editrix-badge--success">{{ t('Replaced') }}</span>
+              <span v-else-if="rowState(row.result) === 'stale'" class="editrix-badge editrix-badge--warning" :title="t('Its content changed after the search. Search again to see the current text.')">{{ t('Changed since search') }}</span>
+              <span v-else-if="rowState(row.result) === 'failed'" class="editrix-badge editrix-badge--warning">{{ t('Not saved') }}</span>
             </td>
-            <td class="editrix-results__preview" v-html="formatPreview(row.result.matchContext)"></td>
+            <td class="editrix-results__preview">
+              <span v-html="formatPreview(row.result.matchContext)"></span>
+              <button
+                v-if="(row.result.matchCount || 1) > 1"
+                type="button"
+                class="editrix-results__expand"
+                :aria-expanded="isExpanded(row.result)"
+                @click.stop="toggleExpanded(row.result)"
+              >
+                {{ isExpanded(row.result)
+                  ? t('Hide matches')
+                  : t('Show all {count} matches', { count: row.result.matchCount }) }}
+              </button>
+            </td>
             <td>
               <button
                 class="editrix-btn editrix-btn--ghost editrix-btn--sm"
@@ -109,6 +141,30 @@
               >
                 {{ t('View') }}
               </button>
+            </td>
+          </tr>
+
+          <tr v-if="isExpanded(row.result)" class="editrix-results__matches-row">
+            <td></td>
+            <td colspan="4">
+              <ol class="editrix-results__matches">
+                <li v-for="(m, i) in row.result.matches" :key="i">
+                  <label class="editrix-results__match">
+                    <input
+                      v-if="actionMode === 'replace' && !row.result.readOnly"
+                      type="checkbox"
+                      :checked="isMatchIncluded(row.result, i)"
+                      :disabled="m.readOnly || rowState(row.result) !== null"
+                      :title="t('Leave this match out of the replace')"
+                      @change="$emit('toggle-match', row.result, i)"
+                    />
+                    <span v-html="formatPreview(m.context)"></span>
+                  </label>
+                </li>
+              </ol>
+              <p v-if="row.result.matchCount > row.result.matches.length" class="editrix-results__matches-more">
+                {{ t('and {count} more', { count: row.result.matchCount - row.result.matches.length }) }}
+              </p>
             </td>
           </tr>
         </template>
@@ -120,7 +176,7 @@
         <span v-if="selectedCount > 0">
           <strong>{{ selectedCount }}</strong> {{ t('entries selected') }}
         </span>
-        <span>{{ t('Total occurrences:') }} <strong>{{ totalResults }}</strong></span>
+        <span>{{ t('Total occurrences:') }} <strong>{{ occurrenceCount }}</strong></span>
       </div>
 
       <div class="editrix-results__pagination">
@@ -150,6 +206,7 @@
 <script setup>
 import { inject, ref, computed, watch } from 'vue';
 import { elementTypeLabel } from '../../utils/elementType';
+import { contextToHtml } from '../../utils/highlight';
 
 const t = inject('t');
 const hasFeature = inject('hasFeature');
@@ -161,8 +218,17 @@ const props = defineProps({
   selectedCount: { type: Number, required: true },
   allSelected: { type: Boolean, default: false },
   isSelected: { type: Function, required: true },
+  // Most rows one replace may change; 0 means no limit.
+  replaceLimit: { type: Number, default: 0 },
+  // 'replaced', 'stale' or null for a result.
+  rowState: { type: Function, default: () => null },
   actionMode: { type: String, default: 'replace' },
+  // Replace only reports what it would change.
+  dryRun: { type: Boolean, default: false },
   searchQuery: { type: String, default: '' },
+  // Occurrences inside a row can be left out of a replace.
+  isMatchIncluded: { type: Function, default: () => true },
+  excludedCount: { type: Function, default: () => 0 },
 });
 
 // Results come from the backend as one big grouped-by-site batch (the
@@ -186,6 +252,24 @@ const flatRows = computed(() => {
   });
   return rows;
 });
+
+// A row is a field; it can match several times. Which rows show their
+// individual matches is purely a view concern.
+const expanded = ref(new Set());
+const isExpanded = result => expanded.value.has(result.uniqueKey);
+const toggleExpanded = result => {
+  const next = new Set(expanded.value);
+  if (!next.delete(result.uniqueKey)) next.add(result.uniqueKey);
+  expanded.value = next;
+};
+
+const overReplaceLimit = computed(
+  () => props.replaceLimit > 0 && props.selectedCount > props.replaceLimit
+);
+
+const occurrenceCount = computed(() =>
+  flatRows.value.reduce((sum, row) => sum + (row.result.matchCount || 1), 0)
+);
 
 const showSiteHeaders = computed(() => Object.keys(props.results).length > 1);
 
@@ -218,18 +302,15 @@ const pageRangeEnd = computed(() =>
 watch(() => props.results, () => { currentPage.value = 1; });
 watch(pageSize, () => { currentPage.value = 1; });
 
-defineEmits(['toggle', 'toggle-all', 'view', 'replace']);
+defineEmits(['toggle', 'toggle-all', 'view', 'replace', 'toggle-match']);
 
 // Format preview with highlighted match
-const formatPreview = (context) => {
-  if (!context) return '';
-  return context
-    .replace(/\[\[MATCH\]\]/g, '<span class="match">')
-    .replace(/\[\[\/MATCH\]\]/g, '</span>');
-};
+const formatPreview = contextToHtml;
 
 const csvCell = (value) => {
-  const str = String(value ?? '');
+  let str = String(value ?? '');
+  // A cell starting with = + - @ is run as a formula by spreadsheets
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
 };
 
@@ -243,15 +324,19 @@ const exportCsv = () => {
     siteData.results.forEach(result => {
       if (!exportAll && !props.isSelected(result)) return;
 
-      rows.push([
-        siteData.siteName,
-        elementTypeLabel(result.elementType),
-        result.elementTitle,
-        result.sectionName,
-        result.fieldName,
-        result.matchContext.replace(/\[\[\/?MATCH\]\]/g, ''),
-        result.cpEditUrl || '',
-      ]);
+      // One line per occurrence, so the file counts what the search found.
+      // Only the first contexts of a field with very many are kept.
+      (result.matches?.length ? result.matches.map(m => m.context) : [result.matchContext]).forEach(context => {
+        rows.push([
+          siteData.siteName,
+          elementTypeLabel(result.elementType),
+          result.elementTitle,
+          result.sectionName,
+          result.fieldName,
+          context.replace(/\[\[\/?MATCH\]\]/g, ''),
+          result.cpEditUrl || '',
+        ]);
+      });
     });
   });
 

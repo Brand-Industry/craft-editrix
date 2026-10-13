@@ -68,12 +68,14 @@ class AssignmentController extends Controller
                 ? $assignmentService->searchCategoryAssignments(
                     $query,
                     $siteId,
-                    $sections
+                    $sections,
+                    Craft::$app->getUser()->getId()
                 )
                 : $assignmentService->searchTagAssignments(
                     $query,
                     $siteId,
-                    $sections
+                    $sections,
+                    Craft::$app->getUser()->getId()
                 );
 
         return $this->asJson([

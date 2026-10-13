@@ -24,7 +24,7 @@ class ScopeController extends Controller
             ]);
         }
 
-        $sections = Craft::$app->getSections()->getAllSections();
+        $sections = $this->viewableSections();
 
         $data = array_map(
             fn($section) => [
@@ -62,7 +62,7 @@ class ScopeController extends Controller
         $type = Craft::$app->getRequest()->getParam("type", "category");
         $targetClass = $type === "tag" ? Tags::class : Categories::class;
 
-        $sections = Craft::$app->getSections()->getAllSections();
+        $sections = $this->viewableSections();
 
         $data = [];
         foreach ($sections as $section) {
@@ -80,6 +80,22 @@ class ScopeController extends Controller
             "success" => true,
             "sections" => $data,
         ]);
+    }
+
+    /**
+     * The sections this user may open in Craft. The lists the search form
+     * offers should not name sections they have no access to.
+     *
+     * @return Section[]
+     */
+    private function viewableSections(): array
+    {
+        $user = Craft::$app->getUser()->getIdentity();
+
+        return array_values(array_filter(
+            Craft::$app->getSections()->getAllSections(),
+            fn(Section $section) => $user !== null && $user->can("viewEntries:{$section->uid}")
+        ));
     }
 
     private function sectionHasRelationField(
@@ -381,7 +397,7 @@ class ScopeController extends Controller
             (array) Craft::$app->getRequest()->getParam("sectionId", [])
         );
 
-        $sections = Craft::$app->getSections()->getAllSections();
+        $sections = $this->viewableSections();
 
         if (!empty($sectionIds)) {
             $sections = array_filter(

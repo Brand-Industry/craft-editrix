@@ -1,18 +1,123 @@
 import { ref, computed, reactive } from 'vue';
 import { useApi } from './useApi';
 import { useConfig } from './useConfig';
+import { slimRow } from '../utils/fieldValue';
+
+// How long a search may sit in "queued" before we tell the user the queue
+// probably isn't running.
+export const QUEUE_STALL_MS = 15000;
+export const POLL_INTERVAL_MS = 1500;
+// A running job reports progress every few hundred entries. This long
+// without a report means the worker most likely died.
+export const JOB_IDLE_SECONDS = 120;
+// A queued or running search silent for this long is a leftover from a dead
+// worker. It stops counting as in progress (the server uses the same limit).
+export const ACTIVE_MAX_IDLE_SECONDS = 600;
+
+// Identifies one field of one element on one site. The server builds the
+// same key (ReplaceService::keyFor), so replaced marks line up with rows.
+export const resultKey = r =>
+  `${r.elementType}_${r.elementId}_${r.fieldHandle}_${r.siteId}`;
+
+export const isActiveSearch = s =>
+  (s.status === 'queued' || s.status === 'running') &&
+  (s.idleSeconds || 0) < ACTIVE_MAX_IDLE_SECONDS;
+
+// Craft starts its web queue runner from the control panel's JavaScript,
+// and only when a panel page loads. A job pushed by an AJAX request, like
+// ours, would otherwise wait until the user opens another page. This asks
+// Craft's own runner to start it now; it does nothing if Craft isn't there
+// or the queue runs from a worker.
+export const kickQueue = () => {
+  try {
+    window.Craft?.cp?.runQueue?.();
+  } catch (err) {
+    // The queue still starts on the next panel page load.
+  }
+};
 
 export function useSearch(actionMode) {
-  const { post } = useApi();
-  const { apiUrl, replaceUrl, previewUrl, hasFeature } = useConfig();
+  const { post, get } = useApi();
+  const {
+    searchStartUrl,
+    searchStatusUrl,
+    searchRecentUrl,
+    searchCancelUrl,
+    replaceUrl,
+    replaceStatusUrl,
+    replaceCancelUrl,
+    replaceActiveUrl,
+    previewUrl,
+    hasFeature,
+  } = useConfig();
 
   // Search state
   const loading = ref(false);
   const error = ref(null);
   const results = ref({});
   const totalResults = ref(0);
+  const truncated = ref(false);
+  const stopReason = ref(null);
+  // The row limit in force and, on Standard, what Pro would allow.
+  const resultLimit = ref(null);
+  const upgradeLimit = ref(null);
   const selectedResults = ref([]);
   const hasSearched = ref(false);
+
+  // Background-search progress - a search runs as a queued job (see
+  // SearchJob/actionSearchStart) instead of inside one HTTP request, so a
+  // large site doesn't risk timing out or starving other requests of
+  // PHP-FPM workers. These track that job while search() polls for it.
+  const scannedCount = ref(0);
+  const totalCount = ref(0);
+  // Matches found so far, reported by the job while it runs.
+  const matchCount = ref(0);
+  const progress = computed(() =>
+    totalCount.value > 0 ? scannedCount.value / totalCount.value : 0
+  );
+  const currentSearchId = ref(null);
+  const recentSearches = ref([]);
+  // The saved search whose results are on screen, so a replace can be
+  // recorded against it.
+  const loadedSearchId = ref(null);
+  // A replace running in the queue: how far it is, and which log it writes to.
+  const replaceProgress = ref(null);
+  // For the waiting screen: the job's state, when the search started
+  // (server clock, so a reopened search shows real elapsed time) and the
+  // first scan reading, which the time estimate measures pace against.
+  const jobStatus = ref(null);
+  const startedAtMs = ref(null);
+  const scanSample = ref(null);
+  // Matches already replaced, and ones skipped because their content
+  // changed after the search. Both stay visible but can't be selected.
+  const replacedKeys = ref(new Set());
+  const staleKeys = ref(new Set());
+  const failedKeys = ref(new Set());
+  const rowState = r => {
+    const key = resultKey(r);
+    if (replacedKeys.value.has(key)) return 'replaced';
+    if (staleKeys.value.has(key)) return 'stale';
+    if (failedKeys.value.has(key)) return 'failed';
+    return null;
+  };
+  const queueStalled = ref(false);
+  const jobStalled = ref(false);
+
+  // Occurrences the user turned off inside a row, by their place in the
+  // row's list. A row still replaces as a whole; these are left alone.
+  const excludedMatches = ref({});
+  const excludedFor = r => [...(excludedMatches.value[resultKey(r)] || [])].sort((a, b) => a - b);
+  const excludedCount = r => (excludedMatches.value[resultKey(r)] || []).length;
+  const isMatchIncluded = (r, index) => !(excludedMatches.value[resultKey(r)] || []).includes(index);
+  const toggleMatch = (r, index) => {
+    const key = resultKey(r);
+    const current = excludedMatches.value[key] || [];
+    const next = current.includes(index) ? current.filter(i => i !== index) : [...current, index];
+    const copy = { ...excludedMatches.value };
+    if (next.length) copy[key] = next;
+    else delete copy[key];
+    excludedMatches.value = copy;
+  };
 
   // Search params
   const searchParams = reactive({
@@ -24,6 +129,8 @@ export function useSearch(actionMode) {
     useRegex: false,
     caseInsensitive: false,
     wholeWords: false,
+    includeLinks: false,
+    preserveCase: false,
     dryRun: false,
     searchEntries: true,
     searchGlobals: true,
@@ -43,56 +150,254 @@ export function useSearch(actionMode) {
   // it drives what gets written back (read-only matches must be excluded).
   const selectableResults = computed(() => {
     const all = getAllResults();
-    return actionMode?.value === 'replace' ? all.filter(r => !r.readOnly) : all;
+    if (actionMode?.value !== 'replace') return all;
+    return all.filter(r => !r.readOnly && !rowState(r));
   });
   const allSelected = computed(() => {
     if (selectableResults.value.length === 0) return false;
     return selectedCount.value === selectableResults.value.length;
   });
 
-  // Perform search
+  // Perform search - starts a background job and polls for progress/
+  // results rather than waiting on a single (potentially very long)
+  // request, so a large site can't time out or crash mid-search.
   const search = async () => {
     loading.value = true;
     error.value = null;
     hasSearched.value = true;
     selectedResults.value = [];
+    scannedCount.value = 0;
+    totalCount.value = 0;
+    matchCount.value = 0;
+    jobStatus.value = null;
+    scanSample.value = null;
+    startedAtMs.value = Date.now();
+    replacedKeys.value = new Set();
+    staleKeys.value = new Set();
+    failedKeys.value = new Set();
+    excludedMatches.value = {};
+    truncated.value = false;
+    stopReason.value = null;
+    resultLimit.value = null;
+    upgradeLimit.value = null;
+    queueStalled.value = false;
+    jobStalled.value = false;
+
+    const payload = {
+      query: searchParams.query,
+      siteId: searchParams.siteId,
+      allSites: searchParams.allSites,
+      siteIds: searchParams.siteIds,
+      useRegex: searchParams.useRegex,
+      caseInsensitive: searchParams.caseInsensitive,
+      wholeWords: searchParams.wholeWords,
+      includeLinks: searchParams.includeLinks,
+      dryRun: searchParams.dryRun,
+      searchEntries: searchParams.searchEntries,
+      searchGlobals: searchParams.searchGlobals,
+      searchMatrix: searchParams.searchMatrix,
+      searchCategories: searchParams.searchCategories,
+      sections: searchParams.sections,
+      fields: searchParams.fields,
+      entryTypes: searchParams.entryTypes,
+    };
 
     try {
-      const data = await post(apiUrl.value, {
-        query: searchParams.query,
-        siteId: searchParams.siteId,
-        allSites: searchParams.allSites,
-        siteIds: searchParams.siteIds,
-        useRegex: searchParams.useRegex,
-        caseInsensitive: searchParams.caseInsensitive,
-        wholeWords: searchParams.wholeWords,
-        dryRun: searchParams.dryRun,
-        searchEntries: searchParams.searchEntries,
-        searchGlobals: searchParams.searchGlobals,
-        searchMatrix: searchParams.searchMatrix,
-        searchCategories: searchParams.searchCategories,
-        sections: searchParams.sections,
-        fields: searchParams.fields,
-        entryTypes: searchParams.entryTypes,
-      });
+      const startData = await post(searchStartUrl.value, payload);
 
-      if (data.success) {
-        results.value = data.groupedResults || {};
-        totalResults.value = data.totalResults || 0;
-      } else {
-        error.value = data.error || 'Search failed';
+      if (!startData.success) {
+        error.value = startData.error || 'Search failed';
         results.value = {};
         totalResults.value = 0;
+        loading.value = false;
+        return startData;
       }
 
-      return data;
+      currentSearchId.value = startData.searchId;
+      loadedSearchId.value = startData.searchId;
+      kickQueue();
+      const finished = await pollSearch(startData.searchId);
+      loadRecentSearches();
+      return finished;
     } catch (err) {
       error.value = err.message;
       results.value = {};
       totalResults.value = 0;
-      throw err;
-    } finally {
       loading.value = false;
+      throw err;
+    }
+  };
+
+  const pollSearch = (searchId, onParams = null) => {
+    const startedAt = Date.now();
+    let paramsApplied = false;
+
+    return new Promise((resolve, reject) => {
+      const tick = async () => {
+        // A cancel (or a newer search started since) may have moved on
+        // from this poll loop - don't let a stale response land.
+        if (currentSearchId.value !== searchId) {
+          resolve(null);
+          return;
+        }
+
+        try {
+          const data = await get(searchStatusUrl.value, { id: searchId });
+
+          if (currentSearchId.value !== searchId) {
+            resolve(null);
+            return;
+          }
+
+          if (!data.success) {
+            error.value = data.error || 'Search failed';
+            results.value = {};
+            totalResults.value = 0;
+            loading.value = false;
+            currentSearchId.value = null;
+            resolve(data);
+            return;
+          }
+
+          // Opening a saved search puts its form back as it was.
+          if (onParams && !paramsApplied && data.params) {
+            paramsApplied = true;
+            Object.assign(searchParams, data.params);
+            onParams(data.params);
+          }
+
+          scannedCount.value = data.scannedCount || 0;
+          totalCount.value = data.totalCount || 0;
+          matchCount.value = data.resultCount || 0;
+          jobStatus.value = data.status;
+          if (data.elapsedSeconds != null) {
+            startedAtMs.value = Date.now() - data.elapsedSeconds * 1000;
+          }
+          if (
+            !scanSample.value &&
+            data.status === 'running' &&
+            (data.scannedCount || 0) > 0
+          ) {
+            scanSample.value = { atMs: Date.now(), scanned: data.scannedCount };
+          }
+          queueStalled.value =
+            data.status === 'queued' &&
+            Date.now() - startedAt >= QUEUE_STALL_MS;
+          jobStalled.value =
+            data.status === 'running' &&
+            (data.idleSeconds || 0) >= JOB_IDLE_SECONDS;
+
+          if (data.status === 'completed' || data.status === 'cancelled') {
+            results.value = data.groupedResults || {};
+            totalResults.value = data.totalResults || 0;
+            truncated.value = data.truncated || false;
+            stopReason.value = data.stopReason || null;
+            resultLimit.value = data.resultLimit || null;
+            upgradeLimit.value = data.upgradeLimit || null;
+            replacedKeys.value = new Set(data.replaced || []);
+            queueStalled.value = false;
+            jobStalled.value = false;
+            loading.value = false;
+            currentSearchId.value = null;
+            resolve(data);
+            return;
+          }
+
+          if (data.status === 'error') {
+            error.value = data.error || 'Search failed';
+            results.value = {};
+            totalResults.value = 0;
+            loading.value = false;
+            currentSearchId.value = null;
+            resolve(data);
+            return;
+          }
+
+          setTimeout(tick, POLL_INTERVAL_MS);
+        } catch (err) {
+          error.value = err.message;
+          loading.value = false;
+          currentSearchId.value = null;
+          reject(err);
+        }
+      };
+
+      tick();
+    });
+  };
+
+  const loadRecentSearches = async () => {
+    try {
+      const data = await get(searchRecentUrl.value);
+      recentSearches.value = data.success ? data.searches || [] : [];
+    } catch (err) {
+      // The list is a convenience; the search itself doesn't depend on it.
+    }
+    return recentSearches.value;
+  };
+
+  // Follows a search that already exists on the server - running, queued
+  // or finished - instead of starting a new one. This is what makes a
+  // search survive leaving the page or a reload.
+  const openSearch = async (searchId, onParams = null) => {
+    loading.value = true;
+    error.value = null;
+    hasSearched.value = true;
+    selectedResults.value = [];
+    scannedCount.value = 0;
+    totalCount.value = 0;
+    matchCount.value = 0;
+    jobStatus.value = null;
+    scanSample.value = null;
+    startedAtMs.value = Date.now();
+    replacedKeys.value = new Set();
+    staleKeys.value = new Set();
+    failedKeys.value = new Set();
+    truncated.value = false;
+    stopReason.value = null;
+    resultLimit.value = null;
+    upgradeLimit.value = null;
+    queueStalled.value = false;
+    jobStalled.value = false;
+    currentSearchId.value = searchId;
+    loadedSearchId.value = searchId;
+
+    try {
+      const finished = await pollSearch(searchId, onParams);
+      loadRecentSearches();
+      return finished;
+    } catch (err) {
+      error.value = err.message;
+      loading.value = false;
+      throw err;
+    }
+  };
+
+  const activeSearches = computed(() =>
+    recentSearches.value.filter(isActiveSearch)
+  );
+
+  // Cancels any of the user's searches, not just the one on screen.
+  const cancelSearchById = async searchId => {
+    try {
+      await post(searchCancelUrl.value, { id: searchId });
+    } catch (err) {
+      // The next refresh of the list shows what actually happened.
+    }
+    await loadRecentSearches();
+  };
+
+  // Best-effort - the running job checks this flag on its own cadence
+  // (every ~250 entries), so cancellation isn't instant, but the search
+  // stops consuming resources shortly after rather than running to
+  // completion regardless. The poll loop above picks up the resulting
+  // "cancelled" status on its own once the job notices.
+  const cancelSearch = async () => {
+    if (!currentSearchId.value) return;
+    try {
+      await post(searchCancelUrl.value, { id: currentSearchId.value });
+    } catch (err) {
+      // Ignored - polling continues regardless.
     }
   };
 
@@ -107,7 +412,7 @@ export function useSearch(actionMode) {
 
   // Selection methods
   const toggleResult = (result) => {
-    if (actionMode?.value === 'replace' && result.readOnly) return;
+    if (actionMode?.value === 'replace' && (result.readOnly || rowState(result))) return;
 
     const index = selectedResults.value.findIndex(
       r => r.uniqueKey === result.uniqueKey
@@ -156,16 +461,29 @@ export function useSearch(actionMode) {
     error.value = null;
 
     try {
-      const data = await post(replaceUrl.value, {
+      let data = await post(replaceUrl.value, {
         searchQuery: searchParams.query,
         replaceWith: replaceWith ?? searchParams.replaceWith,
-        selectedResults: toReplace,
+        selectedResults: toReplace.map(r => slimRow(r, excludedFor(r))),
         siteId: searchParams.siteId,
         useRegex: searchParams.useRegex,
         caseInsensitive: searchParams.caseInsensitive,
         wholeWords: searchParams.wholeWords,
+        preserveCase: searchParams.preserveCase,
+        dryRun: searchParams.dryRun,
         confirmationCode: confirmationCode ?? '',
+        searchId: loadedSearchId.value ?? '',
       });
+
+      // Too many rows to save inside one request: the server queued it.
+      // Follow it until it is done, then treat it like any other replace.
+      if (data?.success && data.queued) {
+        kickQueue();
+        data = await followReplace(data.logId, data.total);
+      }
+
+      // A dry run saved nothing, so the rows stay as they are.
+      if (!data?.dryRun) markReplaced(data);
 
       return data;
     } catch (err) {
@@ -176,16 +494,109 @@ export function useSearch(actionMode) {
     }
   };
 
+  // Marks what a replace did on the rows on screen; no new search is needed.
+  const markReplaced = data => {
+    if (!data?.success) return;
+
+    replacedKeys.value = new Set([
+      ...replacedKeys.value,
+      ...(data.replacedKeys || []),
+    ]);
+    // A row whose text changed (or is gone) is "changed since search". One
+    // that was refused (protected, or not editable by this user) is shown
+    // as not saved, since searching again would not change the answer.
+    const changedSince = s => s.reason === 'changed' || s.reason === 'missing';
+    staleKeys.value = new Set([
+      ...staleKeys.value,
+      ...(data.skipped || []).filter(changedSince).map(s => s.key),
+    ]);
+    failedKeys.value = new Set([
+      ...failedKeys.value,
+      ...(data.failed || []).map(s => s.key),
+      ...(data.skipped || []).filter(s => !changedSince(s)).map(s => s.key),
+    ]);
+    selectedResults.value = selectedResults.value.filter(r => !rowState(r));
+  };
+
+  // A reload drops the page but not the queued replace. If this user left
+  // one running, follow it again; resolves with its final summary, or null
+  // when there is nothing to follow.
+  const resumeReplace = async () => {
+    if (replaceProgress.value || !replaceActiveUrl.value) return null;
+
+    const active = await get(replaceActiveUrl.value);
+    if (!active.success || !active.logId) return null;
+
+    kickQueue();
+    const data = await followReplace(active.logId);
+    markReplaced(data);
+
+    return data;
+  };
+
   // Preview single result
+  const REPLACE_POLL_MS = 1500;
+
+  // Polls a queued replace. Its status, once it stops running, has the
+  // same shape as an inline replace's response.
+  const followReplace = logId =>
+    new Promise((resolve, reject) => {
+      const tick = async () => {
+        try {
+          const data = await get(replaceStatusUrl.value, { logId });
+
+          if (!data.success) {
+            replaceProgress.value = null;
+            resolve(data);
+            return;
+          }
+
+          replaceProgress.value = {
+            logId,
+            status: data.status,
+            total: data.total,
+            done: data.done,
+            replaced: data.replaced,
+            idleSeconds: data.idleSeconds,
+          };
+
+          if (data.status === 'running' || data.status === 'cancelling') {
+            setTimeout(tick, REPLACE_POLL_MS);
+            return;
+          }
+
+          replaceProgress.value = null;
+          resolve(data);
+        } catch (err) {
+          replaceProgress.value = null;
+          reject(err);
+        }
+      };
+
+      tick();
+    });
+
+  // Stops a queued replace after the entry it is on. What it already
+  // changed stays in the log and can be reverted.
+  const cancelReplace = async () => {
+    if (!replaceProgress.value) return;
+    try {
+      await post(replaceCancelUrl.value, { logId: replaceProgress.value.logId });
+    } catch (err) {
+      // The next poll shows what actually happened.
+    }
+  };
+
   const getPreview = async (result) => {
     try {
       const data = await post(previewUrl.value, {
-        result: result,
+        result: slimRow(result, excludedFor(result)),
         searchQuery: searchParams.query,
         replaceWith: searchParams.replaceWith,
         useRegex: searchParams.useRegex,
         caseInsensitive: searchParams.caseInsensitive,
         wholeWords: searchParams.wholeWords,
+        preserveCase: searchParams.preserveCase,
       });
       return data;
     } catch (err) {
@@ -198,9 +609,30 @@ export function useSearch(actionMode) {
   const reset = () => {
     results.value = {};
     totalResults.value = 0;
+    truncated.value = false;
+    stopReason.value = null;
+    resultLimit.value = null;
+    upgradeLimit.value = null;
     selectedResults.value = [];
     hasSearched.value = false;
     error.value = null;
+    scannedCount.value = 0;
+    totalCount.value = 0;
+    matchCount.value = 0;
+    jobStatus.value = null;
+    scanSample.value = null;
+    startedAtMs.value = null;
+    replacedKeys.value = new Set();
+    staleKeys.value = new Set();
+    failedKeys.value = new Set();
+    queueStalled.value = false;
+    jobStalled.value = false;
+    // Lets any in-flight poll loop notice it's stale and stop on its next
+    // tick instead of overwriting this reset with a late response. The job
+    // itself keeps running on the server; coming back re-attaches to it.
+    currentSearchId.value = null;
+    loadedSearchId.value = null;
+    loading.value = false;
   };
 
   // Reset form
@@ -210,6 +642,8 @@ export function useSearch(actionMode) {
     searchParams.useRegex = false;
     searchParams.caseInsensitive = false;
     searchParams.wholeWords = false;
+    searchParams.includeLinks = false;
+    searchParams.preserveCase = false;
     searchParams.dryRun = false;
     searchParams.sections = [];
     searchParams.fields = [];
@@ -223,18 +657,46 @@ export function useSearch(actionMode) {
     error,
     results,
     totalResults,
+    truncated,
+    stopReason,
+    resultLimit,
+    upgradeLimit,
+    recentSearches,
+    replaceProgress,
+    cancelReplace,
+    resumeReplace,
+    rowState,
+    excludedMatches,
+    excludedCount,
+    isMatchIncluded,
+    toggleMatch,
+    loadRecentSearches,
+    openSearch,
+    activeSearches,
+    cancelSearchById,
     selectedResults,
     hasSearched,
     searchParams,
+    scannedCount,
+    matchCount,
+    jobStatus,
+    startedAtMs,
+    scanSample,
+    currentSearchId,
+    totalCount,
+    queueStalled,
+    jobStalled,
 
     // Computed
     hasResults,
     selectedCount,
     hasSelected,
     allSelected,
+    progress,
 
     // Methods
     search,
+    cancelSearch,
     getAllResults,
     toggleResult,
     isSelected,

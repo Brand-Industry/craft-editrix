@@ -38,7 +38,13 @@
         <div v-if="!searchType" class="editrix-tool-picker">
           <button type="button" class="editrix-tool-card editrix-tool-card--text" @click="searchType = 'text'">
             <span class="editrix-tool-card__icon">🔤</span>
-            <h3>{{ t('Text') }}</h3>
+            <h3>
+              {{ t('Text') }}
+              <span v-if="activeSearch" class="editrix-live-tag">
+                <span class="editrix-live-tag__dot" aria-hidden="true"></span>
+                {{ t('Search in progress') }}<template v-if="activePct !== null"> · {{ activePct }}%</template>
+              </span>
+            </h3>
             <p>{{ t('Search for text within field content.') }}</p>
             <span class="editrix-tool-card__arrow">→</span>
           </button>
@@ -179,6 +185,7 @@
         </template>
 
         <template v-if="searchType === 'text'">
+          <fieldset class="editrix-form-lock" :disabled="loading">
           <SearchForm
             v-model:query="searchParams.query"
             v-model:replace-with="searchParams.replaceWith"
@@ -187,6 +194,8 @@
             v-model:use-regex="searchParams.useRegex"
             v-model:case-insensitive="searchParams.caseInsensitive"
             v-model:whole-words="searchParams.wholeWords"
+            v-model:include-links="searchParams.includeLinks"
+            v-model:preserve-case="searchParams.preserveCase"
             v-model:dry-run="searchParams.dryRun"
             v-model:search-entries="searchParams.searchEntries"
             v-model:search-globals="searchParams.searchGlobals"
@@ -196,30 +205,155 @@
             :action-mode="actionMode"
             @search="handleSearch"
           />
+          </fieldset>
 
-          <LoadingSpinner v-if="loading" :text="t('Searching...')" />
+
+          <details v-if="recentSearches.length > 0 && !loading" class="editrix-recent-searches">
+            <summary>{{ t('Recent searches') }} ({{ recentSearches.length }})</summary>
+            <ul>
+              <li v-for="s in recentSearches" :key="s.searchId">
+                <span class="editrix-recent-searches__query">{{ s.query }}</span>
+                <span class="editrix-recent-searches__meta">
+                  <template v-if="s.status === 'completed' || s.status === 'cancelled'">
+                    {{ t('{count} results', { count: (s.resultCount ?? 0).toLocaleString() }) }}
+                    <template v-if="s.status === 'cancelled'"> · {{ t('cancelled') }}</template>
+                  </template>
+                  <template v-else-if="s.status === 'error'">{{ t('failed') }}</template>
+                  <template v-else>{{ t('in progress') }}</template>
+                  · {{ new Date(s.dateCreated).toLocaleString() }}
+                </span>
+                <button
+                  v-if="s.status !== 'error'"
+                  type="button"
+                  class="editrix-btn editrix-btn--secondary editrix-btn--sm"
+                  @click="openRecentSearch(s.searchId)"
+                >
+                  {{ t('Open') }}
+                </button>
+              </li>
+            </ul>
+          </details>
+
+          <div v-if="replaceProgress" class="editrix-search-progress" role="status" aria-live="polite">
+            <p class="editrix-search-progress__title">
+              {{ t('Replacing {done} of {total} rows…', {
+                done: replaceProgress.done.toLocaleString(),
+                total: replaceProgress.total.toLocaleString(),
+              }) }}
+            </p>
+            <div class="editrix-search-progress__bar">
+              <div
+                class="editrix-search-progress__fill is-active"
+                :style="{ width: `${replaceProgress.total > 0 ? Math.max(1, Math.round((replaceProgress.done / replaceProgress.total) * 100)) : 4}%` }"
+              ></div>
+            </div>
+            <p class="editrix-search-progress__label">
+              {{ t('{count} changed so far', { count: replaceProgress.replaced.toLocaleString() }) }}
+              <template v-if="replaceProgress.status === 'cancelling'"> · {{ t('Stopping…') }}</template>
+            </p>
+            <p class="editrix-search-progress__tip">
+              {{ t('Every change is already in Logs & History, so it can be reverted even if this stops.') }}
+            </p>
+            <button
+              type="button"
+              class="editrix-btn editrix-btn--secondary editrix-btn--sm"
+              :disabled="replaceProgress.status === 'cancelling'"
+              @click="cancelReplace"
+            >
+              {{ t('Cancel replace') }}
+            </button>
+          </div>
+
+          <div v-if="lastReplace" class="editrix-replace-summary">
+            <p v-if="lastReplace.dryRun" class="editrix-replace-summary__done">
+              {{ t('Dry run: {count} matches would change. Nothing was saved.', { count: lastReplace.replaced.toLocaleString() }) }}
+            </p>
+            <p v-else-if="lastReplace.replaced > 0" class="editrix-replace-summary__done">
+              ✓ {{ t('Replaced {count} matches.', { count: lastReplace.replaced.toLocaleString() }) }}
+              <a v-if="logsPageUrl" :href="logsPageUrl">{{ t('View in Logs & History') }}</a>
+            </p>
+            <p v-if="lastReplace.skipped > 0" class="editrix-form__warning">
+              ⚠️ {{ t('{count} skipped because their content changed after the search. Search again to see the current text.', { count: lastReplace.skipped.toLocaleString() }) }}
+            </p>
+            <div v-if="lastReplace.failed.length > 0" class="editrix-form__warning">
+              ⚠️ {{ t('{count} could not be saved and were left unchanged.', { count: lastReplace.failed.length.toLocaleString() }) }}
+              <details>
+                <summary>{{ t('Show why') }}</summary>
+                <ul>
+                  <li v-for="f in lastReplace.failed.slice(0, 20)" :key="f.key">
+                    {{ f.elementTitle || ('#' + f.elementId) }} ({{ f.fieldHandle }}): {{ f.reason }}
+                  </li>
+                </ul>
+                <p v-if="lastReplace.failed.length > 20">{{ t('and {count} more', { count: lastReplace.failed.length - 20 }) }}</p>
+              </details>
+            </div>
+            <button v-if="searchParams.query" type="button" class="editrix-btn editrix-btn--secondary editrix-btn--sm" @click="handleSearch">
+              {{ t('Search again') }}
+            </button>
+          </div>
+
+          <SearchProgress
+            v-if="loading"
+            :query="searchParams.query"
+            :has-id="currentSearchId !== null"
+            :job-status="jobStatus"
+            :scanned="scannedCount"
+            :total="totalCount"
+            :progress="progress"
+            :matches="matchCount"
+            :started-at-ms="startedAtMs"
+            :scan-sample="scanSample"
+            :queue-stalled="queueStalled"
+            :job-stalled="jobStalled"
+            @cancel="cancelSearch"
+          />
 
           <div v-else-if="error" class="editrix-form__warning" style="margin-top: 16px;">
             ⚠️ {{ error }}
           </div>
 
+          <template v-else-if="hasSearched">
+          <div v-if="truncated" class="editrix-form__warning" style="margin-top: 16px;">
+            <template v-if="stopReason === 'memory'">
+              ⚠️ {{ t('Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.') }}
+            </template>
+            <template v-else>
+              ⚠️ {{ t('Showing the first {count} results. Narrow your search for more precise results.', {
+                count: totalResults.toLocaleString(),
+              }) }}
+              <template v-if="upgradeLimit">
+                {{ t('Your edition shows up to {limit} results; Pro shows up to {proLimit}.', {
+                  limit: (resultLimit || totalResults).toLocaleString(),
+                  proLimit: upgradeLimit.toLocaleString(),
+                }) }}
+                <span class="editrix-badge editrix-badge--info">Pro</span>
+              </template>
+            </template>
+          </div>
+
           <ResultsTable
-            v-else-if="hasSearched"
             :results="visibleResults"
             :total-results="visibleTotalResults"
             :selected-count="selectedCount"
             :all-selected="allSelected"
             :is-selected="isSelected"
+            :row-state="rowState"
+            :is-match-included="isMatchIncluded"
+            :excluded-count="excludedCount"
             :action-mode="actionMode"
+            :dry-run="searchParams.dryRun"
             :search-query="searchParams.query"
             @toggle="toggleResult"
+            @toggle-match="toggleMatch"
             @toggle-all="toggleSelectAll"
             @view="openView"
-            @replace="showReplaceConfirm = true"
+            :replace-limit="rowLimit"
+            @replace="requestBulkReplace"
           />
+          </template>
 
           <EmptyState v-else />
-          </template>
+        </template>
         </template>
       </main>
     </div>
@@ -230,6 +364,7 @@
       :original="previewData?.original ?? previewResult?.fieldValue ?? ''"
       :proposed="previewData?.proposed ?? previewResult?.fieldValue ?? ''"
       :changed="previewData?.changed ?? false"
+      :stale="previewData?.stale ?? false"
       :loading="previewLoading"
       @close="previewResult = null"
       @apply="applyToSingle"
@@ -278,12 +413,14 @@ import AssignmentSearchForm from '../components/assignments/AssignmentSearchForm
 import AssignmentResultsList from '../components/assignments/AssignmentResultsList.vue';
 import RecentActivity from '../components/search/RecentActivity.vue';
 import ActivityChart from '../components/logs/ActivityChart.vue';
+import SearchProgress from '../components/search/SearchProgress.vue';
 
 const {
   t,
   hasFeature,
   currentSiteId,
   logsUrl,
+  logsPageUrl,
   dailyCountsUrl,
   safety,
   isProduction,
@@ -292,6 +429,8 @@ const {
   tagsSettingsUrl,
   canExport,
   canReplace,
+  replaceRowLimit,
+  dryRunRowLimit,
 } = useConfig();
 const { get: apiGet } = useApi();
 
@@ -361,6 +500,9 @@ const handleAssignmentSearch = async () => {
 // from one tool kept showing its query/results/scope-filter sidebar as if
 // it were still active.
 watch(searchType, (newType, oldType) => {
+  if (newType === 'text') {
+    loadRecentSearches().then(attachToActiveSearch);
+  }
   if (oldType === 'category' || oldType === 'tag') {
     assignmentParams.query = '';
     assignmentParams.sections = [];
@@ -369,6 +511,7 @@ watch(searchType, (newType, oldType) => {
   if (oldType === 'text') {
     setSearchMode('general');
     reset();
+    lastReplace.value = null;
   }
 });
 
@@ -417,6 +560,7 @@ const rerunLog = (log) => {
   searchParams.wholeWords = !!log.wholeWords;
 
   const scope = log.scope || {};
+  searchParams.includeLinks = !!scope.includeLinks;
   searchParams.allSites = !!scope.allSites;
   searchParams.sections = scope.sections || [];
   searchParams.fields = scope.fields || [];
@@ -428,6 +572,24 @@ const rerunLog = (log) => {
     searchParams.sections.length > 0 ? 'segmented' : 'general';
 
   handleSearch();
+  return true;
+};
+
+// Puts the screen back the way a saved search had it: text search, search
+// mode (never replace), and the scope it was run with.
+const applySavedParams = (params) => {
+  searchType.value = 'text';
+  actionMode.value = 'search';
+  searchMode.value =
+    (params.sections || []).length > 0 ? 'segmented' : 'general';
+};
+
+const openRecentSearch = async (searchId) => {
+  try {
+    await openSearch(searchId, applySavedParams);
+  } catch (err) {
+    window.Craft?.cp?.displayError?.(err.message || 'Search failed');
+  }
 };
 
 const searchMode = ref('general');
@@ -439,6 +601,21 @@ const {
   error,
   results,
   totalResults,
+  truncated,
+  stopReason,
+  resultLimit,
+  upgradeLimit,
+  recentSearches,
+  replaceProgress,
+  cancelReplace,
+  resumeReplace,
+  rowState,
+  isMatchIncluded,
+  excludedCount,
+  toggleMatch,
+  loadRecentSearches,
+  openSearch,
+  activeSearches,
   selectedResults,
   hasSearched,
   searchParams,
@@ -446,7 +623,18 @@ const {
   selectedCount,
   hasSelected,
   allSelected,
+  scannedCount,
+  totalCount,
+  matchCount,
+  jobStatus,
+  startedAtMs,
+  scanSample,
+  currentSearchId,
+  progress,
+  queueStalled,
+  jobStalled,
   search,
+  cancelSearch,
   toggleResult,
   isSelected,
   selectAll,
@@ -457,13 +645,34 @@ const {
   reset,
 } = useSearch(actionMode);
 
+// Preserving case only has something to preserve when the search finds
+// every capitalisation, so it turns Case Insensitive on with it.
+watch(
+  () => searchParams.preserveCase,
+  (on) => {
+    if (on) searchParams.caseInsensitive = true;
+  }
+);
+
 const showReplaceConfirm = ref(false);
+// A queued replace has its own progress panel; the modal gets out of the way.
+watch(replaceProgress, (progress) => {
+  if (progress) showReplaceConfirm.value = false;
+});
 const replacing = ref(false);
 const previewResult = ref(null);
 const detailResult = ref(null);
 
 const setSearchMode = (mode) => {
+  if (mode === searchMode.value) return;
+
   searchMode.value = mode;
+  // Segmented's section/field/entry-type scope doesn't carry meaning back
+  // in General, and either way the previous mode's results are no longer
+  // an accurate answer to "what does this scope find" - keep the query
+  // text (the user is likely re-running the same search, just re-scoped),
+  // but the results themselves need a fresh search to mean anything.
+  reset();
 
   if (mode === 'general') {
     searchParams.sections = [];
@@ -518,10 +727,23 @@ const totalEntries = computed(() => {
 onMounted(() => {
   searchParams.siteId = currentSiteId.value;
   assignmentParams.siteId = currentSiteId.value;
-  restoreFromHistory();
+  if (!restoreFromHistory()) {
+    loadRecentSearches().then(attachToActiveSearch);
+  }
   fetchRecentActivity();
   fetchDailyCounts();
+  followLeftoverReplace();
 });
+
+// A replace queued before a reload is still running on the server.
+const followLeftoverReplace = async () => {
+  try {
+    const data = await resumeReplace();
+    if (data?.success) showReplaceSummary(data);
+  } catch (err) {
+    window.Craft?.cp?.displayError?.(err.message || 'Replace failed');
+  }
+};
 
 // "Re-run" from Logs & History links here with the original query/scope in
 // the URL. Always lands in Search mode - re-running a past search should
@@ -529,7 +751,7 @@ onMounted(() => {
 const restoreFromHistory = () => {
   const params = new URLSearchParams(window.location.search);
   const q = params.get('q');
-  if (!q) return;
+  if (!q) return false;
 
   searchParams.query = q;
   searchParams.useRegex = params.get('regex') === '1';
@@ -548,7 +770,43 @@ const restoreFromHistory = () => {
   handleSearch();
 };
 
+// The search the user has running, if any. Only one runs per user.
+const activeSearch = computed(() => activeSearches.value[0] || null);
+const activePct = computed(() => {
+  const s = activeSearch.value;
+  if (!s || s.status === 'queued' || !s.totalCount) return null;
+  return Math.min(100, Math.round((s.scannedCount / s.totalCount) * 100));
+});
+
+// Leaving and coming back (a reload, or the menu and back) lands on the
+// search that is still running, with its progress, instead of an empty form.
+const attachToActiveSearch = () => {
+  if (loading.value || hasSearched.value || !activeSearch.value) return;
+  openRecentSearch(activeSearch.value.searchId);
+};
+
+// While a search is running somewhere (this tab, another tab, before a
+// reload), keep its progress in the list fresh.
+let activePoll = null;
+watch(
+  () => activeSearches.value.length > 0 && !loading.value,
+  watching => {
+    clearInterval(activePoll);
+    activePoll = watching
+      ? setInterval(
+          () =>
+            loadRecentSearches().then(() => {
+              if (searchType.value === 'text') attachToActiveSearch();
+            }),
+          3000
+        )
+      : null;
+  },
+  { immediate: true }
+);
+
 const handleSearch = async () => {
+  lastReplace.value = null;
   try {
     await search();
   } catch (err) {
@@ -569,6 +827,8 @@ const confirmCount = computed(() =>
 // past the bulk threshold, or in production with Safe Mode on, the
 // confirm modal requires typing "REPLACE" (also enforced server-side).
 const requiresConfirmationCode = computed(() => {
+  // A dry run changes nothing.
+  if (searchParams.dryRun) return false;
   const threshold = safety.value.bulkConfirmationThreshold;
   const overThreshold =
     typeof threshold === 'number' && confirmCount.value > threshold;
@@ -598,12 +858,69 @@ const handleRequestSingleReplace = ({ result, replaceWith }) => {
   singleReplaceValue.value = replaceWith;
   detailResult.value = null;
   previewResult.value = null;
+  // Nothing to confirm when nothing will be saved.
+  if (searchParams.dryRun) {
+    handleReplace('');
+    return;
+  }
+  showReplaceConfirm.value = true;
+};
+
+// One request can only change so many entries before the server may cut it
+// off (see maxRowsPerReplace); the server refuses more, this says so first.
+// A dry run is a quick check, so it covers fewer rows than a replace.
+const rowLimit = computed(() =>
+  searchParams.dryRun && dryRunRowLimit.value > 0
+    ? Math.min(dryRunRowLimit.value, replaceRowLimit.value || dryRunRowLimit.value)
+    : replaceRowLimit.value
+);
+
+const requestBulkReplace = () => {
+  if (rowLimit.value > 0 && selectedCount.value > rowLimit.value) {
+    window.Craft?.cp?.displayError?.(
+      t('Select at most {limit} rows per replace; you selected {count}.', {
+        limit: rowLimit.value.toLocaleString(),
+        count: selectedCount.value.toLocaleString(),
+      })
+    );
+    return;
+  }
+  if (searchParams.dryRun) {
+    handleReplace('');
+    return;
+  }
   showReplaceConfirm.value = true;
 };
 
 const cancelReplaceConfirm = () => {
   showReplaceConfirm.value = false;
   singleReplaceTarget.value = null;
+};
+
+// Summary of the last replace, shown above the results until the next search.
+const lastReplace = ref(null);
+
+// The rows are marked in place; searching again would rescan the whole
+// scope just to show what we already know.
+const refusalText = (reason) => ({
+  protected: t('protected field or section'),
+  permission: t("you can't edit this entry in Craft"),
+}[reason] || reason);
+
+const showReplaceSummary = (data) => {
+  const skipped = data.skipped || [];
+  const changedSince = (s) => s.reason === 'changed' || s.reason === 'missing';
+
+  lastReplace.value = {
+    dryRun: !!data.dryRun,
+    replaced: data.replacedMatches ?? data.replacedCount ?? 0,
+    skipped: skipped.filter(changedSince).length,
+    // Refused rows are listed with the failures, each with its reason.
+    failed: [
+      ...(data.failed || []),
+      ...skipped.filter((s) => !changedSince(s)).map((s) => ({ ...s, reason: refusalText(s.reason) })),
+    ],
+  };
 };
 
 const handleReplace = async (confirmationCode) => {
@@ -621,9 +938,7 @@ const handleReplace = async (confirmationCode) => {
     if (data?.success) {
       window.Craft?.cp?.displayNotice?.(data.message);
       showReplaceConfirm.value = false;
-
-      // Re-run search to update results
-      await handleSearch();
+      showReplaceSummary(data);
     } else {
       window.Craft?.cp?.displayError?.(data?.error || 'Replace failed');
     }

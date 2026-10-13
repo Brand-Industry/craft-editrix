@@ -1,58 +1,73 @@
 # Editrix for Craft CMS
 
-**The safest way to update content at scale in Craft CMS.**
+Find text across your Craft content, preview what a replacement would change, apply it, and undo it value by value if you need to.
 
-Editrix is an advanced search & replace plugin that lets you find and update content across your entire Craft site with visual previews, detailed logs, and full rollback capability.
-
-## Features
-
-- **Powerful Search** - Find text across entries, globals, Matrix fields, and more
-- **Visual Diff Preview** - See exactly what will change before you commit
-- **Safe by Default** - Dry-run mode, confirmation dialogs, and environment warnings
-- **Complete History** - Every operation is logged with full rollback capability
-- **Multi-Site Ready** - Search across all sites or filter by specific ones
-- **Scope Filters** - Target specific sections, fields, or entry types
-- **Fast & Efficient** - Update thousands of entries in seconds
-
-## Editions
-
-| Feature                  |    Standard     |    Pro     |
-| ------------------------ | :-------------: | :--------: |
-| Search Entries & Globals |       ✅        |     ✅     |
-| Basic Replace            |       ✅        |     ✅     |
-| Case Insensitive         |       ✅        |     ✅     |
-| Logs & Revert            |     30 days     |  90 days   |
-| Matrix Fields            |       ✅        |     ✅     |
-| Categories               |       ✅        |     ✅     |
-| Regex Support            |       ✅        |     ✅     |
-| Whole Words              |       ✅        |     ✅     |
-| Multi-Site               |       ✅        |     ✅     |
-| Scope Filters            | Sections, Sites |    Full    |
-| Diff Preview             |      Text       |   Visual   |
-| Dry Run Mode             |       ✅        |     ✅     |
-| Export Logs              |       CSV       | CSV + JSON |
-| Presets                  |        5        | Unlimited  |
-| Protected Fields         |        -        |     ✅     |
-| CLI Commands             |        -        |     ✅     |
-| API & Webhooks           |        -        |     ✅     |
+It searches entries, globals, Matrix and Neo blocks, and rich text fields (CKEditor, Redactor). Every replace is written to a log before any entry is saved, so a replace that is cancelled or interrupted can still be reverted. The work runs on Craft's queue, so a large site does not hit a request time limit. Editrix follows Craft's own permissions: people only find and change the entries they can already open and save in Craft.
 
 ## Requirements
 
-- Craft CMS 4.0+
-- PHP 8.0.2+
+- Craft CMS 4.0 or later
+- PHP 8.0.2 or later
 
 ## Installation
 
-## Usage
+From the root of your Craft project:
 
-1. Navigate to **Editrix** in the control panel sidebar
-2. Enter your search term and replacement text
-3. Configure options (regex, case sensitivity, scope)
-4. Click **Preview Changes** to see what will be affected
-5. Review the results and click **Replace Selected**
-6. Done! View the operation in History to revert if needed.
+```bash
+composer require brand-industry/craft-editrix
+php craft plugin/install editrix
+```
+
+You can also install it from **Settings, Plugins** in the control panel. If `php craft up` later shows a project config notice after an update, see [Installation and updating](docs/installation.md).
+
+## Quick start
+
+1. Open **Editrix** in the control panel and choose **New Operation**.
+2. Enter the text to find. Add a replacement to use Search & Replace.
+3. Choose the options you need: regular expression, case, whole words.
+4. Run the search and review the rows it found.
+5. Open a row to see the original and proposed text, then select the rows to change and click **Replace Selected**.
+6. Find the operation under **Logs & History**, where you can revert it.
+
+## Editions
+
+| | Standard (USD 19) | Pro (USD 99) |
+| --- | :---: | :---: |
+| Search entries and globals | Yes | Yes |
+| Regular expressions, case, whole words | Yes | Yes |
+| Preview and dry run | Yes | Yes |
+| Leave single matches out of a replace | Yes | Yes |
+| Search and replace link addresses in rich text | Yes | Yes |
+| Logs and revert | 30 days | 90 days |
+| Rows returned per search | 3,000 | 25,000 |
+| Rows changed per replace | 200 | 5,000 |
+| Matrix and Neo blocks | No | Yes |
+| Categories, and category and tag assignment search | No | Yes |
+| Several sites in one search | No | Yes |
+| Limit a search to sections, entry types and fields | No | Yes |
+| Preserve case | No | Yes |
+| Export results and logs (CSV, JSON) | No | Yes |
+| Command line | No | Yes |
+
+Both editions can be tried for free in development and staging. See [Editions](docs/editions.md) for the details of each limit.
+
+## Documentation
+
+- [Installation and updating](docs/installation.md)
+- [Searching](docs/searching.md)
+- [Replacing](docs/replacing.md)
+- [Logs and revert](docs/logs-and-revert.md)
+- [Large sites and the queue](docs/large-sites.md)
+- [Settings](docs/configuration.md)
+- [Command line](docs/command-line.md)
+- [Editions](docs/editions.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ## Support
 
-- Documentation: [editrix.dev/docs](https://editrix.dev/docs)
 - Issues: [GitHub Issues](https://github.com/brand-industry/craft-editrix/issues)
+- Email: lalonso@tbi.com.mx
+
+## License
+
+Editrix is released under the [Craft License](LICENSE.md). Each license covers one production site.
