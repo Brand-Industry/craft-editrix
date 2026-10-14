@@ -13,7 +13,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] Anota cómo corre la cola en este entorno: `runQueueAutomatically` (por defecto activo) o un worker. La sección 4 necesita poder apagarla.
 - [ ] Haz una copia de la base de datos antes de reemplazar contenido.
 - [ ] Anota la versión y el commit que vas a probar (`version` en `composer.json` y `git rev-parse --short HEAD` en la carpeta del plugin). Todos los reportes la llevan.
-- [ ] Qué se ha probado ya y dónde: un sitio de pruebas grande local (MySQL, 845,000 entradas, un solo sitio) y un segundo sitio de pruebas (PostgreSQL, Neo 5, un solo sitio), los dos en Pro. **Ninguno es multisitio ni Standard**: esas partes (3.4, el reemplazo en dos sitios y los bloqueos de Standard) solo se pueden probar en un entorno aparte.
+- [ ] Qué se ha probado ya y dónde: un sitio local grande (MySQL, 845,000 entradas, un solo sitio) y uno con PostgreSQL y Neo 5 (un solo sitio), los dos en Pro. **Ninguno es multisitio ni Standard**: esas partes (3.4, el reemplazo en dos sitios y los bloqueos de Standard) solo se pueden probar en un entorno aparte.
 - [ ] Si el sitio tiene Neo, comprueba la versión de Neo (en Neo 5 la tabla de bloques usa `primaryOwnerId`).
 
 ## 1. Instalación y ediciones
@@ -77,7 +77,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] Un consejo cambia cada ~8 segundos y el primero dice que se puede salir de la página. Sin Pro no aparece el consejo de Segmented Search.
 - [ ] Con "reducir movimiento" activado en el sistema, las animaciones se detienen y el texto sigue ahí.
 - [ ] La barra de progreso sube y el porcentaje coincide con X de Y.
-- [ ] **Tiempos de referencia** (un sitio de pruebas grande local, 845,000 entradas, medidos el 2026-10-12 con el equipo ocupado, carga de ~5, con Pro y Matrix y globales activos; la primera vez pueden ser más; son cifras de referencia, no promesas): una palabra rara en todo el sitio, de 30 a 34 s; «hotel», que se corta en el tope de 25,000 filas, unos 110 s con Matrix y globales (31 s solo con entradas; con el tope de 3,000 de Standard, mucho menos); una sección de 27,000 entradas con una palabra rara, de 5 a 11 s. Si tarda mucho más, anota el equipo y la memoria asignada a Docker. Un Dry Run de 100 filas tardó 0,8 s y 8 MB. Para repetir las medidas: `EDITRIX_SLOW=1 EDITRIX_RARE=<palabra rara> phpunit --filter SearchTimingTest` (y `DryRunTimingTest`).
+- [ ] **Tiempos de referencia** (sitio local con 845,000 entradas, medidos el 2026-10-12 con el equipo ocupado, carga de ~5, con Pro y Matrix y globales activos; la primera vez pueden ser más; son cifras de referencia, no promesas): una palabra rara en todo el sitio, de 30 a 34 s; «hotel», que se corta en el tope de 25,000 filas, unos 110 s con Matrix y globales (31 s solo con entradas; con el tope de 3,000 de Standard, mucho menos); una sección de 27,000 entradas con una palabra rara, de 5 a 11 s. Si tarda mucho más, anota el equipo y la memoria asignada a Docker. Un Dry Run de 100 filas tardó 0,8 s y 8 MB. Para repetir las medidas: `EDITRIX_SLOW=1 EDITRIX_RARE=<palabra rara> phpunit --filter SearchTimingTest` (y `DryRunTimingTest`).
 - [ ] El botón **Cancel search** detiene la búsqueda en pocos segundos y muestra lo encontrado hasta ese momento.
 - [ ] Cancelar y lanzar otra búsqueda enseguida muestra solo los resultados de la nueva.
 - [ ] **Recargar a mitad de búsqueda**: lanza una búsqueda grande y recarga la página. Te deja en la vista de búsqueda de texto, siguiendo la misma búsqueda: spinner, barra con movimiento, "Scanning X of Y entries", "N matches so far" y el botón **Cancel search**. El formulario se ve con los valores usados y deshabilitado.
@@ -121,7 +121,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] "Apply to this element" y "Skip" por elemento funcionan.
 - [ ] **Dry Run Mode**: con el interruptor activo el botón dice "Run dry run"; al pulsarlo informa cuántas coincidencias cambiarían y qué filas omitiría, no cambia ninguna entrada, no crea un log en Logs & History, no pide el código REPLACE y las filas siguen sin marcar como reemplazadas.
 - [ ] Reemplazo real: aparece "Successfully replaced N occurrence(s)." y la entrada, abierta en otra pestaña, tiene el texto nuevo.
-- [ ] (solo Craft 5, omitir en Craft 4) **CKEditor con entradas anidadas** (en un sitio de pruebas grande: la entrada an entry, campo `articleBody`): reemplaza una palabra del texto, abre la entrada en el editor y comprueba que los bloques anidados siguen ahí. Revierte desde Logs & History y vuelve igual.
+- [ ] (solo Craft 5, omitir en Craft 4) **CKEditor con entradas anidadas** (en un sitio con artículos largos que embeben entradas): reemplaza una palabra del texto, abre la entrada en el editor y comprueba que los bloques anidados siguen ahí. Revierte desde Logs & History y vuelve igual.
 - [ ] **Después de reemplazar no se vuelve a buscar**: las filas reemplazadas quedan visibles con la marca verde "Replaced", sin casilla, y arriba aparece "Replaced N matches." con el enlace a Logs & History y el botón **Search again**. No aparece la barra de progreso.
 - [ ] Reemplaza, y luego sal del plugin y reabre esa búsqueda desde **Recent searches**: las filas ya reemplazadas siguen marcadas.
 - [ ] **Edición posterior**: busca una palabra, edita a mano en otra pestaña una de las entradas del resultado y vuelve a reemplazar. Esa fila queda como "Changed since search", no se sobrescribe (comprueba que tu edición sigue) y el resumen avisa cuántas se omitieron.
@@ -152,7 +152,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] **Revert** de un reemplazo donde editaste una de las entradas después: se restauran las demás, esa se deja como está y se informa; luego se ofrece "Overwrite later edits?" como paso aparte. Revertir dos veces no hace daño.
 - [ ] **Revert grande** (más de 25 valores) corre en la cola y avisa al terminar.
 - [ ] Cada reemplazo y revert escribe líneas en `storage/logs/editrix-*.log`.
-- [ ] (solo Craft 5, omitir en Craft 4) **Campos con handle propio en el layout**: en Craft 5 un mismo campo puede llamarse distinto en cada layout (en un sitio de pruebas grande, `exampleField` aparece como `exampleField` en las guías y `exampleField` como `exampleField` a `4`; en un segundo sitio de pruebas, `exampleField` y `exampleField`). Busca una palabra que esté en uno de esos campos, selecciona su fila y reemplaza: debe guardarse, sin "this field cannot be replaced". Revierte desde Logs & History y la entrada vuelve igual. Ninguna fila encontrada debe rechazarse por el tipo de campo (solo por estar protegida o ser de solo lectura).
+- [ ] (solo Craft 5, omitir en Craft 4) **Campos con handle propio en el layout**: en Craft 5 un mismo campo puede llamarse distinto en cada layout (en los sitios de prueba hay campos que cambian de handle según el tipo de entrada). Busca una palabra que esté en uno de esos campos, selecciona su fila y reemplaza: debe guardarse, sin "this field cannot be replaced". Revierte desde Logs & History y la entrada vuelve igual. Ninguna fila encontrada debe rechazarse por el tipo de campo (solo por estar protegida o ser de solo lectura).
 
 ### 6.2 Línea de comandos (Pro)
 
@@ -218,8 +218,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 
 - **Tope de resultados por edición** (Standard 3,000, Pro 25,000, techo absoluto 50,000): sale de `LicenseService::$limits['searchResultLimit']`; `maxSearchResults` solo puede bajarlo.
 - **Tope de filas por reemplazo** (Standard 200, Pro 5,000, `replaceRowLimit` en `LicenseService`); `maxRowsPerReplace` solo puede bajarlo. Por encima de 25 filas (`replaceQueueThreshold`) el reemplazo corre en la cola.
-- **Cola en producción**: confirmar con quien administra el servidor de un sitio de pruebas grande que corre un worker o cron (o Craft Cloud).
-- **un sitio de pruebas grande**: el error de Twig en `a client template` (línea 8, `is defined` en vez de comprobar null) es de su template. El plugin ya lo omite, pero conviene que lo corrijan.
+- **Cola en producción**: confirmar con quien administra el servidor de cada sitio que corre un worker o cron (o Craft Cloud).
 - **No cubierto por pruebas automáticas**: los endpoints del controlador y toda la interfaz. Por eso existe esta lista.
 - **Palabra partida por formato** (solo Craft 5): el prefiltro no encuentra una palabra cortada por una etiqueta (`Fea<b>tured</b>`). El ajuste `sqlPrefilter` en `false` lo apaga. En Craft 4 no hay prefiltro y esa palabra sí se encuentra.
 - **Con el tope de filas**, el prefiltro y el escaneo completo pueden quedarse con filas ligeramente distintas entre las primeras. En una búsqueda completa, sin tope, son idénticos.
