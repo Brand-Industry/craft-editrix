@@ -1,7 +1,7 @@
 {
   "name": "brand-industry/craft-editrix",
   "description": "Search and replace content across entries, globals, Matrix and Neo, with a preview before anything changes, a log of every change and a revert for each value.",
-  "version": "1.2.0-beta.1",
+  "version": "1.2.0",
   "type": "craft-plugin",
   "license": "proprietary",
   "keywords": [
