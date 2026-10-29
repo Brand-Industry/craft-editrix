@@ -2,3 +2,5 @@
 /phpunit.xml.dist export-ignore
 /buildchain/tests export-ignore
 /docs/images export-ignore
+/CLAUDE.md export-ignore
+/buildchain export-ignore
