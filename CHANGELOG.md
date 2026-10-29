@@ -4,7 +4,7 @@ All notable changes to Editrix will be documented in this file.
 
 ## [2.0.0] - 2026-10-14
 
-First stable release for Craft 5. It has the same code as 2.0.0-beta.6. Requires Craft CMS 5.0 or later and PHP 8.2 or later.
+First stable release for Craft 5. It has the same code as 2.0.0-beta.6, with a new plugin icon and control panel menu icon. Requires Craft CMS 5.0 or later and PHP 8.2 or later.
 
 ## [2.0.0-beta.6] - 2026-10-12
 
