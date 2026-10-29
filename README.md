@@ -1,5 +1,7 @@
 # Editrix for Craft CMS
 
+![Editrix: advanced content search and replace for Craft CMS](docs/images/brand/hero-banner-dark.png)
+
 Find text across your Craft content, preview what a replacement would change, apply it, and undo it value by value if you need to.
 
 It searches entries, globals, Matrix and Neo blocks, and rich text fields (CKEditor, Redactor). Every replace is written to a log before any entry is saved, so a replace that is cancelled or interrupted can still be reverted. The work runs on Craft's queue, so a large site does not hit a request time limit. Editrix follows Craft's own permissions: people only find and change the entries they can already open and save in Craft.

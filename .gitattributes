@@ -1,3 +1,4 @@
 /tests export-ignore
 /phpunit.xml.dist export-ignore
 /buildchain/tests export-ignore
+/docs/images export-ignore
