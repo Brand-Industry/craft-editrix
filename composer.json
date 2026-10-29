@@ -28,7 +28,7 @@
   ],
   "support": {
     "email": "lalonso@tbi.com.mx",
-    "docs": "https://github.com/brand-industry/craft-editrix"
+    "docs": "https://github.com/brand-industry/craft-editrix/tree/craft-5"
   },
   "require": {
     "php": "^8.2",
@@ -47,7 +47,7 @@
     "class": "brandindustry\\editrix\\Editrix",
     "developer": "Brand Industry",
     "developerUrl": "https://tbi.com.mx",
-    "documentationUrl": "https://github.com/brand-industry/craft-editrix",
-    "changelogUrl": "https://github.com/brand-industry/craft-editrix/blob/main/CHANGELOG.md"
+    "documentationUrl": "https://github.com/brand-industry/craft-editrix/tree/craft-5",
+    "changelogUrl": "https://github.com/brand-industry/craft-editrix/blob/craft-5/CHANGELOG.md"
   }
 }
