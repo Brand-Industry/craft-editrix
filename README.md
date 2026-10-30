@@ -55,6 +55,8 @@ Both editions can be tried for free in development and staging. See [Editions](d
 
 ## Documentation
 
+The full documentation is at [editrix.thebrandindustry.com/craft-4](https://editrix.thebrandindustry.com/craft-4/). The same pages are in the `docs` folder:
+
 - [Installation and updating](docs/installation.md)
 - [Searching](docs/searching.md)
 - [Replacing](docs/replacing.md)
@@ -67,8 +69,8 @@ Both editions can be tried for free in development and staging. See [Editions](d
 
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/brand-industry/craft-editrix/issues)
-- Email: lalonso@tbi.com.mx
+- Issues: [GitHub Issues](https://github.com/Brand-Industry/craft-editrix/issues)
+- Email: editrix-support@thebrandindustry.com
 
 ## License
 

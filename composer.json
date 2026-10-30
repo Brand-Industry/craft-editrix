@@ -17,8 +17,8 @@
   "authors": [
     {
       "name": "Brand Industry",
-      "email": "lalonso@tbi.com.mx",
-      "homepage": "https://thebrandindustry.com/"
+      "email": "editrix-support@thebrandindustry.com",
+      "homepage": "https://thebrandindustry.com/es"
     },
     {
       "name": "Lucas A Alonso Cruz",
@@ -27,8 +27,9 @@
     }
   ],
   "support": {
-    "email": "lalonso@tbi.com.mx",
-    "docs": "https://github.com/brand-industry/craft-editrix"
+    "email": "editrix-support@thebrandindustry.com",
+    "issues": "https://github.com/Brand-Industry/craft-editrix/issues",
+    "docs": "https://editrix.thebrandindustry.com/craft-4/"
   },
   "require": {
     "php": "^8.0.2",
@@ -46,8 +47,8 @@
     "hasCpSection": true,
     "class": "brandindustry\\editrix\\Editrix",
     "developer": "Brand Industry",
-    "developerUrl": "https://tbi.com.mx",
-    "documentationUrl": "https://github.com/brand-industry/craft-editrix",
+    "developerUrl": "https://thebrandindustry.com/es",
+    "documentationUrl": "https://editrix.thebrandindustry.com/craft-4/",
     "changelogUrl": "https://github.com/brand-industry/craft-editrix/blob/main/CHANGELOG.md"
   }
 }
