@@ -14,5 +14,5 @@ import { useConfig } from '../../composables/useConfig';
 const { edition } = useConfig();
 
 const isPro = computed(() => edition.value === 'pro');
-const label = computed(() => (isPro.value ? 'Pro' : 'Standard'));
+const label = computed(() => (isPro.value ? 'Pro' : 'Lite'));
 </script>

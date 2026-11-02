@@ -45,14 +45,14 @@ class Settings extends Model
 
     /**
      * Lowers the number of result rows a search returns below what the
-     * edition allows (Standard 3,000, Pro 25,000). Null keeps the
+     * edition allows (Lite 3,000, Pro 25,000). Null keeps the
      * edition's limit; it can never raise it.
      */
     public ?int $maxSearchResults = null;
 
     /**
      * Lowers the number of rows one Replace may change below what the
-     * edition allows (Standard 200, Pro 5,000). Null keeps the edition's
+     * edition allows (Lite 200, Pro 5,000). Null keeps the edition's
      * limit; it can never raise it. A replace above the limit is refused
      * rather than cut short, so what is changed is always what was asked.
      */

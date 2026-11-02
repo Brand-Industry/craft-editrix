@@ -562,7 +562,7 @@ class SearchController extends Controller
                     "success" => false,
                     "error" => Craft::t(
                         "editrix",
-                        "Whole words matching requires Standard or Pro edition"
+                        "Whole words matching requires Lite or Pro edition"
                     ),
                     "upgradeRequired" => true,
                 ],

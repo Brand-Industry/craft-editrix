@@ -2,7 +2,7 @@
 
 Editrix has two paid editions. There is no free edition. Either one can be tried without charge in a development or staging environment. A license covers one production site.
 
-| | Standard (USD 19) | Pro (USD 99) |
+| | Lite (USD 19) | Pro (USD 99) |
 | --- | :---: | :---: |
 | **Searching** | | |
 | Entries and globals | Yes | Yes |

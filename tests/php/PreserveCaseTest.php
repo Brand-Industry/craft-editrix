@@ -142,7 +142,7 @@ class PreserveCaseTest extends TestCase
         $real = Editrix::$plugin->edition;
 
         try {
-            Editrix::$plugin->edition = Editrix::EDITION_STANDARD;
+            Editrix::$plugin->edition = Editrix::EDITION_LITE;
             $this->assertFalse($license->hasFeature(LicenseService::FEATURE_PRESERVE_CASE));
 
             Editrix::$plugin->edition = Editrix::EDITION_PRO;

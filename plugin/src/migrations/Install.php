@@ -52,7 +52,7 @@ class Install extends Migration
             'uid' => $this->uid(),
         ]);
 
-        // Presets table (Standard+)
+        // Presets table (Lite+)
         $this->createTable(self::TABLE_PRESETS, [
             'id' => $this->primaryKey(),
             'userId' => $this->integer()->notNull(),

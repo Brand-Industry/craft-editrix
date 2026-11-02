@@ -11,5 +11,5 @@ Editrix finds text across a Craft site, shows what a replacement would change, a
 | [Large sites and the queue](large-sites.md) | Queue setup, limits, and how searches stay fast on big sites |
 | [Settings](configuration.md) | Every setting, in the control panel and in `config/editrix.php` |
 | [Command line](command-line.md) | Search, replace and revert from the terminal (Pro) |
-| [Editions](editions.md) | What Standard and Pro include, with the exact limits |
+| [Editions](editions.md) | What Lite and Pro include, with the exact limits |
 | [Troubleshooting](troubleshooting.md) | Messages you may see and what they mean |

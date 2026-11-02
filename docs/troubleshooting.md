@@ -14,7 +14,7 @@ The search reached the server's memory limit. It shows the matches found so far.
 
 ## "Showing the first N results"
 
-The search reached the limit of your edition (3,000 rows on Standard, 25,000 on Pro) or the `maxSearchResults` you set. Use a more specific phrase, or narrow the scope.
+The search reached the limit of your edition (3,000 rows on Lite, 25,000 on Pro) or the `maxSearchResults` you set. Use a more specific phrase, or narrow the scope.
 
 ## "You already have a search running"
 
@@ -30,7 +30,7 @@ The field was edited after your search, so Editrix skipped it rather than overwr
 
 ## A replace is refused
 
-- **Too many rows.** You selected more rows than your edition allows in one replace (200 on Standard, 5,000 on Pro). Replace in several batches.
+- **Too many rows.** You selected more rows than your edition allows in one replace (200 on Lite, 5,000 on Pro). Replace in several batches.
 - **This field cannot be replaced.** The field's type is not one Editrix writes to, or the field is no longer in the entry's layout.
 - **Protected.** The field or its section is in `protectedFields` or `protectedSections`. Those rows are skipped and listed as protected.
 - **You can't edit this entry in Craft.** Your user group lacks the permission to save entries in that section. The row is skipped and listed with this reason.

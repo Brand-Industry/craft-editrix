@@ -9,11 +9,11 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] Sitio de pruebas con Craft 4 (4.5 o superior), PHP 8.0.2 o superior, Editrix instalado y al menos un sitio con entradas, un global, un campo Matrix, categorías y tags.
 - [ ] Un sitio multi-sitio (2 o más sitios) para la sección 3.4.
 - [ ] Cuatro usuarios: **admin**, **solo búsqueda** (permiso "Search content"), **buscar y reemplazar** ("Search and replace content") y **sin permisos de Editrix**.
-- [ ] Puedes cambiar la edición (Standard / Pro) desde Configuración, Plugins.
+- [ ] Puedes cambiar la edición (Lite / Pro) desde Configuración, Plugins.
 - [ ] Anota cómo corre la cola en este entorno: `runQueueAutomatically` (por defecto activo) o un worker. La sección 4 necesita poder apagarla.
 - [ ] Haz una copia de la base de datos antes de reemplazar contenido.
 - [ ] Anota la versión y el commit que vas a probar (`version` en `composer.json` y `git rev-parse --short HEAD` en la carpeta del plugin). Todos los reportes la llevan.
-- [ ] Qué se ha probado ya y dónde: un sitio local grande (MySQL, 845,000 entradas, un solo sitio) y uno con PostgreSQL y Neo 5 (un solo sitio), los dos en Pro. **Ninguno es multisitio ni Standard**: esas partes (3.4, el reemplazo en dos sitios y los bloqueos de Standard) solo se pueden probar en un entorno aparte.
+- [ ] Qué se ha probado ya y dónde: un sitio local grande (MySQL, 845,000 entradas, un solo sitio) y uno con PostgreSQL y Neo 5 (un solo sitio), los dos en Pro. **Ninguno es multisitio ni Lite**: esas partes (3.4, el reemplazo en dos sitios y los bloqueos de Lite) solo se pueden probar en un entorno aparte.
 - [ ] Si el sitio tiene Neo, comprueba la versión de Neo (en Neo 5 la tabla de bloques usa `primaryOwnerId`).
 
 ## 1. Instalación y ediciones
@@ -22,15 +22,15 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] Tras actualizar desde una versión anterior, las migraciones corren y existen las tablas `editrix_searches` y `editrix_log_items`.
 - [ ] **Instalación nueva** con `composer require brand-industry/craft-editrix` y `php craft plugin/install editrix`: instala sin errores y la primera búsqueda funciona (la tabla de búsquedas se crea sola).
 - [ ] **Actualización**: tras `composer update` y `php craft up`, si el sitio guarda el `project.yaml` en git y su versión del plugin quedó atrás, Craft termina con "Your project config files were created for different versions". No es un fallo del plugin. Con `php craft project-config/write` en desarrollo (con `allowAdminChanges` activo) el aviso desaparece y `php craft up` termina limpio. El README explica los pasos.
-- [ ] **Standard**: Matrix, Categories, selector de varios sitios, filtros de alcance (Segmented) y exportar CSV/JSON no están disponibles (ocultos o desactivados, y nunca devuelven resultados de todos modos). La insignia del título dice Standard.
+- [ ] **Lite**: Matrix, Categories, selector de varios sitios, filtros de alcance (Segmented) y exportar CSV/JSON no están disponibles (ocultos o desactivados, y nunca devuelven resultados de todos modos). La insignia del título dice Lite.
 - [ ] **Pro**: aparecen todos esos elementos y la insignia dice Pro.
-- [ ] Cambiar de Standard a Pro (y de vuelta) sin recargar manualmente no deja la pantalla en un estado raro. Recarga y confirma.
+- [ ] Cambiar de Lite a Pro (y de vuelta) sin recargar manualmente no deja la pantalla en un estado raro. Recarga y confirma.
 - [ ] La tabla de ediciones del README coincide con lo que ves en cada edición.
 
 ## 2. Pantalla de inicio
 
 - [ ] New Operation muestra "What do you want to search?" con tres tarjetas: Text, Categories, Tags.
-- [ ] En Standard, Categories y Tags aparecen bloqueadas con la etiqueta Pro y no se pueden abrir.
+- [ ] En Lite, Categories y Tags aparecen bloqueadas con la etiqueta Pro y no se pueden abrir.
 - [ ] Se ve la gráfica de actividad y "Recent Activity" con las últimas operaciones.
 - [ ] "Re-run" en una actividad reciente reabre la búsqueda con el mismo texto y alcance, y la ejecuta.
 - [ ] "Choose a different tool" regresa a la pantalla de inicio.
@@ -77,7 +77,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] Un consejo cambia cada ~8 segundos y el primero dice que se puede salir de la página. Sin Pro no aparece el consejo de Segmented Search.
 - [ ] Con "reducir movimiento" activado en el sistema, las animaciones se detienen y el texto sigue ahí.
 - [ ] La barra de progreso sube y el porcentaje coincide con X de Y.
-- [ ] **Tiempos de referencia** (sitio local con 845,000 entradas, medidos el 2026-10-12 con el equipo ocupado, carga de ~5, con Pro y Matrix y globales activos; la primera vez pueden ser más; son cifras de referencia, no promesas): una palabra rara en todo el sitio, de 30 a 34 s; «hotel», que se corta en el tope de 25,000 filas, unos 110 s con Matrix y globales (31 s solo con entradas; con el tope de 3,000 de Standard, mucho menos); una sección de 27,000 entradas con una palabra rara, de 5 a 11 s. Si tarda mucho más, anota el equipo y la memoria asignada a Docker. Un Dry Run de 100 filas tardó 0,8 s y 8 MB. Para repetir las medidas: `EDITRIX_SLOW=1 EDITRIX_RARE=<palabra rara> phpunit --filter SearchTimingTest` (y `DryRunTimingTest`).
+- [ ] **Tiempos de referencia** (sitio local con 845,000 entradas, medidos el 2026-10-12 con el equipo ocupado, carga de ~5, con Pro y Matrix y globales activos; la primera vez pueden ser más; son cifras de referencia, no promesas): una palabra rara en todo el sitio, de 30 a 34 s; «hotel», que se corta en el tope de 25,000 filas, unos 110 s con Matrix y globales (31 s solo con entradas; con el tope de 3,000 de Lite, mucho menos); una sección de 27,000 entradas con una palabra rara, de 5 a 11 s. Si tarda mucho más, anota el equipo y la memoria asignada a Docker. Un Dry Run de 100 filas tardó 0,8 s y 8 MB. Para repetir las medidas: `EDITRIX_SLOW=1 EDITRIX_RARE=<palabra rara> phpunit --filter SearchTimingTest` (y `DryRunTimingTest`).
 - [ ] El botón **Cancel search** detiene la búsqueda en pocos segundos y muestra lo encontrado hasta ese momento.
 - [ ] Cancelar y lanzar otra búsqueda enseguida muestra solo los resultados de la nueva.
 - [ ] **Recargar a mitad de búsqueda**: lanza una búsqueda grande y recarga la página. Te deja en la vista de búsqueda de texto, siguiendo la misma búsqueda: spinner, barra con movimiento, "Scanning X of Y entries", "N matches so far" y el botón **Cancel search**. El formulario se ve con los valores usados y deshabilitado.
@@ -93,10 +93,10 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] **View** carga el texto completo del campo al abrirse (breve "Loading…") y resalta todas las apariciones. **Preview Changes** muestra el antes y el después del campo completo.
 - [ ] Si editas la entrada en otra pestaña después de buscar, **View** y **Preview Changes** avisan "Its content changed after the search…" y View no resalta posiciones viejas.
 - [ ] Abrir una búsqueda de **Recent searches** y usar View o Replace funciona igual que en una búsqueda recién hecha.
-- [ ] **Tope por reemplazo**: seleccionar más filas de las que permite la edición (200 en Standard, 5,000 en Pro) deshabilita **Replace Selected** y muestra "Select at most N rows to replace at once." Con ese número o menos funciona normalmente. Una llamada directa a `editrix/api/replace` con más filas responde con ese mismo error y no cambia nada.
+- [ ] **Tope por reemplazo**: seleccionar más filas de las que permite la edición (200 en Lite, 5,000 en Pro) deshabilita **Replace Selected** y muestra "Select at most N rows to replace at once." Con ese número o menos funciona normalmente. Una llamada directa a `editrix/api/replace` con más filas responde con ese mismo error y no cambia nada.
 - [ ] Al seleccionar esa fila y reemplazar, cambian **todas** las apariciones del campo; el mensaje dice cuántas apariciones se cambiaron. En **View**, todas las apariciones salen resaltadas.
 - [ ] Export CSV genera una línea por aparición.
-- [ ] Con una búsqueda muy amplia en un sitio grande (ej. una vocal en un sitio de miles de entradas) el resultado se corta en el límite de la edición (**3,000** en Standard, **25,000** en Pro) y aparece el aviso amarillo "Showing the first N results…". En Standard el aviso añade "Your edition shows up to 3,000 results; Pro shows up to 25,000" con la insignia Pro; en Pro no. Con una búsqueda estrecha, ese aviso no aparece.
+- [ ] Con una búsqueda muy amplia en un sitio grande (ej. una vocal en un sitio de miles de entradas) el resultado se corta en el límite de la edición (**3,000** en Lite, **25,000** en Pro) y aparece el aviso amarillo "Showing the first N results…". En Lite el aviso añade "Your edition shows up to 3,000 results; Pro shows up to 25,000" con la insignia Pro; en Pro no. Con una búsqueda estrecha, ese aviso no aparece.
 - [ ] **Cola apagada**: pon `runQueueAutomatically => false` en `config/general.php`, sin worker, y busca. A los ~15 segundos aparece el aviso de que la cola de Craft quizá no está corriendo. Cancelar funciona.
 - [ ] Con la cola apagada, arranca el worker (`php craft queue/run`): la búsqueda empieza sola y el aviso desaparece.
 - [ ] **Worker caído**: lanza una búsqueda grande y mata el proceso del worker a mitad. A los ~2 minutos sin avance aparece el aviso de que la búsqueda dejó de reportar progreso. Cancelar la libera.
@@ -113,11 +113,11 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] Coincidencias de Tags aparecen como solo lectura ("Search only").
 - [ ] Bloques Matrix aparecen una sola vez, con su entrada padre.
 - [ ] **Neo** (si el sitio lo tiene): una búsqueda amplia termina sin error, y los bloques Neo salen con su etiqueta "Neo" y la ruta de su entrada padre. En Neo 5 con PostgreSQL esto fallaba con "column ownerId does not exist".
-- [ ] **Export CSV** (con permiso y Pro) descarga un archivo con las filas seleccionadas. Sin permiso o en Standard no aparece.
+- [ ] **Export CSV** (con permiso y Pro) descarga un archivo con las filas seleccionadas. Sin permiso o en Lite no aparece.
 
 ## 6. Reemplazar
 
-- [ ] **Preview Changes** muestra la vista de diff. En Standard es texto, en Pro es lado a lado (ORIGINAL / PROPOSED).
+- [ ] **Preview Changes** muestra la vista de diff. En Lite es texto, en Pro es lado a lado (ORIGINAL / PROPOSED).
 - [ ] "Apply to this element" y "Skip" por elemento funcionan.
 - [ ] **Dry Run Mode**: con el interruptor activo el botón dice "Run dry run"; al pulsarlo informa cuántas coincidencias cambiarían y qué filas omitiría, no cambia ninguna entrada, no crea un log en Logs & History, no pide el código REPLACE y las filas siguen sin marcar como reemplazadas.
 - [ ] Reemplazo real: aparece "Successfully replaced N occurrence(s)." y la entrada, abierta en otra pestaña, tiene el texto nuevo.
@@ -143,11 +143,11 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] **Recargar a mitad de un reemplazo en cola**: el panel "Replacing X of Y rows…" vuelve a aparecer solo, con el avance real y **Cancel replace** funcionando; al terminar sale el resumen (sin botón "Search again" si no hay búsqueda cargada). Salir a otra sección del CP y volver hace lo mismo.
 - [ ] **Cancel replace** detiene el trabajo tras la entrada en curso. En Logs & History, esa operación aparece como `cancelled` con lo que alcanzó a cambiar, y se puede revertir.
 - [ ] **Matar el worker** a mitad de un reemplazo en cola (o reiniciar ddev): el registro en Logs & History queda en `running` y tiene los valores ya cambiados; revertirlo restaura lo que se alcanzó a guardar y deja intacto lo demás.
-- [ ] **Límite por edición**: en Standard, más de 200 filas no se pueden reemplazar (el botón se deshabilita y el servidor lo rechaza); en Pro, más de 5,000.
+- [ ] **Límite por edición**: en Lite, más de 200 filas no se pueden reemplazar (el botón se deshabilita y el servidor lo rechaza); en Pro, más de 5,000.
 - [ ] **Entradas que no se pudieron guardar** aparecen en una lista "Show why" con el motivo, y sus filas salen con "Not saved".
 - [ ] Un reemplazo que dejaría **vacío un campo obligatorio** (por ejemplo, el título completo por nada) se rechaza para esa entrada y el título no cambia.
 - [ ] Una búsqueda vacía, o con el reemplazo igual a lo buscado, se rechaza con un mensaje claro antes de leer nada.
-- [ ] **Preserve case** (Pro, solo en modo reemplazo y sin regex): "widget"→"gadget" convierte "Widget" en "Gadget" y "WIDGET" en "GADGET". Activarlo marca Case Insensitive. En Standard la casilla sale deshabilitada con la insignia Pro.
+- [ ] **Preserve case** (Pro, solo en modo reemplazo y sin regex): "widget"→"gadget" convierte "Widget" en "Gadget" y "WIDGET" en "GADGET". Activarlo marca Case Insensitive. En Lite la casilla sale deshabilitada con la insignia Pro.
 - [ ] **Campos y secciones protegidos** (`protectedFields`, `protectedSections` en `config/editrix.php`): sus coincidencias salen en la búsqueda pero sin casilla (solo lectura, "protected"), y no aparecen en modo reemplazo.
 - [ ] **Revert** de un reemplazo donde editaste una de las entradas después: se restauran las demás, esa se deja como está y se informa; luego se ofrece "Overwrite later edits?" como paso aparte. Revertir dos veces no hace daño.
 - [ ] **Revert grande** (más de 25 valores) corre en la cola y avisa al terminar.
@@ -159,7 +159,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] `php craft editrix/run/search --find=... --sections=...` lista coincidencias y el total.
 - [ ] `php craft editrix/run/replace ...` sin `--dry-run=0` no cambia nada y lo dice.
 - [ ] Con `--dry-run=0` cambia, imprime el id del log, y `php craft editrix/run/revert <id>` lo deshace.
-- [ ] En Standard, los comandos responden "The command line needs Editrix Pro."
+- [ ] En Lite, los comandos responden "The command line needs Editrix Pro."
 
 ## 7. Logs & History
 
@@ -171,7 +171,7 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - [ ] Si la entrada ya no existe, el revert lo indica sin romper el resto.
 - [ ] **Delete** elimina el log (con permiso "Delete logs"). Sin permiso no aparece.
 - [ ] **Export** CSV/JSON del historial (Pro y permiso "Export logs").
-- [ ] Retención: Standard conserva 30 días, Pro 90. Los logs más viejos se limpian.
+- [ ] Retención: Lite conserva 30 días, Pro 90. Los logs más viejos se limpian.
 
 ## 8. Categorías y Tags (Pro)
 
@@ -216,8 +216,8 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 
 ## 13. Pendientes y diferencias conocidas
 
-- **Tope de resultados por edición** (Standard 3,000, Pro 25,000, techo absoluto 50,000): sale de `LicenseService::$limits['searchResultLimit']`; `maxSearchResults` solo puede bajarlo.
-- **Tope de filas por reemplazo** (Standard 200, Pro 5,000, `replaceRowLimit` en `LicenseService`); `maxRowsPerReplace` solo puede bajarlo. Por encima de 25 filas (`replaceQueueThreshold`) el reemplazo corre en la cola.
+- **Tope de resultados por edición** (Lite 3,000, Pro 25,000, techo absoluto 50,000): sale de `LicenseService::$limits['searchResultLimit']`; `maxSearchResults` solo puede bajarlo.
+- **Tope de filas por reemplazo** (Lite 200, Pro 5,000, `replaceRowLimit` en `LicenseService`); `maxRowsPerReplace` solo puede bajarlo. Por encima de 25 filas (`replaceQueueThreshold`) el reemplazo corre en la cola.
 - **Cola en producción**: confirmar con quien administra el servidor de cada sitio que corre un worker o cron (o Craft Cloud).
 - **No cubierto por pruebas automáticas**: los endpoints del controlador y toda la interfaz. Por eso existe esta lista.
 - **Palabra partida por formato** (solo Craft 5): el prefiltro no encuentra una palabra cortada por una etiqueta (`Fea<b>tured</b>`). El ajuste `sqlPrefilter` en `false` lo apaga. En Craft 4 no hay prefiltro y esa palabra sí se encuentra.
@@ -225,8 +225,8 @@ Marca cada línea con `[x]` al probarla. Si algo falla, usa la plantilla de la s
 - **No existe todavía**: Presets y API/Webhooks (el README los menciona), reglas guardadas o programadas, pantalla para campos protegidos e ids de elementos (solo por configuración y línea de comandos).
 - **Versiones**: esta rama es la de Craft 4 (PHP 8.0.2 o superior). En Craft 4 no hay prefiltro de base de datos (una búsqueda lee todas las entradas del alcance) ni entradas anidadas en CKEditor. Redactor no se ha probado con datos reales (CKEditor, Matrix y Neo sí).
 - **Aviso de `craft up`** con el `project.yaml` desfasado: es la comprobación normal de Craft (ver la sección 1).
-- **Revertir** solo funciona mientras exista el registro: 30 días en Standard y 90 en Pro.
-- **Entornos**: no hay un sitio multisitio ni uno en Standard con el que se haya probado; la sección 0 lo marca.
+- **Revertir** solo funciona mientras exista el registro: 30 días en Lite y 90 en Pro.
+- **Entornos**: no hay un sitio multisitio ni uno en Lite con el que se haya probado; la sección 0 lo marca.
 
 ## 14. Guion de demo (unos 10 minutos)
 
@@ -239,7 +239,7 @@ Prepara antes: una palabra que aparezca en 20 a 50 entradas, una entrada con neg
 5. Search & Replace: reemplaza la palabra por otra en 2 o 3 entradas con **Preview Changes** y **Dry Run** primero.
 6. Abre la entrada en Craft y enséñala cambiada.
 7. Logs & History: abre el reemplazo y haz **Revert**. Vuelve a la entrada.
-8. Cierra con Categories o Tags y mostrar que Standard queda bloqueado frente a Pro.
+8. Cierra con Categories o Tags y mostrar que Lite queda bloqueado frente a Pro.
 
 ## 15. Cómo reportar un problema
 
@@ -247,7 +247,7 @@ Una línea por punto:
 
 - **Versión y commit** del plugin.
 - **Entorno**: Craft, PHP, MySQL o PostgreSQL, navegador, ddev o servidor.
-- **Edición y usuario**: Standard o Pro, y si eras admin, solo búsqueda o buscar y reemplazar.
+- **Edición y usuario**: Lite o Pro, y si eras admin, solo búsqueda o buscar y reemplazar.
 - **Dónde** de esta lista: número de sección y la línea que probabas.
 - **Qué hiciste**: texto buscado, opciones, alcance, y a cuántas filas afectó.
 - **Qué esperabas y qué pasó**, con captura.

@@ -23,10 +23,10 @@ If a search is still waiting after about 15 seconds, Editrix shows a warning tha
 
 ## Limits that protect the server
 
-- A search returns at most 3,000 rows on Standard and 25,000 on Pro. See [Searching](searching.md).
+- A search returns at most 3,000 rows on Lite and 25,000 on Pro. See [Searching](searching.md).
 - If a search reaches the server's memory limit, it stops with the matches found so far and says why. Narrow it to a section or field to cover everything.
 - Each user runs one search at a time, and `maxConcurrentSearches` caps the total.
-- A replace changes at most 200 rows on Standard and 5,000 on Pro, and runs in the queue above 25 rows. See [Replacing](replacing.md).
+- A replace changes at most 200 rows on Lite and 5,000 on Pro, and runs in the queue above 25 rows. See [Replacing](replacing.md).
 
 ## Entries that fail to load
 

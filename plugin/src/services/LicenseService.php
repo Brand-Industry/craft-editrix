@@ -58,10 +58,10 @@ class LicenseService extends Component
     public const FEATURE_ENV_INDICATOR = "envIndicator";
 
     private array $featureMatrix = [
-        // Standard is the entry edition: general Search and Search & Replace
+        // Lite is the entry edition: general Search and Search & Replace
         // on Entries and Globals, no segmented scope. Matrix/Neo,
         // Categories, segmented scope, multi-site and exports need Pro.
-        Editrix::EDITION_STANDARD => [
+        Editrix::EDITION_LITE => [
             self::FEATURE_SEARCH_ENTRIES => true,
             self::FEATURE_SEARCH_GLOBALS => true,
             self::FEATURE_SEARCH_MATRIX => false,
@@ -154,7 +154,7 @@ class LicenseService extends Component
      * Limits by edition
      */
     private array $limits = [
-        Editrix::EDITION_STANDARD => [
+        Editrix::EDITION_LITE => [
             "logRetentionDays" => 30,
             "maxPresets" => 5,
             "searchResultLimit" => 3000,

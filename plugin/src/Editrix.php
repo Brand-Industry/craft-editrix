@@ -38,12 +38,12 @@ class Editrix extends Plugin
     public bool $hasCpSettings = true;
     public bool $hasCpSection = true;
 
-    public const EDITION_STANDARD = "standard";
+    public const EDITION_LITE = "lite";
     public const EDITION_PRO = "pro";
 
     public static function editions(): array
     {
-        return [self::EDITION_STANDARD, self::EDITION_PRO];
+        return [self::EDITION_LITE, self::EDITION_PRO];
     }
 
     public static function requireEdition(string $edition): void

@@ -409,7 +409,7 @@ class ReplaceLogTest extends EditrixTestCase
     {
         $license = Editrix::$plugin->license;
 
-        $this->assertSame(200, $license->getLimitFor(Editrix::EDITION_STANDARD, 'replaceRowLimit'));
+        $this->assertSame(200, $license->getLimitFor(Editrix::EDITION_LITE, 'replaceRowLimit'));
         $this->assertSame(5000, $license->getLimitFor(Editrix::EDITION_PRO, 'replaceRowLimit'));
         $this->assertSame(200, ReplaceService::rowLimit(200));
         $this->assertSame(50, ReplaceService::rowLimit(200, 50));

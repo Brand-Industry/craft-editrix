@@ -59,7 +59,7 @@
           @change="$emit('update:wholeWords', $event.target.checked)"
         />
         <span>{{ t('Whole Words') }}</span>
-        <span v-if="!hasFeature('wholeWords')" class="editrix-badge editrix-badge--info">Standard</span>
+        <span v-if="!hasFeature('wholeWords')" class="editrix-badge editrix-badge--info">Lite</span>
       </label>
 
       <label class="editrix-form__checkbox">
