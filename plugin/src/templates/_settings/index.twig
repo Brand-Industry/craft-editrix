@@ -62,7 +62,7 @@
 
     {{ forms.textField({
         label: "Log Retention (days)"|t('editrix'),
-        instructions: "How long to keep operation logs. Limited by your edition (Lite: 30, Pro: 90)."|t('editrix'),
+        instructions: "How long to keep operation logs. Lite can keep them up to 30 days and Pro up to 90. If you move to a smaller edition, the logs you have are kept until you lower this number."|t('editrix'),
         id: 'logRetentionDays',
         name: 'logRetentionDays',
         value: settings.logRetentionDays,

@@ -4,6 +4,7 @@ namespace brandindustry\editrix\tests;
 
 use Craft;
 use craft\db\Query;
+use craft\helpers\Db;
 use brandindustry\editrix\Editrix;
 
 /**
@@ -32,6 +33,17 @@ class LogServiceTest extends EditrixTestCase
             $this->markTestSkipped('The Craft project has no users.');
         }
         return (int) $id;
+    }
+
+    private function ageLog(int $id, int $days): void
+    {
+        Craft::$app->getDb()->createCommand()
+            ->update(
+                '{{%editrix_logs}}',
+                ['dateCreated' => Db::prepareDateForDb((new \DateTime())->modify("-{$days} days"))],
+                ['id' => $id]
+            )
+            ->execute();
     }
 
     private function logSearch(string $query, int $results = 7): int
@@ -108,5 +120,47 @@ class LogServiceTest extends EditrixTestCase
 
         $this->assertTrue(Editrix::$plugin->log->markAsReverted($id));
         $this->assertSame('reverted', Editrix::$plugin->log->getLogById($id)['status']);
+    }
+
+    /**
+     * The window is ten years so the cleanup cannot touch a real log of the
+     * project that runs the tests.
+     */
+    public function testCleanupUsesTheConfiguredRetentionAndNotTheEditionCap(): void
+    {
+        $settings = Editrix::$plugin->getSettings();
+        $original = $settings->logRetentionDays;
+        $settings->logRetentionDays = 3650;
+
+        try {
+            $this->assertGreaterThan(
+                Editrix::$plugin->license->getLimit('logRetentionDays'),
+                $settings->getEffectiveLogRetention()
+            );
+
+            $recent = $this->logSearch('qa-retain-' . random_int(1000, 9999));
+            $beyondEditionCap = $this->logSearch('qa-cap-' . random_int(1000, 9999));
+            $expired = $this->logSearch('qa-expired-' . random_int(1000, 9999));
+            $this->ageLog($beyondEditionCap, 400);
+            $this->ageLog($expired, 4000);
+
+            Editrix::$plugin->log->cleanupOldLogs();
+
+            $this->assertNotNull(Editrix::$plugin->log->getLogById($recent));
+            $this->assertNotNull(
+                Editrix::$plugin->log->getLogById($beyondEditionCap),
+                'A log older than the edition cap must stay while the setting allows it.'
+            );
+            $this->assertNull(Editrix::$plugin->log->getLogById($expired));
+        } finally {
+            $settings->logRetentionDays = $original;
+        }
+    }
+
+    public function testCleanupRunsWithCraftsGarbageCollection(): void
+    {
+        $this->assertTrue(
+            \yii\base\Event::hasHandlers(\craft\services\Gc::class, \craft\services\Gc::EVENT_RUN)
+        );
     }
 }

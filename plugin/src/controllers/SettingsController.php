@@ -37,6 +37,7 @@ class SettingsController extends Controller
         $settings->searchCategories = (bool) $request->getBodyParam(
             "searchCategories"
         );
+        $previousRetention = $settings->logRetentionDays;
         $settings->logRetentionDays =
             (int) ($request->getBodyParam("logRetentionDays") ?: 30);
         $settings->bulkConfirmationThreshold =
@@ -48,7 +49,28 @@ class SettingsController extends Controller
             "productionSafeMode"
         );
 
-        if (!$settings->validate()) {
+        $valid = $settings->validate();
+
+        // A number above the edition cap is refused only when it is a change:
+        // a site that moved to a smaller edition can save its other settings
+        // and keep the logs it already has.
+        $retentionCap = Editrix::$plugin->license->getLimit("logRetentionDays");
+        if (
+            $settings->logRetentionDays > $retentionCap &&
+            $settings->logRetentionDays !== $previousRetention
+        ) {
+            $settings->addError(
+                "logRetentionDays",
+                Craft::t(
+                    "editrix",
+                    "Your edition keeps logs for up to {days} days.",
+                    ["days" => $retentionCap]
+                )
+            );
+            $valid = false;
+        }
+
+        if (!$valid) {
             Craft::$app
                 ->getSession()
                 ->setError(Craft::t("editrix", 'Couldn\'t save settings.'));
