@@ -58,7 +58,7 @@ export function useSearch(actionMode) {
   const totalResults = ref(0);
   const truncated = ref(false);
   const stopReason = ref(null);
-  // The row limit in force and, on Standard, what Pro would allow.
+  // The row limit in force and, on Lite, what Pro would allow.
   const resultLimit = ref(null);
   const upgradeLimit = ref(null);
   const selectedResults = ref([]);

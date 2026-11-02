@@ -20,7 +20,7 @@ An **Editrix** item appears in the control panel sidebar with three pages: **New
 
 ## Choose an edition
 
-Editrix has two paid editions, Standard and Pro. Craft lets you try either one in a development or staging environment before you buy a license. Switch editions in **Settings, Plugins**. See [Editions](editions.md) for what each one includes.
+Editrix has two paid editions, Lite and Pro. Craft lets you try either one in a development or staging environment before you buy a license. Switch editions in **Settings, Plugins**. See [Editions](editions.md) for what each one includes.
 
 A license covers one production site.
 

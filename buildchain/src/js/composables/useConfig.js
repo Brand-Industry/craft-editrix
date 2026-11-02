@@ -38,7 +38,7 @@ export function useConfig() {
   
   // License
   const license = computed(() => config.value.license || {});
-  const edition = computed(() => license.value.edition || 'standard');
+  const edition = computed(() => license.value.edition || 'lite');
   const features = computed(() => license.value.features || {});
   const limits = computed(() => license.value.limits || {});
   
@@ -68,7 +68,7 @@ export function useConfig() {
   
   // Edition check
   const isEdition = (ed) => {
-    const order = { standard: 0, pro: 1 };
+    const order = { lite: 0, pro: 1 };
     return (order[edition.value] || 0) >= (order[ed] || 0);
   };
   

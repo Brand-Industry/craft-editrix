@@ -15,7 +15,7 @@ class SearchLimitsTest extends EditrixTestCase
     {
         $license = Editrix::$plugin->license;
 
-        $this->assertSame(3000, $license->getLimitFor(Editrix::EDITION_STANDARD, 'searchResultLimit'));
+        $this->assertSame(3000, $license->getLimitFor(Editrix::EDITION_LITE, 'searchResultLimit'));
         $this->assertSame(25000, $license->getLimitFor(Editrix::EDITION_PRO, 'searchResultLimit'));
     }
 
@@ -28,7 +28,7 @@ class SearchLimitsTest extends EditrixTestCase
     public function testASettingCanLowerTheLimitButNeverRaiseIt(): void
     {
         $this->assertSame(1000, SearchService::resultLimit(3000, 1000));
-        $this->assertSame(3000, SearchService::resultLimit(3000, 10000), 'Standard cannot be configured up to Pro.');
+        $this->assertSame(3000, SearchService::resultLimit(3000, 10000), 'Lite cannot be configured up to Pro.');
         $this->assertSame(3000, SearchService::resultLimit(3000, null));
         $this->assertSame(3000, SearchService::resultLimit(3000, 0));
     }
@@ -115,7 +115,7 @@ class SearchLimitsTest extends EditrixTestCase
 
     public function testAStandardSiteIsLimitedAndToldWhatProWouldGive(): void
     {
-        $this->asEdition(Editrix::EDITION_STANDARD, function () {
+        $this->asEdition(Editrix::EDITION_LITE, function () {
             $search = Editrix::$plugin->search;
 
             $this->assertSame(3000, $search->currentResultLimit());
@@ -140,7 +140,7 @@ class SearchLimitsTest extends EditrixTestCase
             $this->markTestSkipped('No section has enough entries.');
         }
 
-        $this->asEdition(Editrix::EDITION_STANDARD, function () use ($section) {
+        $this->asEdition(Editrix::EDITION_LITE, function () use ($section) {
             $meta = [];
             $results = Editrix::$plugin->search->search(
                 'e',

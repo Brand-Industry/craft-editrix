@@ -25,7 +25,7 @@ A replace of more rows than `bulkConfirmationThreshold` (default 100) asks you t
 
 ## Limits
 
-One replace changes at most 200 rows on Standard and 5,000 on Pro. A replace over the limit is refused, never cut short, so what changes is always what you selected. `maxRowsPerReplace` can lower the limit, not raise it.
+One replace changes at most 200 rows on Lite and 5,000 on Pro. A replace over the limit is refused, never cut short, so what changes is always what you selected. `maxRowsPerReplace` can lower the limit, not raise it.
 
 ## Large replaces
 

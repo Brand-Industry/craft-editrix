@@ -33,7 +33,7 @@ You can also install it from **Settings, Plugins** in the control panel. If `php
 
 ## Editions
 
-| | Standard (USD 19) | Pro (USD 99) |
+| | Lite (USD 19) | Pro (USD 99) |
 | --- | :---: | :---: |
 | Search entries and globals | Yes | Yes |
 | Regular expressions, case, whole words | Yes | Yes |

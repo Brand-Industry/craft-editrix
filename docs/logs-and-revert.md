@@ -20,7 +20,7 @@ A revert also follows Craft's permissions: a value in an entry the user may not 
 
 A revert of many values runs in the queue, with progress.
 
-A revert only works while the log exists. Logs are kept for the number of days in the **Log Retention** setting, up to 30 days on Standard and 90 on Pro.
+A revert only works while the log exists. Logs are kept for the number of days in the **Log Retention** setting, up to 30 days on Lite and 90 on Pro.
 
 ## Export (Pro)
 

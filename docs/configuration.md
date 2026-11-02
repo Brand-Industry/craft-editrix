@@ -44,5 +44,5 @@ Protected fields and sections are not hidden from searches. Their matches show a
 
 | Setting | Default | Effect |
 | --- | --- | --- |
-| `logRetentionDays` | `30` | Days to keep logs, from 1 to 365. Your edition caps it: 30 on Standard, 90 on Pro. |
+| `logRetentionDays` | `30` | Days to keep logs, from 1 to 365. Your edition caps it: 30 on Lite, 90 on Pro. |
 | `showEnvironmentIndicator` | `true` | Show the current environment in the interface |

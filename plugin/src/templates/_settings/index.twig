@@ -15,7 +15,7 @@
 
     <p class="light">
         {{ "Current edition:"|t('editrix') }} <strong>{{ edition|capitalize }}</strong>
-        {% if edition == 'standard' %}
+        {% if edition == 'lite' %}
             (<a href="https://plugins.craftcms.com/editrix" target="_blank">{{ "Upgrade"|t('editrix') }}</a>)
         {% endif %}
     </p>
@@ -62,7 +62,7 @@
 
     {{ forms.textField({
         label: "Log Retention (days)"|t('editrix'),
-        instructions: "How long to keep operation logs. Limited by your edition (Standard: 30, Pro: 90)."|t('editrix'),
+        instructions: "How long to keep operation logs. Limited by your edition (Lite: 30, Pro: 90)."|t('editrix'),
         id: 'logRetentionDays',
         name: 'logRetentionDays',
         value: settings.logRetentionDays,

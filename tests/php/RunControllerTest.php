@@ -154,7 +154,7 @@ class RunControllerTest extends EditrixTestCase
         $real = Editrix::$plugin->edition;
 
         try {
-            Editrix::$plugin->edition = Editrix::EDITION_STANDARD;
+            Editrix::$plugin->edition = Editrix::EDITION_LITE;
             $this->assertFalse($controller->beforeAction(new Action('search', $controller)));
 
             Editrix::$plugin->edition = Editrix::EDITION_PRO;
