@@ -9,6 +9,7 @@ use craft\base\Model;
 use craft\base\Plugin;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
+use craft\services\Gc;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
 use craft\helpers\UrlHelper;
@@ -115,6 +116,7 @@ class Editrix extends Plugin
         ]);
 
         $this->installCpEventListeners();
+        $this->installGarbageCollection();
         $this->registerLogFile();
 
         Craft::info(
@@ -124,6 +126,17 @@ class Editrix extends Plugin
             ]),
             __METHOD__
         );
+    }
+
+    /**
+     * Craft runs its garbage collection now and then and with `craft gc`;
+     * logs older than the Log Retention setting are removed with it.
+     */
+    protected function installGarbageCollection(): void
+    {
+        Event::on(Gc::class, Gc::EVENT_RUN, function () {
+            $this->log->cleanupOldLogs();
+        });
     }
 
     protected function installCpEventListeners(): void

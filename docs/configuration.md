@@ -44,5 +44,5 @@ Protected fields and sections are not hidden from searches. Their matches show a
 
 | Setting | Default | Effect |
 | --- | --- | --- |
-| `logRetentionDays` | `30` | Days to keep logs, from 1 to 365. Your edition caps it: 30 on Lite, 90 on Pro. |
+| `logRetentionDays` | `30` | Days to keep logs, from 1 to 365. Your edition caps the number you can set: 30 on Lite, 90 on Pro. Logs older than this are removed when Craft runs garbage collection (`craft gc`). If you move to a smaller edition, the number you had stays until you lower it. |
 | `showEnvironmentIndicator` | `true` | Show the current environment in the interface |

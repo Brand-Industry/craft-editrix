@@ -114,9 +114,13 @@ class Settings extends Model
         ];
     }
 
+    /**
+     * The edition caps the number a user can set, not the logs already kept.
+     * A site that moves from Pro to Lite keeps its logs until it lowers the
+     * setting itself, because changing edition must not delete data.
+     */
     public function getEffectiveLogRetention(): int
     {
-        $editionLimit = Editrix::$plugin->license->getLimit("logRetentionDays");
-        return min($this->logRetentionDays, $editionLimit);
+        return $this->logRetentionDays;
     }
 }
