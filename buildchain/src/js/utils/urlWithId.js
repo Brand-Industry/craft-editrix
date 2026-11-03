@@ -6,3 +6,10 @@ export const urlWithId = (url, id) => {
   if (queryAt === -1) return `${url}/${id}`;
   return `${url.slice(0, queryAt)}/${id}${url.slice(queryAt)}`;
 };
+
+// Adds query parameters to a URL that may already have a query string.
+export const urlWithQuery = (url, params) => {
+  const query = params.toString();
+  if (!query) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}${query}`;
+};

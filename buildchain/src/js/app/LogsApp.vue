@@ -185,7 +185,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useApi } from '../composables/useApi';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import ConfirmActionModal from '../components/common/ConfirmActionModal.vue';
-import { urlWithId } from '../utils/urlWithId';
+import { urlWithId, urlWithQuery } from '../utils/urlWithId';
 
 // Config from PHP
 const config = window.EditrixConfig || {};
@@ -396,7 +396,7 @@ const handleExport = (format) => {
   params.append('type', filters.type);
   if (filters.siteId) params.append('siteId', filters.siteId);
   if (filters.status) params.append('status', filters.status);
-  window.location.href = exportUrl + '?' + params.toString();
+  window.location.href = urlWithQuery(exportUrl, params);
 };
 
 const rerunUrl = (log) => {
@@ -412,7 +412,7 @@ const rerunUrl = (log) => {
   (scope.fields || []).forEach(v => params.append('fields[]', v));
   (scope.entryTypes || []).forEach(v => params.append('entryTypes[]', v));
 
-  return `${searchPageUrl}?${params.toString()}`;
+  return urlWithQuery(searchPageUrl, params);
 };
 
 const badgeClass = (status) => {
