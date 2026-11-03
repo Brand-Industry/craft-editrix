@@ -525,4 +525,45 @@ class ReplaceLogTest extends EditrixTestCase
         $this->assertTrue($summary['partial']);
         $this->assertSame(0, $summary['checked']);
     }
+
+    /**
+     * A replace leaves thousands of Craft jobs ahead of the revert, so it can
+     * wait a long time for its turn. Waiting is not being dead.
+     */
+    public function testARevertWaitingInTheQueueIsNotReleased(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $this->appliedItem($logId, 'EditrixQA' . random_int(100, 999));
+        Editrix::$plugin->log->finishReplaceLog($logId, 'reverting', 1);
+        $this->ageLog($logId, 3600);
+
+        $db = Craft::$app->getDb();
+        // Delayed an hour, so no worker running now can pick it up.
+        $db->createCommand()->insert('{{%queue}}', [
+            'channel' => 'queue',
+            'job' => serialize('editrix-test-placeholder'),
+            'description' => (new \brandindustry\editrix\jobs\RevertJob(['logId' => $logId]))->getDescription(),
+            'timePushed' => time(),
+            'ttr' => 300,
+            'delay' => 3600,
+            'priority' => 1024,
+        ])->execute();
+        $queueId = (int) $db->getLastInsertID();
+
+        try {
+            $this->assertTrue(Editrix::$plugin->log->hasRevertJobInQueue($logId));
+            $this->assertFalse(Editrix::$plugin->log->isRevertStale($this->logRow($logId)), 'It is only waiting for its turn.');
+        } finally {
+            $db->createCommand()->delete('{{%queue}}', ['id' => $queueId])->execute();
+        }
+
+        $this->assertFalse(Editrix::$plugin->log->hasRevertJobInQueue($logId));
+        $this->assertTrue(Editrix::$plugin->log->isRevertStale($this->logRow($logId)), 'With nothing left in the queue, an hour without movement means it died.');
+    }
+
+    public function testAnotherLogsRevertInTheQueueDoesNotKeepThisOneAlive(): void
+    {
+        $this->assertFalse(Editrix::$plugin->log->hasRevertJobInQueue(987654321));
+    }
 }

@@ -163,4 +163,21 @@ class LogServiceTest extends EditrixTestCase
             \yii\base\Event::hasHandlers(\craft\services\Gc::class, \craft\services\Gc::EVENT_RUN)
         );
     }
+
+    public function testEditrixJobsGoAheadOfCraftsOwnHousekeeping(): void
+    {
+        // A revert of a log that does not exist does nothing, and this one is delayed anyway.
+        $id = Craft::$app->getQueue()
+            ->priority(Editrix::QUEUE_PRIORITY)
+            ->delay(3600)
+            ->push(new \brandindustry\editrix\jobs\RevertJob(['logId' => 0]));
+
+        try {
+            $priority = (int) (new Query())->select(['priority'])->from('{{%queue}}')->where(['id' => $id])->scalar();
+            $this->assertSame(Editrix::QUEUE_PRIORITY, $priority);
+            $this->assertLessThan(1024, $priority, 'Craft queues its own jobs at 1024, and a lower number runs first.');
+        } finally {
+            Craft::$app->getDb()->createCommand()->delete('{{%queue}}', ['id' => $id])->execute();
+        }
+    }
 }
