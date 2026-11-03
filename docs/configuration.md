@@ -31,7 +31,7 @@ return [
 | --- | --- | --- |
 | `maxRowsPerReplace` | `null` | Lowers the rows one replace may change below your edition's limit. It cannot raise it. |
 | `replaceQueueThreshold` | `25` | A replace of more rows than this runs in the queue |
-| `bulkConfirmationThreshold` | `100` | A replace of more rows than this asks for the confirmation word |
+| `bulkConfirmationThreshold` | `100` | A replace of more rows than this asks for the confirmation word and a reminder to back up the database |
 | `productionSafeMode` | `false` | Ask for the confirmation word on every replace in production (Pro) |
 | `validateOnReplace` | `false` | Validate an entry before saving it |
 | `createRevisionsOnReplace` | `true` | Leave a revision on the entries a replace changes |
