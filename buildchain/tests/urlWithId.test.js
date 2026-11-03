@@ -25,8 +25,8 @@ describe('urlWithQuery', () => {
 
   it('continues the query of a multi-site url', () => {
     expect(
-      urlWithQuery('/craft/editrix?site=en_us', new URLSearchParams({ q: 'Ulbrich', ci: '1' }))
-    ).toBe('/craft/editrix?site=en_us&q=Ulbrich&ci=1');
+      urlWithQuery('/craft/editrix?site=en_us', new URLSearchParams({ q: 'Acme', ci: '1' }))
+    ).toBe('/craft/editrix?site=en_us&q=Acme&ci=1');
   });
 
   it('leaves the url alone when there is nothing to add', () => {

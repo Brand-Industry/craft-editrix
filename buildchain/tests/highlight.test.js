@@ -64,9 +64,9 @@ describe('contextToHtml', () => {
 
 describe('findLiteral', () => {
   it('finds every place the text stands', () => {
-    expect(findLiteral('Ulbrich test and Ulbrich test', 'Ulbrich test')).toEqual([
-      { start: 0, end: 12 },
-      { start: 17, end: 29 },
+    expect(findLiteral('Acme test and Acme test', 'Acme test')).toEqual([
+      { start: 0, end: 9 },
+      { start: 14, end: 23 },
     ]);
   });
 
