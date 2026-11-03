@@ -415,4 +415,114 @@ class ReplaceLogTest extends EditrixTestCase
         $this->assertSame(50, ReplaceService::rowLimit(200, 50));
         $this->assertSame(200, ReplaceService::rowLimit(200, 9999));
     }
+
+    private function ageLog(int $logId, int $seconds): void
+    {
+        $when = \craft\helpers\Db::prepareDateForDb((new \DateTime())->modify("-{$seconds} seconds"));
+        Craft::$app->getDb()->createCommand()->update(Install::TABLE_LOGS, ['dateUpdated' => $when], ['id' => $logId])->execute();
+        Craft::$app->getDb()->createCommand()->update(Install::TABLE_LOG_ITEMS, ['dateUpdated' => $when], ['logId' => $logId])->execute();
+    }
+
+    private function appliedItem(int $logId, string $new): void
+    {
+        $entry = $this->load();
+        $entry->title = $new;
+        Craft::$app->getElements()->saveElement($entry, false);
+        Editrix::$plugin->log->addItem($logId, [
+            'elementType' => 'entry', 'elementId' => $this->entryId, 'siteId' => $this->siteId(),
+            'fieldHandle' => 'title', 'elementTitle' => $this->originalTitle,
+            'oldValue' => $this->originalTitle, 'newValue' => $new,
+        ], 0, 'applied');
+    }
+
+    public function testAStoppedRevertLeavesTheLogOpenNotReverted(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $new = 'EditrixQA' . random_int(100, 999);
+        $this->appliedItem($logId, $new);
+        Editrix::$plugin->log->finishReplaceLog($logId, 'reverting', 1);
+
+        $result = Editrix::$plugin->replace->revertEntries(
+            Editrix::$plugin->log->replacementsFor($this->logRow($logId)),
+            false,
+            logId: $logId,
+            shouldStop: fn() => true
+        );
+        Editrix::$plugin->replace->finishRevert($logId, $result);
+
+        $this->assertTrue($result['stopped']);
+        $this->assertSame(0, $result['reverted']);
+        $this->assertSame($new, $this->title(), 'Nothing was reached, so nothing is restored.');
+        $this->assertNotSame('reverted', $this->logRow($logId)['status'], 'A stopped revert must never close the log as reverted.');
+        $this->assertSame(1, Editrix::$plugin->log->itemCounts($logId)['applied'] ?? 0, 'The value stays in the log, to revert later.');
+    }
+
+    public function testARevertThatIsNotStoppedStillFinishes(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $this->appliedItem($logId, 'EditrixQA' . random_int(100, 999));
+        Editrix::$plugin->log->finishReplaceLog($logId, 'reverting', 1);
+
+        $result = Editrix::$plugin->replace->revertEntries(
+            Editrix::$plugin->log->replacementsFor($this->logRow($logId)),
+            false,
+            logId: $logId,
+            shouldStop: fn() => false
+        );
+        Editrix::$plugin->replace->finishRevert($logId, $result);
+
+        $this->assertSame(1, $result['reverted']);
+        $this->assertSame($this->originalTitle, $this->title());
+        $this->assertSame('reverted', $this->logRow($logId)['status']);
+    }
+
+    public function testARevertThatStoppedMovingIsReleasedAndALiveOneIsNot(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $this->appliedItem($logId, 'EditrixQA' . random_int(100, 999));
+        Editrix::$plugin->log->finishReplaceLog($logId, 'reverting', 1);
+
+        $this->assertFalse(Editrix::$plugin->log->isRevertStale($this->logRow($logId)), 'A revert that just moved is alive.');
+
+        $this->ageLog($logId, 600);
+        $this->assertTrue(Editrix::$plugin->log->isRevertStale($this->logRow($logId)), 'Ten minutes with no movement means the worker is gone.');
+
+        Editrix::$plugin->log->releaseStaleRevert($logId);
+        $this->assertSame('success', $this->logRow($logId)['status'], 'Nothing was restored, so the log goes back to what it was and can be reverted again.');
+    }
+
+    public function testRevertValidationCountsWithoutKeepingARowPerValue(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $this->appliedItem($logId, 'EditrixQA' . random_int(100, 999));
+        $log = $this->logRow($logId);
+
+        $summary = Editrix::$plugin->replace->validateRevertSummary(Editrix::$plugin->log->replacementsFor($log));
+
+        $this->assertSame(1, $summary['checked']);
+        $this->assertSame(1, $summary['safe']);
+        $this->assertSame(0, $summary['modified']);
+        $this->assertFalse($summary['partial']);
+        $this->assertSame([], $summary['details']);
+    }
+
+    public function testRevertValidationGivesUpWhenItRunsOutOfTime(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $this->appliedItem($logId, 'EditrixQA' . random_int(100, 999));
+
+        $summary = Editrix::$plugin->replace->validateRevertSummary(
+            Editrix::$plugin->log->replacementsFor($this->logRow($logId)),
+            null,
+            -1.0
+        );
+
+        $this->assertTrue($summary['partial']);
+        $this->assertSame(0, $summary['checked']);
+    }
 }

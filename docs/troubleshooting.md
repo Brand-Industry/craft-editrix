@@ -12,6 +12,14 @@ The search reported nothing for two minutes, which usually means the server kill
 
 The search reached the server's memory limit. It shows the matches found so far. Narrow it to a section or field to cover everything.
 
+## "Search stopped early to protect the server (time limit)"
+
+The search ran for `maxSearchSeconds` (300 seconds by default). It shows the matches found so far. Narrow it to a section or field, or raise the setting if your server can take longer searches.
+
+## A revert says "This operation is still running"
+
+A revert in the queue is still working, or its worker stopped. If nothing has moved for three minutes, Editrix treats the revert as stopped and lets you start it again: the values already restored stay restored, and the rest are still in the log. To stop one that is running, use **Stop revert** in its dialog.
+
 ## "Showing the first N results"
 
 The search reached the limit of your edition (3,000 rows on Lite, 25,000 on Pro) or the `maxSearchResults` you set. Use a more specific phrase, or narrow the scope.

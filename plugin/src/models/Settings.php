@@ -44,6 +44,13 @@ class Settings extends Model
     public int $maxConcurrentSearches = 2;
 
     /**
+     * Seconds one search may run. Past that it stops and returns the
+     * matches found so far, the way it does when it runs short of memory.
+     * Null or 0 means no limit.
+     */
+    public ?int $maxSearchSeconds = 300;
+
+    /**
      * Lowers the number of result rows a search returns below what the
      * edition allows (Lite 3,000, Pro 25,000). Null keeps the
      * edition's limit; it can never raise it.
@@ -96,6 +103,7 @@ class Settings extends Model
             [["logRetentionDays"], "integer", "min" => 1, "max" => 365],
             [["bulkConfirmationThreshold", "maxConcurrentSearches", "replaceQueueThreshold"], "integer", "min" => 1],
             [["maxSearchResults", "maxRowsPerReplace"], "integer", "min" => 1, "skipOnEmpty" => true],
+            [["maxSearchSeconds"], "integer", "min" => 0, "skipOnEmpty" => true],
             [
                 [
                     "searchEntries",
