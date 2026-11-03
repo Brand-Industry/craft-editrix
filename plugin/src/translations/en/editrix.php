@@ -132,7 +132,7 @@ return [
     'Invalid regular expression' => 'Invalid regular expression',
     'What do you want to search?' => 'What do you want to search?',
     'Confirmation required' => 'Confirmation required',
-    'Already replaced. This is the text as it is now, so there is nothing to apply.' => 'Already replaced. This is the text as it is now, so there is nothing to apply.',
+    'Already replaced. This is the text as it is now, with the replacement marked, so there is nothing to apply.' => 'Already replaced. This is the text as it is now, with the replacement marked, so there is nothing to apply.',
     'CURRENT TEXT' => 'CURRENT TEXT',
     'A replace is running. You can look at this row, but nothing can be applied until it finishes.' => 'A replace is running. You can look at this row, but nothing can be applied until it finishes.',
     'This action can be reverted from the History within {days} days.' => 'This action can be reverted from the History within {days} days.',

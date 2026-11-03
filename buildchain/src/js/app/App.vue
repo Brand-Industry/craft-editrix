@@ -373,6 +373,8 @@
       :stale="previewData?.stale ?? false"
       :replaced="!!previewResult && rowState(previewResult) === 'replaced'"
       :busy="replacing"
+      :highlight="searchParams.useRegex ? '' : searchParams.replaceWith"
+      :highlight-ignore-case="searchParams.preserveCase"
       :loading="previewLoading"
       @close="previewResult = null"
       @apply="applyToSingle"

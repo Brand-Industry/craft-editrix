@@ -28,7 +28,7 @@
 
           <div v-if="replaced" class="editrix-diff__notice editrix-diff__notice--warning">
             <span>⚠️</span>
-            <p>{{ t('Already replaced. This is the text as it is now, so there is nothing to apply.') }}</p>
+            <p>{{ t('Already replaced. This is the text as it is now, with the replacement marked, so there is nothing to apply.') }}</p>
           </div>
 
           <div v-if="stale && !replaced" class="editrix-diff__notice editrix-diff__notice--warning">
@@ -97,7 +97,7 @@
 <script setup>
 import { computed, inject } from 'vue';
 import { diffText } from '../../utils/textDiff';
-import { escapeText } from '../../utils/highlight';
+import { escapeText, findLiteral, highlightMatches } from '../../utils/highlight';
 
 const t = inject('t');
 
@@ -111,6 +111,9 @@ const props = defineProps({
   stale: { type: Boolean, default: false },
   // The row was already replaced in this search.
   replaced: { type: Boolean, default: false },
+  // The replacement text, to mark in a replaced row.
+  highlight: { type: String, default: '' },
+  highlightIgnoreCase: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
   // A replace is running: nothing can be applied until it ends.
   busy: { type: Boolean, default: false },
@@ -132,6 +135,15 @@ const render = (keep, mark) =>
 const originalHtml = computed(() => render('del', 'diff-remove'));
 const proposedHtml = computed(() => render('add', 'diff-add'));
 // A replaced row only shows its text as it is now: replacing it again would
-// show the new text twice.
-const currentHtml = computed(() => escapeText(props.original));
+// show the new text twice. The replacement is marked where it stands. The
+// original text is gone from the row, so this marks every place the
+// replacement text appears, which is where the replace put it.
+const currentHtml = computed(() =>
+  highlightMatches(
+    props.original,
+    findLiteral(props.original, props.highlight, props.highlightIgnoreCase),
+    escapeText,
+    'diff-add'
+  )
+);
 </script>
