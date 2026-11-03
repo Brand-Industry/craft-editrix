@@ -40,7 +40,7 @@
         <button
           v-else
           class="editrix-btn editrix-btn--primary"
-          :disabled="selectedCount === 0 || overReplaceLimit"
+          :disabled="busy || selectedCount === 0 || overReplaceLimit"
           @click="$emit('replace')"
         >
           {{ dryRun ? t('Run dry run') : t('Replace Selected') }}
@@ -225,6 +225,8 @@ const props = defineProps({
   actionMode: { type: String, default: 'replace' },
   // Replace only reports what it would change.
   dryRun: { type: Boolean, default: false },
+  // A replace is running, so another one cannot start.
+  busy: { type: Boolean, default: false },
   searchQuery: { type: String, default: '' },
   // Occurrences inside a row can be left out of a replace.
   isMatchIncluded: { type: Function, default: () => true },
