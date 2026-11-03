@@ -29,6 +29,19 @@ export function formatRemaining(seconds) {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
+// Seconds a revert has left, from how fast values have been restored since it
+// was first seen. Null until there is enough to go on. An upper bound: values
+// edited since are never restored, so it can end sooner.
+export function estimateRevertSeconds({ first, reverted, total, nowMs }) {
+  if (!first) return null;
+
+  const seconds = (nowMs - first.atMs) / 1000;
+  const done = reverted - first.reverted;
+  if (seconds < 15 || done < 20) return null;
+
+  return Math.max(0, total - reverted) / (done / seconds);
+}
+
 // A search that starts scanning is sampled once; later readings give the
 // pace. Too little data gives null so the UI says nothing instead of
 // guessing. It is an upper bound: a search can end earlier, at the result

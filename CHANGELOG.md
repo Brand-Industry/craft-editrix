@@ -20,7 +20,7 @@ All notable changes to Editrix will be documented in this file.
 - While a replace ran, Replace Selected stayed on and a second replace could be started over the same rows. Replace Selected, Apply in the preview, Replace in the detail window and the row selection are now off until it ends
 - The check before a revert kept a row in memory for every value of the log and had no time limit, so a log of many thousands of values could run a web request out of memory. It now counts as it goes and stops after 20 seconds, and says how many values it covered
 - A revert whose worker died left the log stuck as "still running", and a new revert was refused. When Craft's queue no longer holds the revert and nothing has moved for two minutes, the log is closed as partial and can be reverted again. A revert that is only waiting its turn is left alone
-- In Logs & History, a revert of a large log looked stuck: the buttons turned off and nothing said why until the dialog opened. The page now says it is checking, and the dialog shows how many values are restored and how long it has been running, and warns if the count stops moving
+- In Logs & History, a revert of a large log looked stuck: the buttons turned off and nothing said why until the dialog opened. The page now says it is checking, and the dialog shows how many values are restored and how long it has been running, and warns if the count stops moving. It also says about how long is left, and no longer repeats the question once the revert runs
 
 ## [2.0.2] - 2026-11-03
 

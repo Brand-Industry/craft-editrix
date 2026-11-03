@@ -7,6 +7,7 @@ import {
   waitingTips,
   MIN_SAMPLE_SECONDS,
   MIN_SAMPLE_ENTRIES,
+  estimateRevertSeconds,
 } from '../src/js/utils/searchProgress';
 
 describe('searchPhase', () => {
@@ -116,5 +117,29 @@ describe('waitingTips', () => {
 
     expect(withFilters).toMatch(/Segmented Search/);
     expect(without).not.toMatch(/Segmented Search/);
+  });
+});
+
+describe('estimateRevertSeconds', () => {
+  const first = { reverted: 0, atMs: 0 };
+
+  it('gives the time left at the pace so far', () => {
+    // 120 values in 20 s is 6 a second; 1,757 are left.
+    expect(estimateRevertSeconds({ first, reverted: 120, total: 1877, nowMs: 20000 })).toBeCloseTo(292.83, 1);
+  });
+
+  it('counts only what this revert restored, not what was already back', () => {
+    const resumed = { reverted: 1000, atMs: 0 };
+    expect(estimateRevertSeconds({ first: resumed, reverted: 1120, total: 1877, nowMs: 20000 })).toBeCloseTo((1877 - 1120) / 6, 1);
+  });
+
+  it('says nothing until there is enough to go on', () => {
+    expect(estimateRevertSeconds({ first: null, reverted: 50, total: 100, nowMs: 30000 })).toBe(null);
+    expect(estimateRevertSeconds({ first, reverted: 120, total: 1877, nowMs: 5000 })).toBe(null);
+    expect(estimateRevertSeconds({ first, reverted: 5, total: 1877, nowMs: 30000 })).toBe(null);
+  });
+
+  it('is zero when everything is back', () => {
+    expect(estimateRevertSeconds({ first, reverted: 1877, total: 1877, nowMs: 60000 })).toBe(0);
   });
 });

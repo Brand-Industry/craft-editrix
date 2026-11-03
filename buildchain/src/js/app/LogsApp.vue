@@ -194,7 +194,7 @@ import { useApi } from '../composables/useApi';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import ConfirmActionModal from '../components/common/ConfirmActionModal.vue';
 import { urlWithId, urlWithQuery } from '../utils/urlWithId';
-import { formatElapsed } from '../utils/searchProgress';
+import { formatElapsed, formatRemaining, estimateRevertSeconds } from '../utils/searchProgress';
 import { kickQueue } from '../utils/queue';
 
 // Config from PHP
@@ -285,6 +285,7 @@ const runRevert = async (log, force, { resume = false } = {}) => {
   stopRequested.value = false;
   const startedAt = Date.now();
   let counts = null;
+  let first = null;
   let lastMoveAt = startedAt;
 
   // Redrawn every second, so the clock moves even when the count does not.
@@ -296,7 +297,12 @@ const runRevert = async (log, force, { resume = false } = {}) => {
         : counts
           ? `Reverting: ${counts.reverted.toLocaleString()} of ${counts.total.toLocaleString()} values restored.`
           : 'Reverting.';
-    text += ` ${formatElapsed((Date.now() - startedAt) / 1000)} elapsed. Keep this page open until it finishes.`;
+    text += ` ${formatElapsed((Date.now() - startedAt) / 1000)} elapsed.`;
+    const left = counts && !stopRequested.value
+      ? formatRemaining(estimateRevertSeconds({ first, reverted: counts.reverted, total: counts.total, nowMs: Date.now() }) ?? 0)
+      : null;
+    if (left) text += ` Up to ${left} left.`;
+    text += ' Keep this page open until it finishes.';
     if (Date.now() - lastMoveAt > 30000) {
       text += " Nothing has moved for a while, so Craft's queue may not be running.";
     }
@@ -327,6 +333,7 @@ const runRevert = async (log, force, { resume = false } = {}) => {
       if (status.running) {
         if (!counts || status.reverted !== counts.reverted) lastMoveAt = Date.now();
         counts = { reverted: status.reverted, total: status.total };
+        if (!first) first = { reverted: status.reverted, atMs: Date.now() };
         if (Date.now() - lastMoveAt > 10000 && Date.now() - lastKickAt > 10000) {
           kickQueue();
           lastKickAt = Date.now();
