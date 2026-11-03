@@ -12,6 +12,9 @@
             :key="idx"
             :class="{ 'editrix-modal__warning': danger }"
           >{{ line }}</p>
+          <p v-if="loading && progressText" class="editrix-modal__progress" role="status" aria-live="polite" style="margin: 12px 0 0; font-size: 13px;">
+            {{ progressText }}
+          </p>
         </div>
         <footer class="editrix-modal__footer">
           <button
@@ -42,6 +45,7 @@ const props = defineProps({
   title: { type: String, default: 'Confirm' },
   message: { type: String, default: '' },
   loading: { type: Boolean, default: false },
+  progressText: { type: String, default: '' },
   danger: { type: Boolean, default: false },
 });
 defineEmits(['confirm', 'cancel']);
