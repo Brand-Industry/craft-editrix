@@ -36,7 +36,7 @@ The prefilter finds everything except a word that formatting splits in the middl
 - A search stops after `maxSearchSeconds` (300 by default) with the matches found so far, and says why. Raise it, or set `0`, if your server can take longer searches.
 - Each user runs one search at a time, and `maxConcurrentSearches` caps the total.
 - A replace changes at most 200 rows on Lite and 5,000 on Pro, and runs in the queue above 25 rows. See [Replacing](replacing.md).
-- A revert of more than 25 values runs in the queue too. The dialog shows how many values are restored and how long it has been running, and has a **Stop revert** button. Values not reached stay in the log, so you can revert again later.
+- A revert of more than 25 values runs in the queue too. If you reload the page while it runs, Logs & History picks it up again. The dialog shows how many values are restored and how long it has been running, and has a **Stop revert** button. Values not reached stay in the log, so you can revert again later.
 - Before a revert, Editrix checks which values can still be restored. On a very large log it checks for up to 20 seconds and says how many it covered. The revert checks every value again and never overwrites an edit made since.
 
 ## Entries that fail to load

@@ -1458,7 +1458,8 @@ class ReplaceService extends Component
             $this->closeUnfinishedRevert($logId);
         } elseif ($left === 0) {
             $log->markAsReverted($logId, $userId);
-        } elseif ($result["reverted"] + $result["unchanged"] > 0) {
+        } elseif ($result["reverted"] + $result["unchanged"] > 0 || ($log->itemCounts($logId)["reverted"] ?? 0) > 0) {
+            // Some values are back, from this attempt or an earlier one.
             $log->markAsPartial($logId);
         } else {
             // Nothing could be restored: back to what it was before the attempt.

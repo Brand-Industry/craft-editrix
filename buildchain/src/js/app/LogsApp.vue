@@ -279,7 +279,9 @@ const resetAndFetch = () => {
 
 // Starts a revert and, if the server queued it (a large one), follows it
 // until it stops. Returns the final numbers either way.
-const runRevert = async (log, force) => {
+// With `resume`, the revert is already running (the page was reloaded), so
+// nothing is started: it is only followed.
+const runRevert = async (log, force, { resume = false } = {}) => {
   stopRequested.value = false;
   const startedAt = Date.now();
   let counts = null;
@@ -304,7 +306,9 @@ const runRevert = async (log, force) => {
   const ticker = setInterval(() => { progressText.value = describe(); }, 1000);
 
   try {
-    const data = await post(urlWithId(revertUrl, log.id), force ? { force: true } : {});
+    const data = resume
+      ? { success: true, queued: true }
+      : await post(urlWithId(revertUrl, log.id), force ? { force: true } : {});
 
     if (!data.success || !data.queued) return data;
 
@@ -371,6 +375,57 @@ const stopRevert = async () => {
   }
 };
 
+// Runs a revert and says what came of it. Values edited since are never
+// overwritten by a normal revert: they are left as they are and reported.
+// Overwriting them is a separate, explicit step offered afterwards.
+const revertAndReport = async (log, options = {}) => {
+  const data = await runRevert(log, false, options);
+
+  if (!data.success) {
+    window.Craft?.cp?.displayError?.(data.error || 'Revert failed');
+    return null;
+  }
+
+  window.Craft?.cp?.displayNotice?.(data.message);
+
+  if (!data.needsForce) return null;
+
+  // Offer the explicit second step for the ones that were edited.
+  return {
+    followUp: {
+      title: 'Overwrite later edits?',
+      message: `${data.conflictCount} value(s) were edited after the replacement and were left alone.\n\nOverwriting them restores the original text and discards those edits. This cannot be undone.`,
+      danger: true,
+      execute: async () => {
+        const forced = await runRevert(log, true);
+        if (forced.success) {
+          window.Craft?.cp?.displayNotice?.(forced.message);
+        } else {
+          window.Craft?.cp?.displayError?.(forced.error || 'Revert failed');
+        }
+        return null;
+      },
+    },
+  };
+};
+
+// A reload drops the page but not the queued revert. If a log is still
+// reverting, show its progress again, with the same Stop button.
+const resumeRevert = async () => {
+  if (!canRevert || actionInProgress.value || revertingLogId.value !== null) return;
+
+  const active = logs.value.find((l) => l.status === 'reverting');
+  if (!active) return;
+
+  pendingAction.value = {
+    title: 'Revert in progress',
+    message: `Reverting "${active.searchQuery}" → "${active.replaceWith}".`,
+    danger: false,
+    execute: () => revertAndReport(active, { resume: true }),
+  };
+  await executeAction();
+};
+
 const confirmRevert = async (log) => {
   // First, validate the revert to see what it would do
   actionInProgress.value = true;
@@ -407,36 +462,7 @@ const confirmRevert = async (log) => {
           ? `Revert ${validation.safeCount} replacement(s) from "${log.searchQuery}" → "${log.replaceWith}"?`
           : `${warnings.join('. ')}.\n\n${validation.safeCount} of ${validation.total} value(s) can be restored. The rest will be left exactly as they are.`,
       danger: false,
-      execute: async () => {
-        const data = await runRevert(log, false);
-
-        if (!data.success) {
-          window.Craft?.cp?.displayError?.(data.error || 'Revert failed');
-          return null;
-        }
-
-        window.Craft?.cp?.displayNotice?.(data.message);
-
-        if (!data.needsForce) return null;
-
-        // Offer the explicit second step for the ones that were edited.
-        return {
-          followUp: {
-            title: 'Overwrite later edits?',
-            message: `${data.conflictCount} value(s) were edited after the replacement and were left alone.\n\nOverwriting them restores the original text and discards those edits. This cannot be undone.`,
-            danger: true,
-            execute: async () => {
-              const forced = await runRevert(log, true);
-              if (forced.success) {
-                window.Craft?.cp?.displayNotice?.(forced.message);
-              } else {
-                window.Craft?.cp?.displayError?.(forced.error || 'Revert failed');
-              }
-              return null;
-            },
-          },
-        };
-      },
+      execute: () => revertAndReport(log),
     };
   } catch (err) {
     actionInProgress.value = false;
@@ -518,5 +544,8 @@ const nextPage = () => {
   fetchLogs();
 };
 
-onMounted(fetchLogs);
+onMounted(async () => {
+  await fetchLogs();
+  await resumeRevert();
+});
 </script>
