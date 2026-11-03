@@ -319,6 +319,9 @@
             <template v-if="stopReason === 'memory'">
               ⚠️ {{ t('Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.') }}
             </template>
+            <template v-else-if="stopReason === 'time'">
+              ⚠️ {{ t('Search stopped early to protect the server (time limit). Showing the matches found so far. Narrow your search to a section or field to cover everything.') }}
+            </template>
             <template v-else>
               ⚠️ {{ t('Showing the first {count} results. Narrow your search for more precise results.', {
                 count: totalResults.toLocaleString(),

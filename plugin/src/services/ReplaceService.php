@@ -1253,6 +1253,57 @@ class ReplaceService extends Component
      * @param int|null $userId whose Craft permissions decide whether the
      *   current text of an entry may be shown
      */
+    /**
+     * What validateRevert() tells, but counted as it goes instead of keeping a
+     * row per value, and cut short after $seconds. A log can hold a hundred
+     * thousand values and this runs inside a web request. `partial` says it
+     * stopped before the end; the revert itself checks every value again and
+     * leaves alone whatever was edited since, so the answer is advice only.
+     *
+     * @return array{checked: int, safe: int, unchanged: int, modified: int, missing: int, details: array, partial: bool}
+     */
+    public function validateRevertSummary(
+        iterable $replacements,
+        ?int $userId = null,
+        float $seconds = 20.0,
+        int $detailLimit = 100
+    ): array {
+        $started = microtime(true);
+        $out = ["checked" => 0, "safe" => 0, "unchanged" => 0, "modified" => 0, "missing" => 0, "details" => [], "partial" => false];
+
+        foreach ($replacements as $i => $replacement) {
+            if ($out["checked"] % 50 === 0 && microtime(true) - $started > $seconds) {
+                $out["partial"] = true;
+                break;
+            }
+
+            $status = $this->revertStatus($replacement, $current, $element);
+            $out["checked"]++;
+            $out[$status]++;
+
+            if (($status === "modified" || $status === "missing") && count($out["details"]) < $detailLimit) {
+                $detail = [
+                    "status" => $status,
+                    "index" => $i,
+                    "elementId" => $replacement["elementId"],
+                    "elementTitle" => $replacement["elementTitle"] ?? "(unknown)",
+                    "fieldHandle" => $replacement["fieldHandle"],
+                ];
+
+                if ($status === "modified" && $element !== null && !Access::canView($element, $userId)) {
+                    $detail["elementTitle"] = "(hidden)";
+                } elseif ($status === "modified") {
+                    $detail["expectedValue"] = mb_substr((string) ($replacement["newValue"] ?? ""), 0, 100);
+                    $detail["currentValue"] = mb_substr((string) $current, 0, 100);
+                }
+
+                $out["details"][] = $detail;
+            }
+        }
+
+        return $out;
+    }
+
     public function validateRevert(iterable $replacements, ?int $userId = null): array
     {
         $results = [];
@@ -1328,14 +1379,23 @@ class ReplaceService extends Component
         bool $force = false,
         ?callable $onEach = null,
         ?int $userId = null,
-        ?int $logId = null
+        ?int $logId = null,
+        ?callable $shouldStop = null
     ): array {
         $out = ["reverted" => 0, "unchanged" => 0, "conflicts" => [], "missing" => [], "failed" => []];
+        $seen = 0;
         $log = Editrix::$plugin->log;
         $this->actingUserId = $userId ?: null;
         $this->revisionNote = $logId ? "Editrix revert of #{$logId}" : null;
 
         foreach ($entries as $entry) {
+            // Asked for every 25 values, so stopping costs little: what was
+            // not reached stays in the log, to revert later.
+            if ($shouldStop && $seen++ % 25 === 0 && $shouldStop()) {
+                $out["stopped"] = true;
+                break;
+            }
+
             $status = $this->revertStatus($entry, $current, $element);
             $itemId = $entry["itemId"] ?? null;
             $about = [
@@ -1392,13 +1452,30 @@ class ReplaceService extends Component
         $left = count($result["conflicts"]) + count($result["missing"]) + count($result["failed"]);
         $log = Editrix::$plugin->log;
 
-        if ($left === 0) {
+        if (!empty($result["stopped"])) {
+            // Stopped before the end: values not reached are still to revert,
+            // so this is never "reverted".
+            $this->closeUnfinishedRevert($logId);
+        } elseif ($left === 0) {
             $log->markAsReverted($logId, $userId);
         } elseif ($result["reverted"] + $result["unchanged"] > 0) {
             $log->markAsPartial($logId);
         } else {
             // Nothing could be restored: back to what it was before the attempt.
             $log->finishReplaceLog($logId, "success", (int) ($log->itemCounts($logId)["applied"] ?? 0));
+        }
+    }
+
+    /** Partial when some values are back, otherwise the log returns to what it was. */
+    public function closeUnfinishedRevert(int $logId): void
+    {
+        $log = Editrix::$plugin->log;
+        $counts = $log->itemCounts($logId);
+
+        if (($counts["reverted"] ?? 0) > 0) {
+            $log->markAsPartial($logId);
+        } else {
+            $log->finishReplaceLog($logId, "success", (int) (($counts["applied"] ?? 0) + ($counts["pending"] ?? 0)));
         }
     }
 

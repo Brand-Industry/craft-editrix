@@ -144,7 +144,7 @@ class LogController extends Controller
             ]);
         }
 
-        if (in_array($log["status"], ["running", "reverting"], true)) {
+        if ($this->isBusy($log)) {
             return $this->asJson([
                 "success" => false,
                 "error" => Craft::t("editrix", "This operation is still running."),
@@ -161,33 +161,25 @@ class LogController extends Controller
             ]);
         }
 
-        $validation = Editrix::$plugin->replace->validateRevert(
+        // Counted as it goes and cut short on a very large log, so this web
+        // request cannot run out of memory or time.
+        $summary = Editrix::$plugin->replace->validateRevertSummary(
             Editrix::$plugin->log->replacementsFor($log),
             (int) Craft::$app->getUser()->getId()
         );
 
-        $count = fn(string $status) => count(
-            array_filter($validation, fn($v) => $v["status"] === $status)
-        );
-        $safeCount = $count("safe");
-        $unchangedCount = $count("unchanged");
-        $modifiedCount = $count("modified");
-        $missingCount = $count("missing");
-
         return $this->asJson([
             "success" => true,
-            "safe" => $modifiedCount === 0 && $missingCount === 0,
-            "total" => count($validation),
-            "safeCount" => $safeCount,
-            "unchangedCount" => $unchangedCount,
-            "modifiedCount" => $modifiedCount,
-            "missingCount" => $missingCount,
+            "safe" => !$summary["partial"] && $summary["modified"] === 0 && $summary["missing"] === 0,
+            "partial" => $summary["partial"],
+            "checked" => $summary["checked"],
+            "total" => $summary["partial"] ? Editrix::$plugin->log->revertableCount($log) : $summary["checked"],
+            "safeCount" => $summary["safe"],
+            "unchangedCount" => $summary["unchanged"],
+            "modifiedCount" => $summary["modified"],
+            "missingCount" => $summary["missing"],
             // Only the ones that need a decision, and not all of a large log
-            "details" => array_slice(
-                array_values(array_filter($validation, fn($v) => !in_array($v["status"], ["safe", "unchanged"], true))),
-                0,
-                100
-            ),
+            "details" => $summary["details"],
         ]);
     }
 
@@ -212,7 +204,7 @@ class LogController extends Controller
             ]);
         }
 
-        if (in_array($log["status"], ["running", "reverting"], true)) {
+        if ($this->isBusy($log)) {
             return $this->asJson([
                 "success" => false,
                 "error" => Craft::t("editrix", "This operation is still running."),
@@ -301,6 +293,9 @@ class LogController extends Controller
             return $this->asJson(["success" => false, "error" => Craft::t("editrix", "Log entry not found")]);
         }
 
+        // A revert that stopped moving is closed, so the page can stop waiting.
+        $released = $this->isRevertStaleAndClosed($log);
+
         $counts = Editrix::$plugin->log->itemCounts($logId);
         $reverted = (int) ($counts["reverted"] ?? 0);
         $left = (int) (($counts["applied"] ?? 0) + ($counts["pending"] ?? 0));
@@ -308,11 +303,67 @@ class LogController extends Controller
         return $this->asJson([
             "success" => true,
             "status" => $log["status"],
-            "running" => $log["status"] === "reverting",
+            "running" => in_array($log["status"], ["reverting", "cancelling"], true),
+            "released" => $released,
             "reverted" => $reverted,
             "left" => $left,
             "total" => $reverted + $left,
         ]);
+    }
+
+    /**
+     * Stops a revert that runs in the queue. The job notices at its next
+     * check and leaves the log partial. If the worker is gone, there is no
+     * job to notice, so the log is closed here.
+     */
+    public function actionCancelRevert(int $logId): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        if (!Editrix::$plugin->userCan("editrix:revert")) {
+            return $this->asJson(["success" => false, "error" => "Permission denied"]);
+        }
+
+        $log = Editrix::$plugin->log->getLogById($logId);
+
+        if (!$log) {
+            return $this->asJson(["success" => false, "error" => Craft::t("editrix", "Log entry not found")]);
+        }
+
+        $released = $this->isRevertStaleAndClosed($log);
+
+        if (!$released && $log["status"] === "reverting") {
+            Editrix::$plugin->log->finishReplaceLog($logId, "cancelling", (int) $log["replacementCount"]);
+        }
+
+        return $this->asJson(["success" => true, "released" => $released]);
+    }
+
+    /**
+     * True while the log is being worked on. A revert that stopped moving
+     * is closed first, so a dead worker never leaves a log stuck.
+     */
+    private function isBusy(array &$log): bool
+    {
+        if ($this->isRevertStaleAndClosed($log)) {
+            return false;
+        }
+
+        return in_array($log["status"], ["running", "reverting", "cancelling"], true);
+    }
+
+    /** Closes a stale revert and reloads the log. True when it did. */
+    private function isRevertStaleAndClosed(array &$log): bool
+    {
+        if (!Editrix::$plugin->log->isRevertStale($log)) {
+            return false;
+        }
+
+        Editrix::$plugin->log->releaseStaleRevert((int) $log["id"]);
+        $log = Editrix::$plugin->log->getLogById((int) $log["id"]);
+
+        return true;
     }
 
     public function actionDelete(int $logId): Response
@@ -443,6 +494,9 @@ class LogController extends Controller
             ),
             "revertStatusUrl" => \craft\helpers\UrlHelper::cpUrl(
                 "editrix/api/logs/revert-status"
+            ),
+            "cancelRevertUrl" => \craft\helpers\UrlHelper::cpUrl(
+                "editrix/api/logs/cancel-revert"
             ),
             "deleteUrl" => \craft\helpers\UrlHelper::cpUrl(
                 "editrix/api/logs/delete"

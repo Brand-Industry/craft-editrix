@@ -4,12 +4,18 @@ All notable changes to Editrix will be documented in this file.
 
 ## [2.0.3] - 2026-11-03
 
+### Added
+- `maxSearchSeconds` setting (300 by default): a search that runs longer stops and shows the matches found so far, like it does when the server runs short of memory. `0` means no limit
+- A **Stop revert** button in the dialog of a revert that runs in the queue. Values not reached stay in the log, and the log is never marked as reverted
+
 ### Fixed
 - While a replace ran in the queue, the page also showed the search progress panel, "Searching..." on the button and a "Cancel search" button. Only the replace progress is shown now
 - The detail window of a row that was already replaced previewed a second replace, and its Apply button stayed on. It now shows the text as it is now, says the row was already replaced and has no Apply button
 - On a multi-site install, Revert, Delete and the revert check in Logs & History answered "Page not found", because the site parameter of the URL ended up before the log id. The id now goes into the path
 - On a multi-site install, Export and Re-run in Logs & History lost their options for the same reason. They now continue the query string of the URL
 - While a replace ran, Replace Selected stayed on and a second replace could be started over the same rows. The button is off until the replace ends
+- The check before a revert kept a row in memory for every value of the log and had no time limit, so a log of many thousands of values could run a web request out of memory. It now counts as it goes and stops after 20 seconds, and says how many values it covered
+- A revert whose worker died left the log stuck as "still running", and a new revert was refused. After three minutes without movement the log is closed as partial and can be reverted again
 - In Logs & History, a revert of a large log looked stuck: the buttons turned off and nothing said why until the dialog opened. The page now says it is checking, and the dialog shows how many values are restored and how long it has been running, and warns if the count stops moving
 
 ## [2.0.2] - 2026-11-03

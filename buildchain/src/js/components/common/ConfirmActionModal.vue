@@ -15,6 +15,15 @@
           <p v-if="loading && progressText" class="editrix-modal__progress" role="status" aria-live="polite" style="margin: 12px 0 0; font-size: 13px;">
             {{ progressText }}
           </p>
+          <button
+            v-if="loading && stoppable"
+            type="button"
+            class="editrix-btn editrix-btn--secondary editrix-btn--sm"
+            style="margin-top: 12px;"
+            @click="$emit('stop')"
+          >
+            Stop revert
+          </button>
         </div>
         <footer class="editrix-modal__footer">
           <button
@@ -46,9 +55,11 @@ const props = defineProps({
   message: { type: String, default: '' },
   loading: { type: Boolean, default: false },
   progressText: { type: String, default: '' },
+  // A revert is running in the queue and can be stopped.
+  stoppable: { type: Boolean, default: false },
   danger: { type: Boolean, default: false },
 });
-defineEmits(['confirm', 'cancel']);
+defineEmits(['confirm', 'cancel', 'stop']);
 
 const messageLines = computed(() => props.message.split('\n').filter(l => l.trim() !== ''));
 </script>

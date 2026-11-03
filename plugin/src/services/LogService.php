@@ -591,6 +591,42 @@ class LogService extends Component
             ->execute() > 0;
     }
 
+    /**
+     * When a log last moved: its newest item change, or the log itself.
+     * Every restored value touches its item, so a live revert keeps this fresh.
+     */
+    public function lastActivity(array $log): int
+    {
+        $newest = (new Query())
+            ->from(Install::TABLE_LOG_ITEMS)
+            ->where(["logId" => $log["id"]])
+            ->max("dateUpdated");
+
+        // Craft stores its dates in UTC.
+        $utc = new \DateTimeZone("UTC");
+
+        return max(
+            $newest ? (new DateTime($newest, $utc))->getTimestamp() : 0,
+            (new DateTime($log["dateUpdated"], $utc))->getTimestamp()
+        );
+    }
+
+    /**
+     * A revert in the queue that has not moved for a while: its worker died
+     * or the queue stopped, and nothing will ever close the log.
+     */
+    public function isRevertStale(array $log, int $seconds = 180): bool
+    {
+        return in_array($log["status"], ["reverting", "cancelling"], true)
+            && time() - $this->lastActivity($log) > $seconds;
+    }
+
+    /** Closes a stale revert as partial (or as before, if nothing was restored). */
+    public function releaseStaleRevert(int $logId): void
+    {
+        Editrix::$plugin->replace->closeUnfinishedRevert($logId);
+    }
+
     public function deleteLog(int $logId): bool
     {
         $affected = Craft::$app

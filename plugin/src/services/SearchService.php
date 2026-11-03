@@ -96,6 +96,7 @@ class SearchService extends Component
 
     /** Why the last search ended before covering everything, if it did. */
     private ?string $stopReason = null;
+    private float $searchStartedAt = 0.0;
 
     /** Who the last search ran for; what they may not view is left out. */
     private ?int $actingUserId = null;
@@ -116,6 +117,7 @@ class SearchService extends Component
         $results = [];
         $truncated = false;
         $this->stopReason = null;
+        $this->searchStartedAt = microtime(true);
         $this->matchesBase = 0;
         $this->actingUserId = ($options["userId"] ?? null) ?: null;
         $this->includeLinks = (bool) ($options["includeLinks"] ?? false);
@@ -512,6 +514,10 @@ class SearchService extends Component
                 $this->stopReason = "memory";
                 return false;
             }
+            if ($this->timeUp()) {
+                $this->stopReason = "time";
+                return false;
+            }
 
             return true;
         };
@@ -532,6 +538,10 @@ class SearchService extends Component
                 }
                 if ($this->memoryLow()) {
                     $this->stopReason = "memory";
+                    break;
+                }
+                if ($this->timeUp()) {
+                    $this->stopReason = "time";
                     break;
                 }
             }
@@ -1113,6 +1123,17 @@ class SearchService extends Component
 
         return $limit > 0 &&
             memory_get_usage(true) > $limit * self::MEMORY_STOP_RATIO;
+    }
+
+    /**
+     * True once this search has run for `maxSearchSeconds`. Overridable so
+     * tests can trip it without waiting.
+     */
+    protected function timeUp(): bool
+    {
+        $max = (int) (Editrix::$plugin->getSettings()->maxSearchSeconds ?? 0);
+
+        return $max > 0 && microtime(true) - $this->searchStartedAt > $max;
     }
 
     private function memoryLimitBytes(): int

@@ -3,8 +3,10 @@
 namespace brandindustry\editrix\jobs;
 
 use Craft;
+use craft\db\Query;
 use craft\queue\BaseJob;
 use brandindustry\editrix\Editrix;
+use brandindustry\editrix\migrations\Install;
 
 /**
  * Reverts a replace in the background, for the same reason a large
@@ -31,10 +33,20 @@ class RevertJob extends BaseJob
             Editrix::$plugin->log->replacementsFor($log),
             $this->force,
             userId: $this->userId,
-            logId: $this->logId
+            logId: $this->logId,
+            shouldStop: fn() => $this->isCancelling()
         );
 
         $service->finishRevert($this->logId, $result, $this->userId);
+    }
+
+    private function isCancelling(): bool
+    {
+        return (new Query())
+            ->select(["status"])
+            ->from(Install::TABLE_LOGS)
+            ->where(["id" => $this->logId])
+            ->scalar() === "cancelling";
     }
 
     protected function defaultDescription(): ?string

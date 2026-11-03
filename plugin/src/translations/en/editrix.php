@@ -64,6 +64,7 @@ return [
     "This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search." => "This search has stopped reporting progress, so the server may have killed it. Cancel it and try a narrower search.",
     'Showing the first {count} results. Narrow your search for more precise results.' => 'Showing the first {count} results. Narrow your search for more precise results.',
     'Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.' => 'Search stopped early to protect the server (memory). Showing the matches found so far. Narrow your search to a section or field to cover everything.',
+    'Search stopped early to protect the server (time limit). Showing the matches found so far. Narrow your search to a section or field to cover everything.' => 'Search stopped early to protect the server (time limit). Showing the matches found so far. Narrow your search to a section or field to cover everything.',
     'Recent searches' => 'Recent searches',
     '{count} results' => '{count} results',
     'cancelled' => 'cancelled',

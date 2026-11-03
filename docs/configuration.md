@@ -24,6 +24,7 @@ return [
 | `maxSearchResults` | `null` | Lowers the rows a search returns below your edition's limit. It cannot raise it. |
 | `maxConcurrentSearches` | `2` | Searches that may run at once across all users |
 | `sqlPrefilter` | `true` | Ask the database for candidate rows first. See [Large sites](large-sites.md). |
+| `maxSearchSeconds` | `300` | Seconds one search may run. After that it stops and shows the matches found so far. Use `0` for no limit. |
 
 ## Replace
 

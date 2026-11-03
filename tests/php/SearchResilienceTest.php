@@ -47,6 +47,55 @@ class SearchResilienceTest extends EditrixTestCase
         $this->assertSame(250, $scanned, 'The scan should stop at the first memory check.');
     }
 
+    public function testATimeLimitStopsTheScanWithPartialResults(): void
+    {
+        $section = $this->smallestSection(300);
+        if (!$section) {
+            $this->markTestSkipped('No section has 300 entries, so the periodic check never runs.');
+        }
+
+        $service = new class extends SearchService {
+            protected function timeUp(): bool
+            {
+                return true;
+            }
+        };
+
+        $scanned = 0;
+        $meta = [];
+        $service->search(
+            'zzq-editrix-no-such-text-zzq',
+            $this->siteId(),
+            false,
+            false,
+            $this->sectionOptions($section[0], ['sqlPrefilter' => false]),
+            function (int $done) use (&$scanned) {
+                $scanned = $done;
+            },
+            null,
+            $meta
+        );
+
+        $this->assertTrue($meta['truncated']);
+        $this->assertSame('time', $meta['stopReason']);
+        $this->assertSame(250, $scanned, 'The scan should stop at the first check.');
+    }
+
+    public function testNoTimeLimitMeansTheScanRunsToTheEnd(): void
+    {
+        $settings = Editrix::$plugin->getSettings();
+        $original = $settings->maxSearchSeconds;
+        $settings->maxSearchSeconds = 0;
+
+        try {
+            $meta = [];
+            Editrix::$plugin->search->search('zzq-editrix-no-such-text-zzq', $this->siteId(), false, false, [], null, null, $meta);
+            $this->assertNotSame('time', $meta['stopReason'] ?? null);
+        } finally {
+            $settings->maxSearchSeconds = $original;
+        }
+    }
+
     public function testTheCapReportsItsOwnStopReason(): void
     {
         $section = $this->smallestSection(20);

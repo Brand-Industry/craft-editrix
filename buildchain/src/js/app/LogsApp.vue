@@ -178,6 +178,8 @@
         :message="pendingAction?.message || ''"
         :loading="actionInProgress"
         :progress-text="progressText"
+        :stoppable="revertingLogId !== null && !stopRequested"
+        @stop="stopRevert"
         :danger="pendingAction?.danger || false"
         @confirm="executeAction"
         @cancel="pendingAction = null"
@@ -202,6 +204,7 @@ const apiUrl = config.apiUrl || '';
 const validateRevertUrl = config.validateRevertUrl || '';
 const revertUrl = config.revertUrl || '';
 const revertStatusUrl = config.revertStatusUrl || '';
+const cancelRevertUrl = config.cancelRevertUrl || '';
 const deleteUrl = config.deleteUrl || '';
 const exportUrl = config.exportUrl || '';
 const searchPageUrl = config.searchPageUrl || '';
@@ -225,6 +228,9 @@ const actionInProgress = ref(false);
 // What a long step is doing, so a big log does not look stuck.
 const busyText = ref('');
 const progressText = ref('');
+// A queued revert that can be stopped, and whether the user asked to.
+const revertingLogId = ref(null);
+const stopRequested = ref(false);
 const pendingAction = ref(null);
 
 const filters = reactive({
@@ -273,15 +279,18 @@ const resetAndFetch = () => {
 // Starts a revert and, if the server queued it (a large one), follows it
 // until it stops. Returns the final numbers either way.
 const runRevert = async (log, force) => {
+  stopRequested.value = false;
   const startedAt = Date.now();
   let counts = null;
   let lastMoveAt = startedAt;
 
   // Redrawn every second, so the clock moves even when the count does not.
   const describe = () => {
-    let text = counts
-      ? `Reverting: ${counts.reverted.toLocaleString()} of ${counts.total.toLocaleString()} values restored.`
-      : 'Reverting.';
+    let text = stopRequested.value
+      ? 'Stopping. This can take a few seconds.'
+      : counts
+        ? `Reverting: ${counts.reverted.toLocaleString()} of ${counts.total.toLocaleString()} values restored.`
+        : 'Reverting.';
     text += ` ${formatElapsed((Date.now() - startedAt) / 1000)} elapsed. Keep this page open until it finishes.`;
     if (Date.now() - lastMoveAt > 30000) {
       text += " Nothing has moved for a while, so Craft's queue may not be running.";
@@ -296,6 +305,8 @@ const runRevert = async (log, force) => {
 
     if (!data.success || !data.queued) return data;
 
+    revertingLogId.value = log.id;
+
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
       const status = await get(urlWithId(revertStatusUrl, log.id));
@@ -306,6 +317,18 @@ const runRevert = async (log, force) => {
         if (!counts || status.reverted !== counts.reverted) lastMoveAt = Date.now();
         counts = { reverted: status.reverted, total: status.total };
         continue;
+      }
+
+      if (stopRequested.value || status.released) {
+        const lead = stopRequested.value
+          ? 'Revert stopped.'
+          : "The revert stopped before it finished, so Craft's queue may not be running.";
+        return {
+          success: true,
+          revertedCount: status.reverted,
+          needsForce: false,
+          message: `${lead} ${status.reverted} value(s) were restored. Revert again to restore the rest.`,
+        };
       }
 
       return {
@@ -322,6 +345,18 @@ const runRevert = async (log, force) => {
     }
   } finally {
     clearInterval(ticker);
+    revertingLogId.value = null;
+  }
+};
+
+const stopRevert = async () => {
+  if (revertingLogId.value === null || stopRequested.value) return;
+  stopRequested.value = true;
+  progressText.value = 'Stopping. This can take a few seconds.';
+  try {
+    await post(urlWithId(cancelRevertUrl, revertingLogId.value), {});
+  } catch (err) {
+    window.Craft?.cp?.displayError?.(err.message || 'Could not stop the revert');
   }
 };
 
@@ -354,9 +389,10 @@ const confirmRevert = async (log) => {
     // revert: they are left as they are and reported. Overwriting them is a
     // separate, explicit step offered afterwards.
     pendingAction.value = {
-      title: left === 0 ? 'Revert Operation' : 'Revert what is safe',
-      message:
-        left === 0
+      title: left === 0 && !validation.partial ? 'Revert Operation' : 'Revert what is safe',
+      message: validation.partial
+        ? `This log is large: ${validation.checked.toLocaleString()} of ${validation.total.toLocaleString()} values were checked in the time allowed.\n\n${warnings.length ? warnings.join('. ') + ' so far.\n\n' : ''}Reverting checks every value again and leaves alone anything edited since.`
+        : left === 0
           ? `Revert ${validation.safeCount} replacement(s) from "${log.searchQuery}" → "${log.replaceWith}"?`
           : `${warnings.join('. ')}.\n\n${validation.safeCount} of ${validation.total} value(s) can be restored. The rest will be left exactly as they are.`,
       danger: false,

@@ -268,6 +268,7 @@ class Editrix extends Plugin
                 "editrix/log/validate-revert",
             "editrix/api/logs/revert/<logId:\d+>" => "editrix/log/revert",
             "editrix/api/logs/revert-status/<logId:\d+>" => "editrix/log/revert-status",
+            "editrix/api/logs/cancel-revert/<logId:\d+>" => "editrix/log/cancel-revert",
             "editrix/api/logs/delete/<logId:\d+>" => "editrix/log/delete",
             "editrix/api/logs/export" => "editrix/log/export",
 
