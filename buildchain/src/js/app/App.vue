@@ -579,8 +579,14 @@ const rerunLog = (log) => {
   searchParams.fields = scope.fields || [];
   searchParams.entryTypes = scope.entryTypes || [];
 
+  // A replace comes back as a replace: Replace mode, with its replacement
+  // text. That changes nothing, the rows are only found again and still have
+  // to be selected and confirmed. A search comes back as a search.
+  const asReplace = log.type === 'replace' && canReplace.value;
+  searchParams.replaceWith = asReplace ? log.replaceWith || '' : '';
+
   searchType.value = 'text';
-  actionMode.value = 'search';
+  setActionMode(asReplace ? 'replace' : 'search');
   searchMode.value =
     searchParams.sections.length > 0 ? 'segmented' : 'general';
 
