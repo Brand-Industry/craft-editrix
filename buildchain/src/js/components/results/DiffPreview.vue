@@ -21,6 +21,11 @@
         <div v-if="loading" class="editrix-diff__loading">{{ t('Loading...') }}</div>
 
         <template v-else>
+          <div v-if="busy" class="editrix-diff__notice editrix-diff__notice--warning">
+            <span>⏳</span>
+            <p>{{ t('A replace is running. You can look at this row, but nothing can be applied until it finishes.') }}</p>
+          </div>
+
           <div v-if="replaced" class="editrix-diff__notice editrix-diff__notice--warning">
             <span>⚠️</span>
             <p>{{ t('Already replaced. This is the text as it is now, so there is nothing to apply.') }}</p>
@@ -79,7 +84,7 @@
         <button
           v-if="!replaced"
           class="editrix-btn editrix-btn--primary"
-          :disabled="loading || !changed"
+          :disabled="busy || loading || !changed"
           @click="$emit('apply', result)"
         >
           ✓ {{ t('Apply to this element') }}
@@ -107,6 +112,8 @@ const props = defineProps({
   // The row was already replaced in this search.
   replaced: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
+  // A replace is running: nothing can be applied until it ends.
+  busy: { type: Boolean, default: false },
 });
 
 defineEmits(['close', 'apply', 'skip']);

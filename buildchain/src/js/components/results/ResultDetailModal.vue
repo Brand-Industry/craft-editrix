@@ -83,7 +83,7 @@
               </button>
               <button
                 class="editrix-btn editrix-btn--primary"
-                :disabled="!replaceValue"
+                :disabled="busy || !replaceValue"
                 @click="$emit('request-replace', { result, replaceWith: replaceValue })"
               >
                 {{ t('Continue') }}
@@ -92,6 +92,7 @@
             <button
               v-else
               class="editrix-btn editrix-btn--secondary"
+              :disabled="busy"
               @click="showReplaceField = true"
             >
               {{ t('Replace') }}
@@ -122,6 +123,8 @@ const { get } = useApi();
 const props = defineProps({
   show: { type: Boolean, default: false },
   result: { type: Object, default: null },
+  // A replace is running: nothing can be replaced until it ends.
+  busy: { type: Boolean, default: false },
 });
 
 defineEmits(['close', 'request-replace']);

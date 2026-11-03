@@ -134,6 +134,7 @@ return [
     'Confirmation required' => 'Confirmation required',
     'Already replaced. This is the text as it is now, so there is nothing to apply.' => 'Already replaced. This is the text as it is now, so there is nothing to apply.',
     'CURRENT TEXT' => 'CURRENT TEXT',
+    'A replace is running. You can look at this row, but nothing can be applied until it finishes.' => 'A replace is running. You can look at this row, but nothing can be applied until it finishes.',
     'This action can be reverted from the History within {days} days.' => 'This action can be reverted from the History within {days} days.',
     'Back up your database first.' => 'Back up your database first.',
     'This is a large replace. If the server stops halfway, the History can revert the values that were saved, but a backup is the only complete copy.' => 'This is a large replace. If the server stops halfway, the History can revert the values that were saved, but a backup is the only complete copy.',
