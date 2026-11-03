@@ -31,7 +31,7 @@
             <p>{{ t('Already replaced. This is the text as it is now, so there is nothing to apply.') }}</p>
           </div>
 
-          <div v-if="stale" class="editrix-diff__notice editrix-diff__notice--warning">
+          <div v-if="stale && !replaced" class="editrix-diff__notice editrix-diff__notice--warning">
             <span>⚠️</span>
             <p>{{ t('Its content changed after the search. Search again to see the current text.') }}</p>
           </div>
