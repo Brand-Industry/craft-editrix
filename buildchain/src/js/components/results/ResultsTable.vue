@@ -19,6 +19,7 @@
       <div class="editrix-results__actions">
         <button
           class="editrix-btn editrix-btn--secondary editrix-btn--sm"
+          :disabled="busy"
           @click="$emit('toggle-all')"
         >
           {{ allSelected ? t('Deselect All') : t('Select All') }}
@@ -65,6 +66,7 @@
             <input
               type="checkbox"
               :checked="allSelected"
+              :disabled="busy"
               @change="$emit('toggle-all')"
             />
           </th>
@@ -96,7 +98,7 @@
               <input
                 type="checkbox"
                 :checked="isSelected(row.result)"
-                :disabled="rowState(row.result) !== null"
+                :disabled="busy || rowState(row.result) !== null"
                 @change="$emit('toggle', row.result)"
               />
             </td>
@@ -154,7 +156,7 @@
                       v-if="actionMode === 'replace' && !row.result.readOnly"
                       type="checkbox"
                       :checked="isMatchIncluded(row.result, i)"
-                      :disabled="m.readOnly || rowState(row.result) !== null"
+                      :disabled="busy || m.readOnly || rowState(row.result) !== null"
                       :title="t('Leave this match out of the replace')"
                       @change="$emit('toggle-match', row.result, i)"
                     />

@@ -372,6 +372,7 @@
       :changed="previewData?.changed ?? false"
       :stale="previewData?.stale ?? false"
       :replaced="!!previewResult && rowState(previewResult) === 'replaced'"
+      :busy="replacing"
       :loading="previewLoading"
       @close="previewResult = null"
       @apply="applyToSingle"
@@ -381,6 +382,7 @@
     <ResultDetailModal
       :show="!!detailResult"
       :result="detailResult"
+      :busy="replacing"
       @close="detailResult = null"
       @request-replace="handleRequestSingleReplace"
     />
@@ -1016,6 +1018,7 @@ const openView = (result) => {
 };
 
 const applyToSingle = (result) => {
+  if (replacing.value) return;
   handleRequestSingleReplace({
     result,
     replaceWith: searchParams.replaceWith,
