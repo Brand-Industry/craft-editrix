@@ -169,7 +169,8 @@
         :disabled="!query || loading"
         @click="$emit('search')"
       >
-        <span v-if="loading">{{ t('Searching...') }}</span>
+        <span v-if="replacing">{{ t('Replacing...') }}</span>
+        <span v-else-if="loading">{{ t('Searching...') }}</span>
         <span v-else-if="actionMode === 'replace'">{{ t('Preview Changes') }}</span>
         <span v-else>{{ t('Search') }}</span>
       </button>
@@ -201,6 +202,7 @@ defineProps({
   searchMatrix: { type: Boolean, default: true },
   searchCategories: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
+  replacing: { type: Boolean, default: false },
   actionMode: { type: String, default: 'replace' },
 });
 

@@ -202,6 +202,7 @@
             v-model:search-matrix="searchParams.searchMatrix"
             v-model:search-categories="searchParams.searchCategories"
             :loading="loading"
+            :replacing="replacing"
             :action-mode="actionMode"
             @search="handleSearch"
           />
@@ -292,8 +293,9 @@
             </button>
           </div>
 
+          <!-- loading is also on while a replace runs, which has its own panel. -->
           <SearchProgress
-            v-if="loading"
+            v-if="loading && !replacing"
             :query="searchParams.query"
             :has-id="currentSearchId !== null"
             :job-status="jobStatus"
