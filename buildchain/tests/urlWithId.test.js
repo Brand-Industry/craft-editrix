@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { urlWithId } from '../src/js/utils/urlWithId';
+import { urlWithId, urlWithQuery } from '../src/js/utils/urlWithId';
 
 describe('urlWithId', () => {
   it('adds the id to a plain url', () => {
@@ -15,5 +15,21 @@ describe('urlWithId', () => {
 
   it('keeps every query parameter', () => {
     expect(urlWithId('/x/delete?site=en_us&foo=bar', 7)).toBe('/x/delete/7?site=en_us&foo=bar');
+  });
+});
+
+describe('urlWithQuery', () => {
+  it('starts the query on a plain url', () => {
+    expect(urlWithQuery('/x/export', new URLSearchParams({ format: 'csv' }))).toBe('/x/export?format=csv');
+  });
+
+  it('continues the query of a multi-site url', () => {
+    expect(
+      urlWithQuery('/craft/editrix?site=en_us', new URLSearchParams({ q: 'Ulbrich', ci: '1' }))
+    ).toBe('/craft/editrix?site=en_us&q=Ulbrich&ci=1');
+  });
+
+  it('leaves the url alone when there is nothing to add', () => {
+    expect(urlWithQuery('/x?site=en_us', new URLSearchParams())).toBe('/x?site=en_us');
   });
 });
