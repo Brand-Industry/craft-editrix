@@ -7,11 +7,14 @@
           <h2 class="editrix-modal__title">{{ title }}</h2>
         </header>
         <div class="editrix-modal__body">
-          <p
-            v-for="(line, idx) in messageLines"
-            :key="idx"
-            :class="{ 'editrix-modal__warning': danger }"
-          >{{ line }}</p>
+          <!-- Once it runs, the question is answered: only the progress is left. -->
+          <template v-if="!(loading && progressText)">
+            <p
+              v-for="(line, idx) in messageLines"
+              :key="idx"
+              :class="{ 'editrix-modal__warning': danger }"
+            >{{ line }}</p>
+          </template>
           <p v-if="loading && progressText" class="editrix-modal__progress" role="status" aria-live="polite" style="margin: 12px 0 0; font-size: 13px;">
             {{ progressText }}
           </p>
