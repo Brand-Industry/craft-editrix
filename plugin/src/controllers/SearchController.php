@@ -821,6 +821,7 @@ class SearchController extends Controller
             "safety" => [
                 "bulkConfirmationThreshold" =>
                     $settings->bulkConfirmationThreshold,
+                "logRetentionDays" => $settings->getEffectiveLogRetention(),
                 "productionSafeMode" => $settings->productionSafeMode,
                 "showEnvironmentIndicator" =>
                     $settings->showEnvironmentIndicator,

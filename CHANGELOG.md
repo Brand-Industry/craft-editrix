@@ -2,6 +2,11 @@
 
 All notable changes to Editrix will be documented in this file.
 
+## [1.2.2] - 2026-11-03
+
+### Added
+- The replace confirmation window asks you to back up your database first when a replace is above the bulk confirmation threshold. It also shows your real log retention instead of a fixed 30 days
+
 ## [1.2.1] - 2026-11-02
 
 ### Changed

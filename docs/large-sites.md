@@ -15,6 +15,12 @@ Each search runs as a background job on Craft's queue, so a large site cannot ti
 
 If a search is still waiting after about 15 seconds, Editrix shows a warning that the queue may not be running. You can cancel the search from the same screen.
 
+## Before a large replace
+
+Make a database backup before you run a large replace. The log lets you revert the values that were saved, but if the server stops halfway, a backup is the only complete copy of your content. Editrix reminds you in the confirmation window when a replace is above the `bulkConfirmationThreshold` setting (100 rows by default).
+
+A backup is also worth having before the first replace on a site, and before any replace in production.
+
 ## Keeping searches fast
 
 **No database prefilter on Craft 4.** Craft 4 keeps the text of each field in its own column of the `content` table, so Editrix cannot ask the database which rows contain the words and reads every entry in scope instead. On a site with hundreds of thousands of entries a search over everything takes minutes. Narrow it with a section or an entry type; the queue and the limits below still protect the server.

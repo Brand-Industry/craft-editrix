@@ -385,6 +385,8 @@
       :loading="replacing"
       :require-confirmation-code="requiresConfirmationCode"
       :confirmation-reasons="confirmationReasons"
+      :backup-advised="backupAdvised"
+      :retention-days="safety.logRetentionDays || 30"
       @confirm="handleReplace"
       @cancel="cancelReplaceConfirm"
     />
@@ -834,6 +836,15 @@ const requiresConfirmationCode = computed(() => {
     typeof threshold === 'number' && confirmCount.value > threshold;
   const productionRisk = safety.value.productionSafeMode && isProduction.value;
   return overThreshold || productionRisk;
+});
+
+// A replace past the bulk threshold is large enough to warrant a database
+// backup first: the log can revert what was saved, but only a backup is a
+// full copy if the server stops halfway.
+const backupAdvised = computed(() => {
+  if (searchParams.dryRun) return false;
+  const threshold = safety.value.bulkConfirmationThreshold;
+  return typeof threshold === 'number' && confirmCount.value > threshold;
 });
 
 const confirmationReasons = computed(() => {

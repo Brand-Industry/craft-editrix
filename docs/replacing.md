@@ -21,7 +21,7 @@ With **Include link addresses** on, a replace also changes the `href` and `src` 
 
 ## Confirmations
 
-A replace of more rows than `bulkConfirmationThreshold` (default 100) asks you to type `REPLACE` before it runs. With **Production Safe Mode** on (Pro), every replace in a production environment asks the same.
+A replace of more rows than `bulkConfirmationThreshold` (default 100) asks you to type `REPLACE` before it runs, and reminds you to back up your database first. With **Production Safe Mode** on (Pro), every replace in a production environment asks the same.
 
 ## Limits
 

@@ -15,7 +15,17 @@
                 {{ t('You are about to replace') }} <strong>{{ count }}</strong> {{ t('occurrence(s).') }}
               </p>
               <p style="margin: 0; font-size: 13px;">
-                {{ t('This action can be reverted from the History within 30 days.') }}
+                {{ t('This action can be reverted from the History within {days} days.', { days: retentionDays }) }}
+              </p>
+            </div>
+          </div>
+
+          <div v-if="backupAdvised" class="editrix-modal__warning" style="margin-top: 12px;">
+            <span>💾</span>
+            <div>
+              <p style="margin: 0 0 4px; font-weight: 600;">{{ t('Back up your database first.') }}</p>
+              <p style="margin: 0; font-size: 13px;">
+                {{ t('This is a large replace. If the server stops halfway, the History can revert the values that were saved, but a backup is the only complete copy.') }}
               </p>
             </div>
           </div>
@@ -71,6 +81,8 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   requireConfirmationCode: { type: Boolean, default: false },
   confirmationReasons: { type: Array, default: () => [] },
+  backupAdvised: { type: Boolean, default: false },
+  retentionDays: { type: Number, default: 30 },
 });
 
 defineEmits(['confirm', 'cancel']);
