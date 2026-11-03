@@ -9,6 +9,7 @@ All notable changes to Editrix will be documented in this file.
 - The detail window of a row that was already replaced previewed a second replace, and its Apply button stayed on. It now says the row was already replaced and turns Apply off
 - On a multi-site install, Revert, Delete and the revert check in Logs & History answered "Page not found", because the site parameter of the URL ended up before the log id. The id now goes into the path
 - On a multi-site install, Export and Re-run in Logs & History lost their options for the same reason. They now continue the query string of the URL
+- While a replace ran, Replace Selected stayed on and a second replace could be started over the same rows. The button is off until the replace ends
 
 ## [1.2.2] - 2026-11-03
 

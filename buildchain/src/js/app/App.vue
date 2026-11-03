@@ -344,6 +344,7 @@
             :excluded-count="excludedCount"
             :action-mode="actionMode"
             :dry-run="searchParams.dryRun"
+            :busy="replacing"
             :search-query="searchParams.query"
             @toggle="toggleResult"
             @toggle-match="toggleMatch"
@@ -868,6 +869,7 @@ const confirmationReasons = computed(() => {
 });
 
 const handleRequestSingleReplace = ({ result, replaceWith }) => {
+  if (replacing.value) return;
   singleReplaceTarget.value = result;
   singleReplaceValue.value = replaceWith;
   detailResult.value = null;
@@ -890,6 +892,7 @@ const rowLimit = computed(() =>
 );
 
 const requestBulkReplace = () => {
+  if (replacing.value) return;
   if (rowLimit.value > 0 && selectedCount.value > rowLimit.value) {
     window.Craft?.cp?.displayError?.(
       t('Select at most {limit} rows per replace; you selected {count}.', {
