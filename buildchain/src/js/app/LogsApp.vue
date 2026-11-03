@@ -70,6 +70,11 @@
         </select>
       </div>
 
+      <!-- Checking a revert: the dialog only opens once the server has looked at every value -->
+      <div v-if="busyText" class="editrix-logs__loading" role="status" aria-live="polite">
+        <LoadingSpinner :text="busyText" />
+      </div>
+
       <!-- Loading -->
       <div v-if="loading" class="editrix-logs__loading">
         <LoadingSpinner text="Loading logs..." />
@@ -172,6 +177,7 @@
         :title="pendingAction?.title || ''"
         :message="pendingAction?.message || ''"
         :loading="actionInProgress"
+        :progress-text="progressText"
         :danger="pendingAction?.danger || false"
         @confirm="executeAction"
         @cancel="pendingAction = null"
@@ -215,6 +221,9 @@ const total = ref(0);
 const limit = ref(20);
 const offset = ref(0);
 const actionInProgress = ref(false);
+// What a long step is doing, so a big log does not look stuck.
+const busyText = ref('');
+const progressText = ref('');
 const pendingAction = ref(null);
 
 const filters = reactive({
@@ -263,6 +272,7 @@ const resetAndFetch = () => {
 // Starts a revert and, if the server queued it (a large one), follows it
 // until it stops. Returns the final numbers either way.
 const runRevert = async (log, force) => {
+  progressText.value = 'Reverting. Keep this page open until it finishes.';
   const data = await post(urlWithId(revertUrl, log.id), force ? { force: true } : {});
 
   if (!data.success || !data.queued) return data;
@@ -272,6 +282,10 @@ const runRevert = async (log, force) => {
     const status = await get(urlWithId(revertStatusUrl, log.id));
 
     if (!status.success) return status;
+
+    if (status.running) {
+      progressText.value = `Reverting: ${status.reverted.toLocaleString()} of ${status.total.toLocaleString()} values restored. Keep this page open until it finishes.`;
+    }
 
     if (!status.running) {
       return {
@@ -292,8 +306,10 @@ const runRevert = async (log, force) => {
 const confirmRevert = async (log) => {
   // First, validate the revert to see what it would do
   actionInProgress.value = true;
+  busyText.value = 'Checking which values can be restored. A large log can take a minute.';
   try {
     const validation = await get(urlWithId(validateRevertUrl, log.id));
+    busyText.value = '';
 
     if (!validation.success) {
       window.Craft?.cp?.displayError?.(validation.error || 'Validation failed');
@@ -355,6 +371,7 @@ const confirmRevert = async (log) => {
     };
   } catch (err) {
     actionInProgress.value = false;
+    busyText.value = '';
     window.Craft?.cp?.displayError?.(err.message || 'Failed to validate revert');
   }
 };
@@ -387,6 +404,7 @@ const executeAction = async () => {
     window.Craft?.cp?.displayError?.(err.message || 'Action failed');
   } finally {
     actionInProgress.value = false;
+    progressText.value = '';
   }
 };
 
