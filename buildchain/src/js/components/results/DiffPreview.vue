@@ -23,7 +23,7 @@
         <template v-else>
           <div v-if="replaced" class="editrix-diff__notice editrix-diff__notice--warning">
             <span>⚠️</span>
-            <p>{{ t('Already replaced. This preview shows what replacing again would do, so Apply is off.') }}</p>
+            <p>{{ t('Already replaced. This is the text as it is now, so there is nothing to apply.') }}</p>
           </div>
 
           <div v-if="stale" class="editrix-diff__notice editrix-diff__notice--warning">
@@ -31,33 +31,35 @@
             <p>{{ t('Its content changed after the search. Search again to see the current text.') }}</p>
           </div>
 
-          <div v-if="!changed" class="editrix-diff__notice editrix-diff__notice--warning">
+          <div v-if="!changed && !replaced" class="editrix-diff__notice editrix-diff__notice--warning">
             <span>⚠️</span>
             <p>{{ t("This occurrence won't be changed by this replacement.") }}</p>
           </div>
 
           <div class="editrix-diff__section">
             <div class="editrix-diff__section-header">
-              <h4 class="editrix-diff__section-title">⊖ {{ t('ORIGINAL') }}</h4>
+              <h4 class="editrix-diff__section-title">{{ replaced ? t('CURRENT TEXT') : '⊖ ' + t('ORIGINAL') }}</h4>
             </div>
             <div class="editrix-diff__text editrix-diff__text--original">
-              <span v-html="originalHtml"></span>
+              <span v-html="replaced ? currentHtml : originalHtml"></span>
             </div>
           </div>
 
-          <div class="editrix-diff__arrow">↓</div>
+          <template v-if="!replaced">
+            <div class="editrix-diff__arrow">↓</div>
 
-          <div class="editrix-diff__section">
-            <div class="editrix-diff__section-header">
-              <h4 class="editrix-diff__section-title">⊕ {{ t('PROPOSED') }}</h4>
+            <div class="editrix-diff__section">
+              <div class="editrix-diff__section-header">
+                <h4 class="editrix-diff__section-title">⊕ {{ t('PROPOSED') }}</h4>
+              </div>
+              <div class="editrix-diff__text editrix-diff__text--proposed">
+                <span v-html="proposedHtml"></span>
+              </div>
             </div>
-            <div class="editrix-diff__text editrix-diff__text--proposed">
-              <span v-html="proposedHtml"></span>
-            </div>
-          </div>
+          </template>
         </template>
 
-        <div class="editrix-diff__notice">
+        <div v-if="!replaced" class="editrix-diff__notice">
           <span>ℹ️</span>
           <p>
             <strong>{{ t('Individual Update') }}</strong><br>
@@ -75,8 +77,9 @@
           {{ t('Skip') }}
         </button>
         <button
+          v-if="!replaced"
           class="editrix-btn editrix-btn--primary"
-          :disabled="loading || !changed || replaced"
+          :disabled="loading || !changed"
           @click="$emit('apply', result)"
         >
           ✓ {{ t('Apply to this element') }}
@@ -121,4 +124,7 @@ const render = (keep, mark) =>
 
 const originalHtml = computed(() => render('del', 'diff-remove'));
 const proposedHtml = computed(() => render('add', 'diff-add'));
+// A replaced row only shows its text as it is now: replacing it again would
+// show the new text twice.
+const currentHtml = computed(() => escapeText(props.original));
 </script>
