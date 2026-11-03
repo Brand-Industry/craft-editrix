@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { highlightMatches, contextToHtml } from '../src/js/utils/highlight';
+import { highlightMatches, contextToHtml, findLiteral } from '../src/js/utils/highlight';
 
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const mark = s => `<span class="match">${s}</span>`;
@@ -59,5 +59,32 @@ describe('contextToHtml', () => {
   it('handles empty input', () => {
     expect(contextToHtml(undefined)).toBe('');
     expect(contextToHtml('')).toBe('');
+  });
+});
+
+describe('findLiteral', () => {
+  it('finds every place the text stands', () => {
+    expect(findLiteral('Ulbrich test and Ulbrich test', 'Ulbrich test')).toEqual([
+      { start: 0, end: 12 },
+      { start: 17, end: 29 },
+    ]);
+  });
+
+  it('can ignore case', () => {
+    expect(findLiteral('Hotel and HOTEL', 'hotel', true)).toHaveLength(2);
+    expect(findLiteral('Hotel and HOTEL', 'hotel', false)).toEqual([]);
+  });
+
+  it('marks nothing for an empty replacement', () => {
+    expect(findLiteral('anything', '')).toEqual([]);
+  });
+
+  it('does not overlap', () => {
+    expect(findLiteral('aaa', 'aa')).toEqual([{ start: 0, end: 2 }]);
+  });
+
+  it('works with highlightMatches and its own class, escaping the text', () => {
+    const html = highlightMatches('<p>x test2 y</p>', findLiteral('<p>x test2 y</p>', 'test2'), esc, 'diff-add');
+    expect(html).toBe('&lt;p&gt;x <span class="diff-add">test2</span> y&lt;/p&gt;');
   });
 });
