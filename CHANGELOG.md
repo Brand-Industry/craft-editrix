@@ -7,6 +7,7 @@ All notable changes to Editrix will be documented in this file.
 ### Fixed
 - While a replace ran in the queue, the page also showed the search progress panel, "Searching..." on the button and a "Cancel search" button. Only the replace progress is shown now
 - The detail window of a row that was already replaced previewed a second replace, and its Apply button stayed on. It now says the row was already replaced and turns Apply off
+- On a multi-site install, Revert, Delete and the revert check in Logs & History answered "Page not found", because the site parameter of the URL ended up before the log id. The id now goes into the path
 
 ## [1.2.2] - 2026-11-03
 

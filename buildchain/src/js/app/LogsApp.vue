@@ -185,6 +185,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useApi } from '../composables/useApi';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import ConfirmActionModal from '../components/common/ConfirmActionModal.vue';
+import { urlWithId } from '../utils/urlWithId';
 
 // Config from PHP
 const config = window.EditrixConfig || {};
@@ -262,13 +263,13 @@ const resetAndFetch = () => {
 // Starts a revert and, if the server queued it (a large one), follows it
 // until it stops. Returns the final numbers either way.
 const runRevert = async (log, force) => {
-  const data = await post(revertUrl + '/' + log.id, force ? { force: true } : {});
+  const data = await post(urlWithId(revertUrl, log.id), force ? { force: true } : {});
 
   if (!data.success || !data.queued) return data;
 
   for (;;) {
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    const status = await get(revertStatusUrl + '/' + log.id);
+    const status = await get(urlWithId(revertStatusUrl, log.id));
 
     if (!status.success) return status;
 
@@ -292,7 +293,7 @@ const confirmRevert = async (log) => {
   // First, validate the revert to see what it would do
   actionInProgress.value = true;
   try {
-    const validation = await get(validateRevertUrl + '/' + log.id);
+    const validation = await get(urlWithId(validateRevertUrl, log.id));
 
     if (!validation.success) {
       window.Craft?.cp?.displayError?.(validation.error || 'Validation failed');
@@ -364,7 +365,7 @@ const confirmDelete = (log) => {
     message: 'Permanently delete this log entry? This cannot be undone.',
     danger: true,
     execute: async () => {
-      const data = await post(deleteUrl + '/' + log.id, {});
+      const data = await post(urlWithId(deleteUrl, log.id), {});
       if (data.success) {
         window.Craft?.cp?.displayNotice?.(data.message);
       } else {
