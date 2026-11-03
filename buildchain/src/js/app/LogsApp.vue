@@ -195,6 +195,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import ConfirmActionModal from '../components/common/ConfirmActionModal.vue';
 import { urlWithId, urlWithQuery } from '../utils/urlWithId';
 import { formatElapsed } from '../utils/searchProgress';
+import { kickQueue } from '../utils/queue';
 
 // Config from PHP
 const config = window.EditrixConfig || {};
@@ -308,6 +309,10 @@ const runRevert = async (log, force) => {
     if (!data.success || !data.queued) return data;
 
     revertingLogId.value = log.id;
+    // The revert was pushed by this request, so Craft would not start it until
+    // another panel page loads. Ask for it now, and again if it still waits.
+    kickQueue();
+    let lastKickAt = Date.now();
 
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -318,6 +323,10 @@ const runRevert = async (log, force) => {
       if (status.running) {
         if (!counts || status.reverted !== counts.reverted) lastMoveAt = Date.now();
         counts = { reverted: status.reverted, total: status.total };
+        if (Date.now() - lastMoveAt > 10000 && Date.now() - lastKickAt > 10000) {
+          kickQueue();
+          lastKickAt = Date.now();
+        }
         continue;
       }
 

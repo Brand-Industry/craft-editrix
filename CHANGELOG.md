@@ -10,6 +10,7 @@ All notable changes to Editrix will be documented in this file.
 
 ### Fixed
 - A search, replace or revert waited behind the thousands of jobs Craft queues after a replace (revision pruning, search indexes), so a revert could take many minutes to start. Editrix jobs now go to the front of the queue, and the revert dialog says when it is waiting for the queue
+- A revert queued from Logs & History did not ask Craft to start the queue, as a search or a replace does, so it waited until another panel page was opened. It now asks right away and again while it waits
 - While a replace ran in the queue, the page also showed the search progress panel, "Searching..." on the button and a "Cancel search" button. Only the replace progress is shown now
 - The detail window of a row that was already replaced previewed a second replace, and its Apply button stayed on. It now shows the text as it is now, says the row was already replaced and has no Apply button
 - On a multi-site install, Revert, Delete and the revert check in Logs & History answered "Page not found", because the site parameter of the URL ended up before the log id. The id now goes into the path
