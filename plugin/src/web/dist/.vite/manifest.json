@@ -1,6 +1,6 @@
 {
-  "_searchProgress-C_IFnwZX.js": {
-    "file": "js/searchProgress-C_IFnwZX.js",
+  "_searchProgress-Cdplr2Fw.js": {
+    "file": "js/searchProgress-Cdplr2Fw.js",
     "name": "searchProgress"
   },
   "src/js/app/logs.js": {
@@ -9,7 +9,7 @@
     "src": "src/js/app/logs.js",
     "isEntry": true,
     "imports": [
-      "_searchProgress-C_IFnwZX.js"
+      "_searchProgress-Cdplr2Fw.js"
     ],
     "css": [
       "css/editrix-logs.css"
@@ -21,7 +21,7 @@
     "src": "src/js/app/main.js",
     "isEntry": true,
     "imports": [
-      "_searchProgress-C_IFnwZX.js"
+      "_searchProgress-Cdplr2Fw.js"
     ],
     "css": [
       "css/editrix.css"
