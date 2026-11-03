@@ -229,7 +229,7 @@ class LogController extends Controller
         if ($count > Editrix::$plugin->getSettings()->replaceQueueThreshold) {
             Editrix::$plugin->log->finishReplaceLog($logId, "reverting", (int) $log["replacementCount"]);
 
-            Craft::$app->getQueue()->push(new RevertJob([
+            Craft::$app->getQueue()->priority(Editrix::QUEUE_PRIORITY)->push(new RevertJob([
                 "logId" => $logId,
                 "force" => $force,
                 "userId" => (int) Craft::$app->getUser()->getId(),

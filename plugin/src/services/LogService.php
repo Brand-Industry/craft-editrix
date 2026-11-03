@@ -615,10 +615,36 @@ class LogService extends Component
      * A revert in the queue that has not moved for a while: its worker died
      * or the queue stopped, and nothing will ever close the log.
      */
-    public function isRevertStale(array $log, int $seconds = 180): bool
+    public function isRevertStale(array $log, int $seconds = 120): bool
     {
         return in_array($log["status"], ["reverting", "cancelling"], true)
+            && !$this->hasRevertJobInQueue((int) $log["id"])
             && time() - $this->lastActivity($log) > $seconds;
+    }
+
+    /**
+     * Whether Craft's queue still holds this log's revert: waiting for its
+     * turn or running. A job that failed does not count. A job that waits
+     * is not a dead one, however long the queue ahead of it is.
+     */
+    public function hasRevertJobInQueue(int $logId): bool
+    {
+        $descriptions = (new Query())
+            ->select(["description"])
+            ->from("{{%queue}}")
+            ->where(["fail" => false])
+            ->andWhere(["like", "description", "Reverting replacement"])
+            ->column();
+
+        // The job's description names its log, as plain text or, in Craft's
+        // own style, as JSON parameters: either way the id stands alone.
+        foreach ($descriptions as $description) {
+            if (preg_match('/(?<!\d)' . $logId . '(?!\d)/', (string) $description)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Closes a stale revert as partial (or as before, if nothing was restored). */

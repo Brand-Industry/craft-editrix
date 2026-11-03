@@ -77,6 +77,13 @@ class Editrix extends Plugin
     public const LOG_CATEGORY = "editrix";
 
     /**
+     * Queue priority of Editrix's own jobs. Craft's default is 1024 and a lower
+     * number runs first. A replace leaves thousands of Craft jobs behind (revision
+     * pruning, search indexes), and a search or revert must not wait for them.
+     */
+    public const QUEUE_PRIORITY = 10;
+
+    /**
      * A log file of what replaces and reverts did. The database log can be
      * lost with a restored backup; a file in storage/logs survives it, and
      * says which entries were changed.

@@ -192,7 +192,7 @@ class SearchController extends Controller
             ])
             ->execute();
 
-        Craft::$app->getQueue()->push(
+        Craft::$app->getQueue()->priority(Editrix::QUEUE_PRIORITY)->push(
             new SearchJob([
                 "searchId" => $searchId,
                 "query" => $p["query"],

@@ -18,7 +18,7 @@ The search ran for `maxSearchSeconds` (300 seconds by default). It shows the mat
 
 ## A revert says "This operation is still running"
 
-A revert in the queue is still working, or its worker stopped. If nothing has moved for three minutes, Editrix treats the revert as stopped and lets you start it again: the values already restored stay restored, and the rest are still in the log. To stop one that is running, use **Stop revert** in its dialog.
+A revert in the queue is still working, or its worker stopped. If Craft's queue no longer holds the revert and nothing has moved for two minutes, Editrix treats it as stopped and lets you start it again (a revert that is only waiting its turn in the queue is left alone): the values already restored stay restored, and the rest are still in the log. To stop one that is running, use **Stop revert** in its dialog.
 
 ## "Showing the first N results"
 

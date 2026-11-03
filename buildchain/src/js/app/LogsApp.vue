@@ -288,9 +288,11 @@ const runRevert = async (log, force) => {
   const describe = () => {
     let text = stopRequested.value
       ? 'Stopping. This can take a few seconds.'
-      : counts
-        ? `Reverting: ${counts.reverted.toLocaleString()} of ${counts.total.toLocaleString()} values restored.`
-        : 'Reverting.';
+      : counts && counts.reverted === 0
+        ? "Waiting for Craft's queue to start the revert. Other jobs may be ahead of it."
+        : counts
+          ? `Reverting: ${counts.reverted.toLocaleString()} of ${counts.total.toLocaleString()} values restored.`
+          : 'Reverting.';
     text += ` ${formatElapsed((Date.now() - startedAt) / 1000)} elapsed. Keep this page open until it finishes.`;
     if (Date.now() - lastMoveAt > 30000) {
       text += " Nothing has moved for a while, so Craft's queue may not be running.";

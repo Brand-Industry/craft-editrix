@@ -141,7 +141,7 @@ class ReplaceController extends Controller
                 // Too many to save inside one request: do it in the queue.
                 Editrix::$plugin->log->setTotal($logId, count($selectedResults));
 
-                Craft::$app->getQueue()->push(new ReplaceJob([
+                Craft::$app->getQueue()->priority(Editrix::QUEUE_PRIORITY)->push(new ReplaceJob([
                     "logId" => $logId,
                     "rows" => array_values($selectedResults),
                     "query" => $searchQuery,
