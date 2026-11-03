@@ -192,6 +192,7 @@ import { useApi } from '../composables/useApi';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import ConfirmActionModal from '../components/common/ConfirmActionModal.vue';
 import { urlWithId, urlWithQuery } from '../utils/urlWithId';
+import { formatElapsed } from '../utils/searchProgress';
 
 // Config from PHP
 const config = window.EditrixConfig || {};
@@ -272,22 +273,41 @@ const resetAndFetch = () => {
 // Starts a revert and, if the server queued it (a large one), follows it
 // until it stops. Returns the final numbers either way.
 const runRevert = async (log, force) => {
-  progressText.value = 'Reverting. Keep this page open until it finishes.';
-  const data = await post(urlWithId(revertUrl, log.id), force ? { force: true } : {});
+  const startedAt = Date.now();
+  let counts = null;
+  let lastMoveAt = startedAt;
 
-  if (!data.success || !data.queued) return data;
-
-  for (;;) {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const status = await get(urlWithId(revertStatusUrl, log.id));
-
-    if (!status.success) return status;
-
-    if (status.running) {
-      progressText.value = `Reverting: ${status.reverted.toLocaleString()} of ${status.total.toLocaleString()} values restored. Keep this page open until it finishes.`;
+  // Redrawn every second, so the clock moves even when the count does not.
+  const describe = () => {
+    let text = counts
+      ? `Reverting: ${counts.reverted.toLocaleString()} of ${counts.total.toLocaleString()} values restored.`
+      : 'Reverting.';
+    text += ` ${formatElapsed((Date.now() - startedAt) / 1000)} elapsed. Keep this page open until it finishes.`;
+    if (Date.now() - lastMoveAt > 30000) {
+      text += " Nothing has moved for a while, so Craft's queue may not be running.";
     }
+    return text;
+  };
+  progressText.value = describe();
+  const ticker = setInterval(() => { progressText.value = describe(); }, 1000);
 
-    if (!status.running) {
+  try {
+    const data = await post(urlWithId(revertUrl, log.id), force ? { force: true } : {});
+
+    if (!data.success || !data.queued) return data;
+
+    for (;;) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const status = await get(urlWithId(revertStatusUrl, log.id));
+
+      if (!status.success) return status;
+
+      if (status.running) {
+        if (!counts || status.reverted !== counts.reverted) lastMoveAt = Date.now();
+        counts = { reverted: status.reverted, total: status.total };
+        continue;
+      }
+
       return {
         success: true,
         revertedCount: status.reverted,
@@ -300,6 +320,8 @@ const runRevert = async (log, force) => {
             : `Successfully reverted ${status.reverted} change(s).`,
       };
     }
+  } finally {
+    clearInterval(ticker);
   }
 };
 
