@@ -31,9 +31,10 @@ class FieldValue
      * {asset:12:url||https://cdn/x.jpg} compares equal to {asset:12:url}.
      * Craft rewrites that fallback from the asset's current URL on every
      * save, so two copies of the same content can differ only there.
+     * The reference may carry a site ({entry:12@1:url||...}) or a handle.
      */
     public static function withoutRefFallbacks(string $html): string
     {
-        return preg_replace('/\{(\w+:\d+(?::\w+)?)\|\|[^}]*\}/', '{$1}', $html) ?? $html;
+        return preg_replace('/\{(\w+:[\w.\-@]+(?::\w+)?)\|\|[^}]*\}/', '{$1}', $html) ?? $html;
     }
 }

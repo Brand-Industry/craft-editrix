@@ -143,6 +143,59 @@ class RunControllerTest extends EditrixTestCase
         $this->assertSame('reverted', Editrix::$plugin->log->getLogById($summary['logId'])['status']);
     }
 
+    private function appliedLog(): int
+    {
+        [$section, $word] = $this->sectionAndWord();
+
+        $cli = $this->controller([
+            'find' => $word,
+            'replace' => 'EditrixQA' . random_int(100, 999),
+            'sections' => $section,
+            'fields' => 'title',
+            'elements' => (string) $this->entryId,
+            'dryRun' => false,
+        ]);
+        $summary = $cli->applyPlan($cli->plan(100));
+        $this->logIds[] = $summary['logId'];
+
+        return $summary['logId'];
+    }
+
+    public function testRevertIsADryRunUnlessToldOtherwise(): void
+    {
+        $logId = $this->appliedLog();
+        $changed = $this->currentTitle();
+
+        $cli = $this->controller();
+        $this->assertTrue($cli->dryRun, 'Every command defaults to a dry run.');
+
+        $preview = $cli->revertPreview($logId);
+        $this->assertSame(1, $preview['safe']);
+        $this->assertFalse($preview['partial']);
+
+        ob_start();
+        $exit = $cli->actionRevert($logId);
+        $output = (string) ob_get_clean();
+
+        $this->assertSame(0, $exit);
+        $this->assertStringContainsString('Nothing was written', $output);
+        $this->assertSame($changed, $this->currentTitle(), 'A dry run must not touch the entry.');
+        $this->assertSame('success', Editrix::$plugin->log->getLogById($logId)['status'], 'Nor the log.');
+    }
+
+    public function testRevertWritesOnlyWithDryRunOff(): void
+    {
+        $logId = $this->appliedLog();
+
+        $cli = $this->controller(['dryRun' => false]);
+        ob_start();
+        $cli->actionRevert($logId);
+        ob_end_clean();
+
+        $this->assertSame($this->originalTitle, $this->currentTitle());
+        $this->assertSame('reverted', Editrix::$plugin->log->getLogById($logId)['status']);
+    }
+
     public function testRevertOfAnUnknownLogSaysSo(): void
     {
         $this->assertArrayHasKey('error', $this->controller()->revertLog(999999999));

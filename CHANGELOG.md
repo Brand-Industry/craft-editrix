@@ -9,6 +9,10 @@ All notable changes to Editrix will be documented in this file.
 - A **Stop revert** button in the dialog of a revert that runs in the queue. Values not reached stay in the log, and the log is never marked as reverted
 
 ### Fixed
+- `php craft editrix/run/revert` restored values at once, although the documentation says every command is a dry run unless `--dry-run=0` is typed. It is now a dry run: it says what would be restored and writes nothing. Use `--dry-run=0` to revert
+- A revert left alone, as "edited since", every Redactor or CKEditor value with a link to an entry on a site (`{entry:12@1:url||...}`), because the fallback URL Craft rewrites on save was only ignored for references without a site. Those values are now restored
+- A second replace could be started while one was running, by calling the server directly. The server now refuses it
+- A replace whose worker died stayed "running" for good: its progress never ended and the log could not be reverted. After two minutes without movement, and with no job left in Craft's queue, it is closed as partial (or failed if nothing was saved). A replace that only waits its turn in the queue is left alone
 - A revert that could not restore anything turned a partial log back into "success", forgetting the values restored by an earlier revert. The log stays partial
 - A search, replace or revert waited behind the thousands of jobs Craft queues after a replace (revision pruning, search indexes), so a revert could take many minutes to start. Editrix jobs now go to the front of the queue, and the revert dialog says when it is waiting for the queue
 - A revert queued from Logs & History did not ask Craft to start the queue, as a search or a replace does, so it waited until another panel page was opened. It now asks right away and again while it waits
@@ -17,7 +21,7 @@ All notable changes to Editrix will be documented in this file.
 - The detail window of a row that was already replaced previewed a second replace, and its Apply button stayed on. It now shows the text as it is now with the replacement marked, says the row was already replaced and has no Apply button
 - On a multi-site install, Revert, Delete and the revert check in Logs & History answered "Page not found", because the site parameter of the URL ended up before the log id. The id now goes into the path
 - On a multi-site install, Export and Re-run in Logs & History lost their options for the same reason. They now continue the query string of the URL
-- Re-run on a replace in Recent activity ran only the search, in Search mode. It now opens in Replace mode with the replacement text. Nothing changes until you select the rows and confirm
+- Re-run on a replace in Recent activity ran only the search, in Search mode. It now opens in Replace mode with the replacement text. Nothing changes until you select the rows and confirm. A replace now also keeps the sections, fields, entry types and sites it covered, so Re-run brings them back (replaces made before this update keep only their text)
 - While a replace ran, Replace Selected stayed on and a second replace could be started over the same rows. Replace Selected, Apply in the preview, Replace in the detail window and the row selection are now off until it ends
 - The check before a revert kept a row in memory for every value of the log and had no time limit, so a log of many thousands of values could run a web request out of memory. It now counts as it goes and stops after 20 seconds, and says how many values it covered
 - A revert whose worker died left the log stuck as "still running", and a new revert was refused. When Craft's queue no longer holds the revert and nothing has moved for two minutes, the log is closed as partial and can be reverted again. A revert that is only waiting its turn is left alone

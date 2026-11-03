@@ -463,6 +463,14 @@ export function useSearch(actionMode) {
         dryRun: searchParams.dryRun,
         confirmationCode: confirmationCode ?? '',
         searchId: loadedSearchId.value ?? '',
+        // What the search covered, kept in the log so Re-run can bring it back.
+        scope: {
+          allSites: searchParams.allSites,
+          includeLinks: searchParams.includeLinks,
+          sections: searchParams.sections,
+          fields: searchParams.fields,
+          entryTypes: searchParams.entryTypes,
+        },
       });
 
       // Too many rows to save inside one request: the server queued it.

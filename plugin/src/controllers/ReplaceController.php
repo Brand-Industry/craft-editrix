@@ -112,6 +112,16 @@ class ReplaceController extends Controller
             return $this->asJson($confirmationError);
         }
 
+        // One replace at a time per user. The page already turns its buttons
+        // off while one runs; this is the same rule for anything that calls
+        // the server directly.
+        if (Editrix::$plugin->log->replaceInProgress((int) Craft::$app->getUser()->getId(), self::ACTIVE_WINDOW_SECONDS)) {
+            return $this->asJson([
+                "success" => false,
+                "error" => Craft::t("editrix", "You already have a replace running. Wait for it to finish, or cancel it first."),
+            ]);
+        }
+
         try {
             $userId = (int) Craft::$app->getUser()->getId();
             $logSiteId = (int) ($siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
@@ -125,7 +135,9 @@ class ReplaceController extends Controller
                 $replaceWith,
                 $useRegex,
                 !$caseInsensitive,
-                $wholeWords
+                $wholeWords,
+                null,
+                $this->scopeFromRequest($request->getBodyParam("scope", []))
             );
 
             if (!$logId) {
@@ -488,6 +500,11 @@ class ReplaceController extends Controller
             return $this->asJson(["success" => false, "error" => "Replace not found"]);
         }
 
+        // A replace whose worker died is closed here, so the page stops waiting.
+        if (Editrix::$plugin->log->releaseStale($log)) {
+            $log = Editrix::$plugin->log->getLogById($logId);
+        }
+
         $counts = Editrix::$plugin->log->itemCounts($logId);
         $running = in_array($log["status"], ["running", "cancelling"], true);
 
@@ -533,6 +550,39 @@ class ReplaceController extends Controller
         ]);
     }
 
+    /**
+     * What the search covered, as the page sends it, kept in the log so
+     * Re-run can bring it back. Only known keys and plain values are kept.
+     */
+    private function scopeFromRequest(mixed $scope): array
+    {
+        if (is_string($scope)) {
+            $scope = json_decode($scope, true);
+        }
+
+        if (!is_array($scope)) {
+            return [];
+        }
+
+        $list = fn($value) => is_array($value)
+            ? array_slice(array_values(array_filter($value, fn($v) => is_string($v) && $v !== "")), 0, 200)
+            : [];
+
+        $out = [];
+        foreach (["sections", "fields", "entryTypes"] as $key) {
+            if ($list($scope[$key] ?? []) !== []) {
+                $out[$key] = $list($scope[$key]);
+            }
+        }
+        foreach (["allSites", "includeLinks"] as $key) {
+            if (!empty($scope[$key])) {
+                $out[$key] = true;
+            }
+        }
+
+        return $out;
+    }
+
     public function actionCancel(): Response
     {
         $this->requirePostRequest();
@@ -546,7 +596,10 @@ class ReplaceController extends Controller
         $log = Editrix::$plugin->log->getLogById($logId);
 
         if ($log && (int) $log["userId"] === (int) Craft::$app->getUser()->getId() && $log["status"] === "running") {
-            Editrix::$plugin->log->finishReplaceLog($logId, "cancelling", (int) $log["replacementCount"]);
+            // With the worker gone there is no job to notice the request, so close it now.
+            if (!Editrix::$plugin->log->releaseStale($log)) {
+                Editrix::$plugin->log->finishReplaceLog($logId, "cancelling", (int) $log["replacementCount"]);
+            }
         }
 
         return $this->asJson(["success" => true]);
