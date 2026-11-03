@@ -131,6 +131,7 @@ return [
     'Invalid regular expression' => 'Invalid regular expression',
     'What do you want to search?' => 'What do you want to search?',
     'Confirmation required' => 'Confirmation required',
+    'Already replaced. This preview shows what replacing again would do, so Apply is off.' => 'Already replaced. This preview shows what replacing again would do, so Apply is off.',
     'This action can be reverted from the History within {days} days.' => 'This action can be reverted from the History within {days} days.',
     'Back up your database first.' => 'Back up your database first.',
     'This is a large replace. If the server stops halfway, the History can revert the values that were saved, but a backup is the only complete copy.' => 'This is a large replace. If the server stops halfway, the History can revert the values that were saved, but a backup is the only complete copy.',

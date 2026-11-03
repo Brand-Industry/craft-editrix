@@ -367,6 +367,7 @@
       :proposed="previewData?.proposed ?? previewResult?.fieldValue ?? ''"
       :changed="previewData?.changed ?? false"
       :stale="previewData?.stale ?? false"
+      :replaced="!!previewResult && rowState(previewResult) === 'replaced'"
       :loading="previewLoading"
       @close="previewResult = null"
       @apply="applyToSingle"

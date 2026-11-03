@@ -21,6 +21,11 @@
         <div v-if="loading" class="editrix-diff__loading">{{ t('Loading...') }}</div>
 
         <template v-else>
+          <div v-if="replaced" class="editrix-diff__notice editrix-diff__notice--warning">
+            <span>⚠️</span>
+            <p>{{ t('Already replaced. This preview shows what replacing again would do, so Apply is off.') }}</p>
+          </div>
+
           <div v-if="stale" class="editrix-diff__notice editrix-diff__notice--warning">
             <span>⚠️</span>
             <p>{{ t('Its content changed after the search. Search again to see the current text.') }}</p>
@@ -71,7 +76,7 @@
         </button>
         <button
           class="editrix-btn editrix-btn--primary"
-          :disabled="loading || !changed"
+          :disabled="loading || !changed || replaced"
           @click="$emit('apply', result)"
         >
           ✓ {{ t('Apply to this element') }}
@@ -96,6 +101,8 @@ const props = defineProps({
   changed: { type: Boolean, default: false },
   // The field was edited after the search.
   stale: { type: Boolean, default: false },
+  // The row was already replaced in this search.
+  replaced: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
 });
 
