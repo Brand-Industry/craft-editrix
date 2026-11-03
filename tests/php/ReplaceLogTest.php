@@ -566,4 +566,35 @@ class ReplaceLogTest extends EditrixTestCase
     {
         $this->assertFalse(Editrix::$plugin->log->hasRevertJobInQueue(987654321));
     }
+
+    public function testRevertingAPartialLogThatCannotRestoreAnythingStaysPartial(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+
+        // One value restored by an earlier revert...
+        Editrix::$plugin->log->addItem($logId, [
+            'elementType' => 'entry', 'elementId' => $this->entryId, 'siteId' => $this->siteId(),
+            'fieldHandle' => 'title', 'elementTitle' => $this->originalTitle,
+            'oldValue' => $this->originalTitle, 'newValue' => 'EditrixQA111',
+        ], 0, 'reverted');
+        // ...and one that was edited since, so a normal revert leaves it.
+        Editrix::$plugin->log->addItem($logId, [
+            'elementType' => 'entry', 'elementId' => $this->entryId, 'siteId' => $this->siteId(),
+            'fieldHandle' => 'title', 'elementTitle' => $this->originalTitle,
+            'oldValue' => 'EditrixQA222', 'newValue' => 'EditrixQA333',
+        ], 1, 'applied');
+        Editrix::$plugin->log->finishReplaceLog($logId, 'reverting', 2);
+
+        $result = Editrix::$plugin->replace->revertEntries(
+            Editrix::$plugin->log->replacementsFor($this->logRow($logId)),
+            false,
+            logId: $logId
+        );
+        Editrix::$plugin->replace->finishRevert($logId, $result);
+
+        $this->assertSame(0, $result['reverted']);
+        $this->assertCount(1, $result['conflicts']);
+        $this->assertSame('partial', $this->logRow($logId)['status'], 'Earlier restored values must not be forgotten.');
+    }
 }
