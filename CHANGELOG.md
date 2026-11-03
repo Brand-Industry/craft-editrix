@@ -2,6 +2,11 @@
 
 All notable changes to Editrix will be documented in this file.
 
+## [1.2.3] - 2026-11-03
+
+### Fixed
+- While a replace ran in the queue, the page also showed the search progress panel, "Searching..." on the button and a "Cancel search" button. Only the replace progress is shown now
+
 ## [1.2.2] - 2026-11-03
 
 ### Added
