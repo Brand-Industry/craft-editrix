@@ -597,4 +597,109 @@ class ReplaceLogTest extends EditrixTestCase
         $this->assertCount(1, $result['conflicts']);
         $this->assertSame('partial', $this->logRow($logId)['status'], 'Earlier restored values must not be forgotten.');
     }
+
+    /** A queued job of this kind and log, delayed an hour so no worker can pick it up. */
+    private function queueJobFor(\craft\queue\JobInterface $job): int
+    {
+        $db = Craft::$app->getDb();
+        $db->createCommand()->insert('{{%queue}}', [
+            'channel' => 'queue',
+            'job' => serialize('editrix-test-placeholder'),
+            'description' => $job->getDescription(),
+            'timePushed' => time(),
+            'ttr' => 300,
+            'delay' => 3600,
+            'priority' => 1024,
+        ])->execute();
+
+        return (int) $db->getLastInsertID();
+    }
+
+    private function dropQueueJob(int $id): void
+    {
+        Craft::$app->getDb()->createCommand()->delete('{{%queue}}', ['id' => $id])->execute();
+    }
+
+    public function testAReplaceThatIsWorkingBlocksTheNextOne(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+
+        $this->assertSame('running', $this->logRow($logId)['status']);
+        $this->assertTrue(Editrix::$plugin->log->replaceInProgress($this->userId(), 600));
+
+        Editrix::$plugin->log->finishReplaceLog($logId, 'success', 0);
+        $this->assertFalse(Editrix::$plugin->log->replaceInProgress($this->userId(), 600), 'A finished replace blocks nothing.');
+    }
+
+    public function testAReplaceWhoseWorkerDiedIsClosedAndNoLongerBlocks(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $this->appliedItem($logId, 'EditrixQA' . random_int(100, 999));
+        $this->ageLog($logId, 300);
+
+        $this->assertTrue(Editrix::$plugin->log->isReplaceStale($this->logRow($logId)));
+        $this->assertFalse(Editrix::$plugin->log->replaceInProgress($this->userId(), 600), 'It stopped moving and no job holds it.');
+
+        $row = $this->logRow($logId);
+        $this->assertSame('partial', $row['status'], 'Some values were saved, so it is partial and can be reverted.');
+        $this->assertSame(1, (int) $row['replacementCount']);
+    }
+
+    public function testAReplaceWithNothingSavedThatDiedIsMarkedFailed(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $this->ageLog($logId, 300);
+
+        $this->assertTrue(Editrix::$plugin->log->releaseStale($this->logRow($logId)));
+        $this->assertSame('failed', $this->logRow($logId)['status']);
+    }
+
+    public function testAReplaceWaitingInTheQueueIsNotReleased(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $this->ageLog($logId, 3600);
+
+        $queueId = $this->queueJobFor(new ReplaceJob(['logId' => $logId, 'query' => 'q', 'replaceWith' => 'r']));
+
+        try {
+            $this->assertTrue(Editrix::$plugin->log->hasReplaceJobInQueue($logId));
+            $this->assertFalse(Editrix::$plugin->log->isReplaceStale($this->logRow($logId)), 'It only waits for its turn.');
+            $this->assertTrue(Editrix::$plugin->log->replaceInProgress($this->userId(), 7200), 'And it still blocks the next one.');
+        } finally {
+            $this->dropQueueJob($queueId);
+        }
+
+        $this->assertFalse(Editrix::$plugin->log->hasReplaceJobInQueue($logId));
+    }
+
+    public function testAJobIsMatchedByItsLogIdAndNotByNumbersInItsText(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+
+        // The query ends with this log's id, but the job belongs to another log.
+        $queueId = $this->queueJobFor(new ReplaceJob(['logId' => $logId + 1000, 'query' => "item {$logId}", 'replaceWith' => 'r']));
+
+        try {
+            $this->assertFalse(Editrix::$plugin->log->hasReplaceJobInQueue($logId));
+        } finally {
+            $this->dropQueueJob($queueId);
+        }
+    }
+
+    public function testACancelledReplaceThatDiedIsClosed(): void
+    {
+        [$row, $word] = $this->pickRow();
+        $logId = $this->beginLog();
+        $this->appliedItem($logId, 'EditrixQA' . random_int(100, 999));
+        Editrix::$plugin->log->finishReplaceLog($logId, 'cancelling', 1);
+        $this->ageLog($logId, 300);
+
+        $this->assertTrue(Editrix::$plugin->log->releaseStale($this->logRow($logId)));
+        $this->assertSame('partial', $this->logRow($logId)['status']);
+    }
 }

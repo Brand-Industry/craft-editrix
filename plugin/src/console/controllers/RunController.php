@@ -84,7 +84,7 @@ class RunController extends Controller
         return match ($actionID) {
             "search" => array_merge($options, $scope),
             "replace" => array_merge($options, $scope, ["replace", "preserveCase", "dryRun", "user"]),
-            "revert" => array_merge($options, ["force", "user"]),
+            "revert" => array_merge($options, ["force", "dryRun", "user"]),
             default => $options,
         };
     }
@@ -186,6 +186,29 @@ class RunController extends Controller
 
     public function actionRevert(int $id): int
     {
+        if ($this->dryRun) {
+            $preview = $this->revertPreview($id);
+
+            if (isset($preview["error"])) {
+                return $this->fail($preview["error"]);
+            }
+
+            $this->stdout(sprintf(
+                "Dry run: %d value(s) would be restored, %d already hold the original text, %d were edited since%s, %d are missing. Nothing was written. Add --dry-run=0 to revert.\n",
+                $preview["safe"],
+                $preview["unchanged"],
+                $preview["modified"],
+                $this->force ? " and --force would overwrite them" : " and would be left alone",
+                $preview["missing"]
+            ));
+
+            if ($preview["partial"]) {
+                $this->stdout(sprintf("Only %d value(s) were checked in the time allowed.\n", $preview["checked"]), Console::FG_YELLOW);
+            }
+
+            return ExitCode::OK;
+        }
+
         $result = $this->revertLog($id, $this->force);
 
         if (isset($result["error"])) {
@@ -325,7 +348,27 @@ class RunController extends Controller
     }
 
     /** @return array reverted, unchanged, conflicts, missing, failed; or error */
-    public function revertLog(int $id, bool $force = false): array
+    /**
+     * What a revert of this log would do, without writing anything.
+     *
+     * @return array{error?: string, safe?: int, unchanged?: int, modified?: int, missing?: int, checked?: int, partial?: bool}
+     */
+    public function revertPreview(int $id): array
+    {
+        $log = $this->revertableLog($id);
+
+        if (isset($log["error"])) {
+            return $log;
+        }
+
+        return Editrix::$plugin->replace->validateRevertSummary(
+            Editrix::$plugin->log->replacementsFor($log),
+            $this->resolveUser()
+        );
+    }
+
+    /** The log, or an error when it is not a replace or is still being worked on. */
+    private function revertableLog(int $id): array
     {
         $log = Editrix::$plugin->log->getLogById($id);
 
@@ -333,8 +376,24 @@ class RunController extends Controller
             return ["error" => "There is no replace with log id {$id}."];
         }
 
-        if (in_array($log["status"], ["running", "reverting"], true)) {
+        // A revert whose worker died is closed first, so it does not block this one.
+        if (Editrix::$plugin->log->releaseStale($log)) {
+            $log = Editrix::$plugin->log->getLogById($id);
+        }
+
+        if (in_array($log["status"], ["running", "reverting", "cancelling"], true)) {
             return ["error" => "That replace is still running."];
+        }
+
+        return $log;
+    }
+
+    public function revertLog(int $id, bool $force = false): array
+    {
+        $log = $this->revertableLog($id);
+
+        if (isset($log["error"])) {
+            return $log;
         }
 
         $userId = $this->resolveUser();

@@ -98,7 +98,8 @@ class LogService extends Component
         bool $useRegex = false,
         bool $caseSensitive = true,
         bool $wholeWords = false,
-        ?int $userId = null
+        ?int $userId = null,
+        array $scope = []
     ): ?int {
         $userId ??= Craft::$app->getUser()->getId();
 
@@ -115,6 +116,8 @@ class LogService extends Component
                 "siteId" => $siteId,
                 "userId" => $userId,
                 "type" => "replace",
+                // What the search covered, so Re-run can bring it back.
+                "scope" => $scope === [] ? null : json_encode($scope),
                 "searchQuery" => $searchQuery,
                 "replaceWith" => $replaceWith,
                 "useRegex" => $useRegex,
@@ -233,11 +236,17 @@ class LogService extends Component
         Craft::$app
             ->getDb()
             ->createCommand()
-            ->update(Install::TABLE_LOGS, ["scope" => json_encode(["total" => $total])], ["id" => $logId])
+            ->update(Install::TABLE_LOGS, ["scope" => json_encode(["total" => $total] + $this->scopeOf($logId))], ["id" => $logId])
             ->execute();
     }
 
     public function getTotal(int $logId): int
+    {
+        return (int) ($this->scopeOf($logId)["total"] ?? 0);
+    }
+
+    /** The scope column of a log, as an array: what the search covered, and a queued replace's total. */
+    private function scopeOf(int $logId): array
     {
         $scope = (new Query())
             ->select(["scope"])
@@ -245,7 +254,9 @@ class LogService extends Component
             ->where(["id" => $logId])
             ->scalar();
 
-        return (int) (json_decode((string) $scope, true)["total"] ?? 0);
+        $decoded = json_decode((string) $scope, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     /** Updates the running count and the "still alive" timestamp. */
@@ -619,7 +630,68 @@ class LogService extends Component
     {
         return in_array($log["status"], ["reverting", "cancelling"], true)
             && !$this->hasRevertJobInQueue((int) $log["id"])
+            && !$this->hasReplaceJobInQueue((int) $log["id"])
             && time() - $this->lastActivity($log) > $seconds;
+    }
+
+    /**
+     * A replace that has not moved for a while and that Craft's queue no
+     * longer holds: its worker died. A queued replace that only waits for
+     * its turn is not one.
+     */
+    public function isReplaceStale(array $log, int $seconds = 120): bool
+    {
+        return ($log["type"] ?? "") === "replace"
+            && in_array($log["status"], ["running", "cancelling"], true)
+            && !$this->hasReplaceJobInQueue((int) $log["id"])
+            && !$this->hasRevertJobInQueue((int) $log["id"])
+            && time() - $this->lastActivity($log) > $seconds;
+    }
+
+    /** Closes a replace whose worker died: partial if some values were saved, failed if none. */
+    public function releaseStaleReplace(int $logId): void
+    {
+        $applied = (int) ($this->itemCounts($logId)["applied"] ?? 0);
+        $this->finishReplaceLog($logId, $applied > 0 ? "partial" : "failed", $applied);
+    }
+
+    /**
+     * Closes a replace or a revert whose worker died, whichever this log is
+     * stuck in. True when it did. Cancelling is shared by both: a log with
+     * restored values is a revert.
+     */
+    public function releaseStale(array $log): bool
+    {
+        $id = (int) $log["id"];
+
+        if ($log["status"] === "reverting" && $this->isRevertStale($log)) {
+            $this->releaseStaleRevert($id);
+            return true;
+        }
+
+        if (!$this->isReplaceStale($log)) {
+            return false;
+        }
+
+        if ($log["status"] === "cancelling" && (($this->itemCounts($id)["reverted"] ?? 0) > 0)) {
+            $this->releaseStaleRevert($id);
+        } else {
+            $this->releaseStaleReplace($id);
+        }
+
+        return true;
+    }
+
+    /**
+     * Whether this user has a replace working right now. One that stopped
+     * moving with no job left in the queue is closed first, so a dead
+     * worker never blocks the next replace.
+     */
+    public function replaceInProgress(int $userId, int $window): bool
+    {
+        $active = $this->activeReplaceFor($userId, $window);
+
+        return $active !== null && !$this->releaseStale($active);
     }
 
     /**
@@ -629,17 +701,27 @@ class LogService extends Component
      */
     public function hasRevertJobInQueue(int $logId): bool
     {
+        return $this->queueHolds("Reverting replacement", '/#' . $logId . '$/');
+    }
+
+    /** The same for the queued replace of this log. */
+    public function hasReplaceJobInQueue(int $logId): bool
+    {
+        return $this->queueHolds("Replacing", '/\(#' . $logId . '\)$/');
+    }
+
+    /** A job's description ends with its log id, as plain text. */
+    private function queueHolds(string $like, string $endsWith): bool
+    {
         $descriptions = (new Query())
             ->select(["description"])
             ->from("{{%queue}}")
             ->where(["fail" => false])
-            ->andWhere(["like", "description", "Reverting replacement"])
+            ->andWhere(["like", "description", $like])
             ->column();
 
-        // The job's description names its log, as plain text or, in Craft's
-        // own style, as JSON parameters: either way the id stands alone.
         foreach ($descriptions as $description) {
-            if (preg_match('/(?<!\d)' . $logId . '(?!\d)/', (string) $description)) {
+            if (preg_match($endsWith, trim((string) $description))) {
                 return true;
             }
         }

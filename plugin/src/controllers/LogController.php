@@ -356,11 +356,10 @@ class LogController extends Controller
     /** Closes a stale revert and reloads the log. True when it did. */
     private function isRevertStaleAndClosed(array &$log): bool
     {
-        if (!Editrix::$plugin->log->isRevertStale($log)) {
+        if (!Editrix::$plugin->log->releaseStale($log)) {
             return false;
         }
 
-        Editrix::$plugin->log->releaseStaleRevert((int) $log["id"]);
         $log = Editrix::$plugin->log->getLogById((int) $log["id"]);
 
         return true;

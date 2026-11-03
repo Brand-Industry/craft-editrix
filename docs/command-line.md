@@ -7,7 +7,10 @@ php craft editrix/run/search --find="old name" --sections=articles
 php craft editrix/run/replace --find="old name" --replace="new name" --sections=articles
 php craft editrix/run/replace --find="old name" --replace="new name" --dry-run=0
 php craft editrix/run/revert 12
+php craft editrix/run/revert 12 --dry-run=0
 ```
+
+`revert` is a dry run too: without `--dry-run=0` it only says how many values would be restored, and writes nothing.
 
 ## Options
 
@@ -25,7 +28,7 @@ php craft editrix/run/revert 12
 | `--whole-words` | Match whole words only |
 | `--links` | Also search and replace the `href` and `src` of links and images in rich text |
 | `--preserve-case` | Give the replacement the capitalisation of what it replaces |
-| `--dry-run` | `1` (default) reports only. `0` changes content. |
+| `--dry-run` | `1` (default) reports only. `0` changes content, on `replace` and on `revert`. |
 | `--user` | The user a replace is logged under: id, username or email. Defaults to the first admin. |
 | `--limit` | How many matches to list. Default 20. |
 | `--force` | On `revert`, also overwrite values edited since |

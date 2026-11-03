@@ -180,4 +180,30 @@ class LogServiceTest extends EditrixTestCase
             Craft::$app->getDb()->createCommand()->delete('{{%queue}}', ['id' => $id])->execute();
         }
     }
+
+    public function testAReplaceKeepsWhatTheSearchCoveredAndItsQueuedTotal(): void
+    {
+        $scope = ['sections' => ['news'], 'fields' => ['title'], 'allSites' => true];
+        $id = Editrix::$plugin->log->beginReplaceLog($this->siteId(), 'q', 'r', false, true, false, $this->userId(), $scope);
+        $this->assertNotNull($id);
+        $this->logIds[] = $id;
+
+        Editrix::$plugin->log->setTotal($id, 5000);
+
+        $stored = json_decode((string) Editrix::$plugin->log->getLogById($id)['scope'], true);
+        $this->assertSame(['news'], $stored['sections']);
+        $this->assertSame(['title'], $stored['fields']);
+        $this->assertTrue($stored['allSites']);
+        $this->assertSame(5000, Editrix::$plugin->log->getTotal($id), 'The total must not overwrite the scope, nor the scope the total.');
+    }
+
+    public function testAReplaceWithoutAScopeStillHasItsTotal(): void
+    {
+        $id = Editrix::$plugin->log->beginReplaceLog($this->siteId(), 'q', 'r', false, true, false, $this->userId());
+        $this->logIds[] = $id;
+
+        Editrix::$plugin->log->setTotal($id, 40);
+
+        $this->assertSame(40, Editrix::$plugin->log->getTotal($id));
+    }
 }

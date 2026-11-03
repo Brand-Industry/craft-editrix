@@ -66,9 +66,12 @@ class ReplaceJob extends BaseJob
 
     protected function defaultDescription(): ?string
     {
-        return Craft::t("editrix", "Replacing \"{query}\" with \"{replaceWith}\"", [
+        // Ends with the log id: the queue is searched for it to tell a replace
+        // that waits its turn from one whose worker died.
+        return Craft::t("editrix", "Replacing \"{query}\" with \"{replaceWith}\" (#{id})", [
             "query" => $this->query,
             "replaceWith" => $this->replaceWith,
+            "id" => $this->logId,
         ]);
     }
 }
