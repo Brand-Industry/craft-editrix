@@ -40,7 +40,17 @@ class RunControllerTest extends EditrixTestCase
 
     private function controller(array $props = []): RunController
     {
-        $controller = new RunController('run', Craft::$app);
+        // What the command prints goes straight to the console, so it is kept here to be read.
+        $controller = new class('run', Craft::$app) extends RunController {
+            public string $printed = '';
+
+            public function stdout($string)
+            {
+                $this->printed .= $string;
+
+                return strlen($string);
+            }
+        };
         foreach ($props as $name => $value) {
             $controller->$name = $value;
         }
@@ -173,12 +183,11 @@ class RunControllerTest extends EditrixTestCase
         $this->assertSame(1, $preview['safe']);
         $this->assertFalse($preview['partial']);
 
-        ob_start();
         $exit = $cli->actionRevert($logId);
-        $output = (string) ob_get_clean();
 
         $this->assertSame(0, $exit);
-        $this->assertStringContainsString('Nothing was written', $output);
+        $this->assertStringContainsString('Nothing was written', $cli->printed);
+        $this->assertStringContainsString('--dry-run=0', $cli->printed, 'It says how to really revert.');
         $this->assertSame($changed, $this->currentTitle(), 'A dry run must not touch the entry.');
         $this->assertSame('success', Editrix::$plugin->log->getLogById($logId)['status'], 'Nor the log.');
     }
@@ -188,10 +197,9 @@ class RunControllerTest extends EditrixTestCase
         $logId = $this->appliedLog();
 
         $cli = $this->controller(['dryRun' => false]);
-        ob_start();
         $cli->actionRevert($logId);
-        ob_end_clean();
 
+        $this->assertStringContainsString('Reverted log', $cli->printed);
         $this->assertSame($this->originalTitle, $this->currentTitle());
         $this->assertSame('reverted', Editrix::$plugin->log->getLogById($logId)['status']);
     }
