@@ -1,0 +1,83 @@
+name: "Bug Report: Craft 5"
+description: Report an issue or unexpected behavior in Editrix 2.x for Craft 5
+title: "[Craft 5] "
+labels: ["bug", "craft-5"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for **Editrix 2.x on Craft 5**. For Craft 4 (Editrix 1.x) use the Craft 4 form.
+        Check the [troubleshooting page](https://editrix.thebrandindustry.com/troubleshooting) first.
+        Do not paste client names, customer text or database content. Replace them with neutral examples.
+  - type: input
+    id: editrix-version
+    attributes:
+      label: Editrix version
+      placeholder: "2.0.4"
+    validations:
+      required: true
+  - type: input
+    id: craft-version
+    attributes:
+      label: Craft CMS version
+      placeholder: "5.10.12"
+    validations:
+      required: true
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      placeholder: "8.2"
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition
+      options:
+        - Lite
+        - Pro
+    validations:
+      required: true
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - MySQL
+        - MariaDB
+        - PostgreSQL
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      options:
+        - Search
+        - Replace
+        - Logs and revert
+        - Command line
+        - Settings
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, in order. Include the search term, the scope and the field types if they matter.
+      placeholder: |
+        1. Open Editrix in the control panel
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Add the exact error text, a screenshot or the relevant lines from `storage/logs`. Remove private data first.
+    validations:
+      required: true
