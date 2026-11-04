@@ -20,7 +20,7 @@ composer require brand-industry/craft-editrix
 php craft plugin/install editrix
 ```
 
-You can also install it from **Settings, Plugins** in the control panel. If `php craft up` later shows a project config notice after an update, see [Installation and updating](docs/installation.md).
+You can also install it from **Settings, Plugins** in the control panel. If `php craft up` later shows a project config notice after an update, see [Installation and updating](https://editrix.thebrandindustry.com/installation).
 
 ## Quick start
 
@@ -51,21 +51,11 @@ You can also install it from **Settings, Plugins** in the control panel. If `php
 | Export results and logs (CSV, JSON) | No | Yes |
 | Command line | No | Yes |
 
-Both editions can be tried for free in development and staging. See [Editions](docs/editions.md) for the details of each limit.
+Both editions can be tried for free in development and staging. See [Editions](https://editrix.thebrandindustry.com/editions) for the details of each limit.
 
 ## Documentation
 
-The full documentation is at [editrix.thebrandindustry.com](https://editrix.thebrandindustry.com/). The same pages are in the `docs` folder:
-
-- [Installation and updating](docs/installation.md)
-- [Searching](docs/searching.md)
-- [Replacing](docs/replacing.md)
-- [Logs and revert](docs/logs-and-revert.md)
-- [Large sites and the queue](docs/large-sites.md)
-- [Settings](docs/configuration.md)
-- [Command line](docs/command-line.md)
-- [Editions](docs/editions.md)
-- [Troubleshooting](docs/troubleshooting.md)
+The full documentation is at [editrix.thebrandindustry.com](https://editrix.thebrandindustry.com/).
 
 ## Support
 

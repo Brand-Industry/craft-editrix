@@ -4,6 +4,9 @@ All notable changes to Editrix will be documented in this file.
 
 ## [2.0.4] - 2026-11-03
 
+### Changed
+- The documentation now lives only on the documentation site, https://editrix.thebrandindustry.com/. The `docs` folder is no longer in the repository or in the Composer package, and the README links to the site
+
 ### Fixed
 - `LICENSE.md` now has the exact layout of the Craft License that Craft's own plugins use: it starts with the copyright line and the five conditions are numbered. The text of the license is the same
 
