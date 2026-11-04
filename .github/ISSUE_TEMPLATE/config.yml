@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Brand-Industry/craft-editrix/security/policy
+    about: Do not open a public issue. Read how to report it privately.
+  - name: Documentation
+    url: https://editrix.thebrandindustry.com/
+    about: Installation, editions, searching, replacing, logs and the command line
+  - name: Troubleshooting
+    url: https://editrix.thebrandindustry.com/troubleshooting
+    about: Known problems and how to solve them, for Craft 5 (Craft 4 pages are under /craft-4/)

@@ -1,0 +1,33 @@
+name: Feature Request
+description: Suggest a change or an addition to Editrix
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem you want solved before the solution you have in mind.
+        Do not paste client names or customer text.
+  - type: dropdown
+    id: line
+    attributes:
+      label: Which Craft version is this for?
+      options:
+        - Craft 5 (Editrix 2.x)
+        - Craft 4 (Editrix 1.x)
+        - Both
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like instead
+    validations:
+      required: true
