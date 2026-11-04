@@ -2,6 +2,11 @@
 
 All notable changes to Editrix will be documented in this file.
 
+## [2.0.4] - 2026-11-03
+
+### Fixed
+- `LICENSE.md` now has the exact layout of the Craft License that Craft's own plugins use: it starts with the copyright line and the five conditions are numbered. The text of the license is the same
+
 ## [2.0.3] - 2026-11-03
 
 ### Added
