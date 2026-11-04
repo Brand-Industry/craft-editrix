@@ -29,7 +29,7 @@
   "support": {
     "email": "editrix-support@thebrandindustry.com",
     "issues": "https://github.com/Brand-Industry/craft-editrix/issues",
-    "docs": "https://editrix.thebrandindustry.com/craft-4/"
+    "docs": "https://editrix.thebrandindustry.com/"
   },
   "require": {
     "php": "^8.0.2",
@@ -48,7 +48,7 @@
     "class": "brandindustry\\editrix\\Editrix",
     "developer": "Brand Industry",
     "developerUrl": "https://thebrandindustry.com/es",
-    "documentationUrl": "https://editrix.thebrandindustry.com/craft-4/",
+    "documentationUrl": "https://editrix.thebrandindustry.com/",
     "changelogUrl": "https://github.com/brand-industry/craft-editrix/blob/main/CHANGELOG.md"
   }
 }

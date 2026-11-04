@@ -2,6 +2,12 @@
 
 All notable changes to Editrix will be documented in this file.
 
+## [1.2.4] - 2026-11-03
+
+### Fixed
+- `LICENSE.md` now has the exact layout of the Craft License that Craft's own plugins use: it starts with the copyright line and the five conditions are numbered. The text of the license is the same
+- The documentation URL in `composer.json` (`extra.documentationUrl` and `support.docs`) is the root of the documentation site, as listed in the Plugin Store. The root links to the Craft 4 pages
+
 ## [1.2.3] - 2026-11-03
 
 ### Added
